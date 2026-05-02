@@ -158,6 +158,23 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Section: Administration — Commanders and Supervisors only */}
+      {(user.role === "commander" || user.role === "supervisor") && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+            ADMINISTRATION
+          </Text>
+          <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <SettingRow
+              icon="users"
+              label="Manage Users"
+              value="Officers & Roles"
+              onPress={() => router.push("/users")}
+            />
+          </View>
+        </View>
+      )}
+
       {/* Section: Operations */}
       <View style={styles.section}>
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>

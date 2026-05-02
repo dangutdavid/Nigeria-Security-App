@@ -43,14 +43,20 @@ export default function LoginScreen() {
     }
     setError("");
     setLoading(true);
-    const ok = await login(badge.trim(), pin.trim());
+    const result = await login(badge.trim(), pin.trim());
     setLoading(false);
-    if (ok) {
+    if (result === "ok") {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.replace("/(tabs)/");
     } else {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      setError("Invalid badge number or PIN. Please try again.");
+      if (result === "inactive") {
+        setError("This account is inactive. Contact your commander.");
+      } else if (result === "suspended") {
+        setError("This account has been suspended. Contact your commander.");
+      } else {
+        setError("Invalid badge number or PIN. Please try again.");
+      }
     }
   }
 
