@@ -28,8 +28,11 @@ import {
 // ---------------------------------------------------------------------------
 // Filter config
 // ---------------------------------------------------------------------------
-const STATUS_FILTERS: Array<{ label: string; value: IncidentStatus | "all" }> = [
+type StatusFilterValue = IncidentStatus | "all" | "open";
+
+const STATUS_FILTERS: Array<{ label: string; value: StatusFilterValue }> = [
   { label: "All", value: "all" },
+  { label: "Open", value: "open" },
   { label: "Submitted", value: "submitted" },
   { label: "Assigned", value: "assigned" },
   { label: "Review", value: "under_review" },
@@ -527,16 +530,18 @@ export default function CasesScreen() {
     if (s === "fatal" || s === "serious" || s === "minor" || s === "property_only") return s;
     return "all";
   })();
-  const initStatus = ((): IncidentStatus | "all" => {
+  const initStatus = ((): StatusFilterValue => {
     const s = params.status;
     if (s === "submitted" || s === "assigned" || s === "under_review" || s === "closed") return s;
-    if (s === "open") return "submitted"; // "open" is a meta-filter; default to submitted tab
+    if (s === "open") return "open";
     return "all";
   })();
+  const initTodayOnly = params.filter === "today";
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<IncidentStatus | "all">(initStatus);
+  const [statusFilter, setStatusFilter] = useState<StatusFilterValue>(initStatus);
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | "all">(initSeverity);
+  const [todayOnly, setTodayOnly] = useState(initTodayOnly);
   const [mineOnly, setMineOnly] = useState(false);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
@@ -546,15 +551,24 @@ export default function CasesScreen() {
   const locationBadge = selectedStates.length + selectedLGAs.length;
 
   const filtered = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
     return incidents.filter((inc) => {
       const matchSearch =
         !search ||
         inc.title.toLowerCase().includes(search.toLowerCase()) ||
         inc.id.toLowerCase().includes(search.toLowerCase()) ||
         inc.location.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = statusFilter === "all" || inc.status === statusFilter;
+
+      const matchStatus =
+        statusFilter === "all" ? true :
+        statusFilter === "open" ? inc.status !== "closed" :
+        inc.status === statusFilter;
+
       const matchSeverity = severityFilter === "all" || inc.severity === severityFilter;
       const matchMine = !mineOnly || inc.reportedBy === user?.id;
+      const matchToday = !todayOnly || new Date(inc.dateTime) >= todayStart;
 
       let matchLocation = true;
       if (selectedStates.length > 0) {
@@ -564,9 +578,9 @@ export default function CasesScreen() {
         matchLocation = selectedLGAs.includes(inc.lga ?? "");
       }
 
-      return matchSearch && matchStatus && matchSeverity && matchMine && matchLocation;
+      return matchSearch && matchStatus && matchSeverity && matchMine && matchToday && matchLocation;
     });
-  }, [incidents, search, statusFilter, severityFilter, mineOnly, user?.id, selectedStates, selectedLGAs]);
+  }, [incidents, search, statusFilter, severityFilter, mineOnly, todayOnly, user?.id, selectedStates, selectedLGAs]);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
@@ -747,6 +761,17 @@ export default function CasesScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        {/* Today-only active chip */}
+        {todayOnly && (
+          <View style={[styles.activeLocRow, { backgroundColor: colors.infoLight }]}>
+            <Feather name="calendar" size={12} color={colors.info} />
+            <Text style={[styles.activeLocText, { color: colors.info }]}>Today's incidents only</Text>
+            <TouchableOpacity onPress={() => setTodayOnly(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Feather name="x" size={13} color={colors.info} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Active location summary strip */}
         {locationActive && (

@@ -379,6 +379,7 @@ function Step1({ colors, form, update }: any) {
 
 function Step2({ colors, form, update }: any) {
   const [locating, setLocating] = useState(false);
+  const [lgaSearch, setLgaSearch] = useState("");
 
   async function getGPSLocation() {
     setLocating(true);
@@ -491,12 +492,29 @@ function Step2({ colors, form, update }: any) {
                   Pick an LGA in {form.state}
                 </Text>
               )}
+              {lgas.length > 8 && (
+                <View style={[s.lgaSearchBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                  <Feather name="search" size={13} color={colors.mutedForeground} />
+                  <TextInput
+                    style={[s.lgaSearchInput, { color: colors.text }]}
+                    placeholder={`Search ${lgas.length} LGAs…`}
+                    placeholderTextColor={colors.mutedForeground}
+                    value={lgaSearch}
+                    onChangeText={setLgaSearch}
+                  />
+                  {lgaSearch ? (
+                    <TouchableOpacity onPress={() => setLgaSearch("")}>
+                      <Feather name="x" size={13} color={colors.mutedForeground} />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              )}
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ gap: 8, paddingVertical: 6 }}
               >
-                {lgas.map((lga) => (
+                {lgas.filter((l) => !lgaSearch || l.toLowerCase().includes(lgaSearch.toLowerCase())).map((lga) => (
                   <TouchableOpacity
                     key={lga}
                     style={[
@@ -780,6 +798,7 @@ function Step5Review({ colors, form }: any) {
         <ReviewRow label="Severity" value={sevInfo?.label || "—"} colors={colors} valueColor={sevInfo?.color} />
         <ReviewRow label="Location" value={form.location || "—"} colors={colors} />
         <ReviewRow label="State" value={form.state || "—"} colors={colors} />
+        <ReviewRow label="LGA" value={form.lga || "—"} colors={colors} />
         <ReviewRow
           label="GPS"
           value={form.latitude ? `${form.latitude.toFixed(4)}, ${form.longitude.toFixed(4)}` : "Not captured"}
@@ -876,6 +895,8 @@ const s = StyleSheet.create({
   lgaSelectedText: { flex: 1, fontSize: 13, fontFamily: "Inter_600SemiBold" },
   lgaHint: { fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 2, fontStyle: "italic" },
   lgaDisabled: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
+  lgaSearchBox: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7, marginBottom: 2 },
+  lgaSearchInput: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", padding: 0 },
   addBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
   addBtnText: { fontSize: 13, fontFamily: "Inter_700Bold" },
   emptyHint: { fontSize: 13, fontFamily: "Inter_400Regular", fontStyle: "italic", marginBottom: 8 },

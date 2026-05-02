@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, UserRole } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -96,6 +97,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const router = useRouter();
+  const { isDark, toggleTheme } = useTheme();
 
   const [offlineMode, setOfflineMode] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
@@ -205,6 +207,22 @@ export default function ProfileScreen() {
             icon="plus-circle"
             label="New Incident Report"
             onPress={() => router.push("/report")}
+          />
+        </View>
+      </View>
+
+      {/* Section: Appearance */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
+          APPEARANCE
+        </Text>
+        <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <SettingRow
+            icon={isDark ? "moon" : "sun"}
+            label="Dark Mode"
+            toggle
+            toggled={isDark}
+            onToggle={toggleTheme}
           />
         </View>
       </View>
