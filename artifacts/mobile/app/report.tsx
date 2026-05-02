@@ -308,7 +308,7 @@ function Step1({ colors, form, update }: any) {
               s.optionCard,
               { borderColor: form.type === t.value ? t.color : colors.border, backgroundColor: form.type === t.value ? t.color + "12" : colors.card },
             ]}
-            onPress={() => update({ type: t.value })}
+            onPress={() => update({ type: t.value, severity: null })}
             activeOpacity={0.75}
           >
             <View style={[s.optionIcon, { backgroundColor: t.color + "18" }]}>
@@ -423,14 +423,6 @@ function Step2({ colors, form, update }: any) {
         onChangeText={(t: string) => update({ location: t })}
         multiline
       />
-      <FieldInput
-        colors={colors}
-        label="LGA"
-        placeholder="Local Government Area"
-        value={form.lga}
-        onChangeText={(t: string) => update({ lga: t })}
-      />
-
       <View>
         <Text style={[s.fieldLabel, { color: colors.mutedForeground }]}>State</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
@@ -445,6 +437,14 @@ function Step2({ colors, form, update }: any) {
           ))}
         </ScrollView>
       </View>
+
+      <FieldInput
+        colors={colors}
+        label="LGA"
+        placeholder="Local Government Area"
+        value={form.lga}
+        onChangeText={(t: string) => update({ lga: t })}
+      />
 
       <FieldInput
         colors={colors}
