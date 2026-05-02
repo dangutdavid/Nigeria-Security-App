@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIncidents, IncidentStatus, SeverityLevel } from "@/context/IncidentContext";
+import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { IncidentCard } from "@/components/IncidentCard";
 import {
@@ -516,11 +517,13 @@ export default function CasesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { incidents } = useIncidents();
+  const { user } = useAuth();
   const router = useRouter();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<IncidentStatus | "all">("all");
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | "all">("all");
+  const [mineOnly, setMineOnly] = useState(false);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
   const [selectedLGAs, setSelectedLGAs] = useState<string[]>([]);
@@ -537,6 +540,7 @@ export default function CasesScreen() {
         inc.location.toLowerCase().includes(search.toLowerCase());
       const matchStatus = statusFilter === "all" || inc.status === statusFilter;
       const matchSeverity = severityFilter === "all" || inc.severity === severityFilter;
+      const matchMine = !mineOnly || inc.reportedBy === user?.id;
 
       let matchLocation = true;
       if (selectedStates.length > 0) {
@@ -546,9 +550,9 @@ export default function CasesScreen() {
         matchLocation = selectedLGAs.includes(inc.lga ?? "");
       }
 
-      return matchSearch && matchStatus && matchSeverity && matchLocation;
+      return matchSearch && matchStatus && matchSeverity && matchMine && matchLocation;
     });
-  }, [incidents, search, statusFilter, severityFilter, selectedStates, selectedLGAs]);
+  }, [incidents, search, statusFilter, severityFilter, mineOnly, user?.id, selectedStates, selectedLGAs]);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
@@ -599,9 +603,8 @@ export default function CasesScreen() {
           ) : null}
         </View>
 
-        {/* Filter row: status + severity + location */}
+        {/* Filter row: status + Mine toggle */}
         <View style={styles.filterBarRow}>
-          {/* Status */}
           <FlatList
             horizontal
             data={STATUS_FILTERS}
@@ -638,6 +641,25 @@ export default function CasesScreen() {
               </TouchableOpacity>
             )}
           />
+          {/* Mine toggle */}
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              styles.filterChipSmall,
+              styles.filterChipRow,
+              {
+                backgroundColor: mineOnly ? colors.secondary : colors.muted,
+                borderColor: mineOnly ? colors.secondary : colors.border,
+                marginLeft: 6,
+              },
+            ]}
+            onPress={() => setMineOnly((v) => !v)}
+          >
+            <Feather name="user" size={11} color={mineOnly ? "#fff" : colors.mutedForeground} />
+            <Text style={[styles.filterLabel, { color: mineOnly ? "#fff" : colors.mutedForeground }]}>
+              Mine
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Severity + Location row */}
@@ -738,8 +760,14 @@ export default function CasesScreen() {
       <View style={[styles.countRow, { borderBottomColor: colors.border }]}>
         <Text style={[styles.countText, { color: colors.mutedForeground }]}>
           {filtered.length} {filtered.length === 1 ? "case" : "cases"}
+          {mineOnly ? " reported by me" : ""}
           {locationActive ? " in selected area" : ""}
         </Text>
+        {mineOnly && (
+          <TouchableOpacity onPress={() => setMineOnly(false)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            <Feather name="x-circle" size={14} color={colors.secondary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <FlatList
@@ -841,6 +869,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   filterChipSmall: { paddingVertical: 4, paddingHorizontal: 12 },
+  filterChipRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   filterLabel: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   locationBtn: {
     flexDirection: "row",
@@ -878,8 +907,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_500Medium",
   },
-  countRow: { paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1 },
-  countText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  countRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, gap: 6 },
+  countText: { flex: 1, fontSize: 12, fontFamily: "Inter_500Medium" },
   list: { padding: 16 },
   emptyList: { flex: 1 },
   emptyState: {

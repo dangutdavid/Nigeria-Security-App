@@ -7,6 +7,7 @@ import {
   Image,
   Platform,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -63,6 +64,41 @@ export default function CaseDetailScreen() {
 
   const incident = getIncident(id as string);
 
+  async function shareCase() {
+    if (!incident) return;
+    const victims = incident.victims.length > 0
+      ? `\nVictims: ${incident.victims.length} (${incident.victims.map((v) => v.condition).join(", ")})`
+      : "";
+    const vehicles = incident.vehicles.length > 0
+      ? `\nVehicles: ${incident.vehicles.map((v) => v.plate || "N/A").join(", ")}`
+      : "";
+    const text = [
+      `FRSC INCIDENT REPORT`,
+      `━━━━━━━━━━━━━━━━━━━━━`,
+      `Case ID: ${incident.id}`,
+      `Type: ${incident.type.toUpperCase()}`,
+      `Severity: ${incident.severity.toUpperCase()}`,
+      `Status: ${incident.status.replace("_", " ").toUpperCase()}`,
+      ``,
+      `Title: ${incident.title}`,
+      `Location: ${incident.location}${incident.state ? ` · ${incident.state}` : ""}${incident.lga ? ` / ${incident.lga}` : ""}`,
+      `Date/Time: ${formatDate(incident.dateTime)}`,
+      `Reported by: ${incident.reportedByName}`,
+      `${incident.assignedToName ? `Assigned to: ${incident.assignedToName}` : "Unassigned"}`,
+      victims,
+      vehicles,
+      ``,
+      `━━━━━━━━━━━━━━━━━━━━━`,
+      `FRSC Field Operations App`,
+    ].filter((l) => l !== "").join("\n");
+
+    try {
+      await Share.share({ message: text, title: `FRSC Case ${incident.id}` });
+    } catch {
+      // dismissed
+    }
+  }
+
   if (!incident) {
     return (
       <View style={[styles.notFound, { backgroundColor: colors.background }]}>
@@ -81,7 +117,7 @@ export default function CaseDetailScreen() {
   async function advanceStatus(next: IncidentStatus) {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const newTimeline = [
-      ...incident.timeline,
+      ...(incident?.timeline ?? []),
       {
         id: Date.now().toString(),
         action: `Status changed to ${next.replace("_", " ")}`,
@@ -96,7 +132,7 @@ export default function CaseDetailScreen() {
   async function addNote() {
     if (!noteText.trim()) return;
     const newTimeline = [
-      ...incident.timeline,
+      ...(incident?.timeline ?? []),
       {
         id: Date.now().toString(),
         action: `Note: ${noteText.trim()}`,
@@ -112,7 +148,7 @@ export default function CaseDetailScreen() {
 
   async function assignToOfficer(officerId: string, officerName: string) {
     const newTimeline = [
-      ...incident.timeline,
+      ...(incident?.timeline ?? []),
       {
         id: Date.now().toString(),
         action: `Assigned to ${officerName}`,
@@ -168,9 +204,14 @@ export default function CaseDetailScreen() {
               {incident.title}
             </Text>
           </View>
-          {incident.pendingSync && (
-            <Feather name="cloud-off" size={18} color={colors.warning} />
-          )}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            {incident.pendingSync && (
+              <Feather name="cloud-off" size={18} color={colors.warning} />
+            )}
+            <TouchableOpacity onPress={shareCase} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Feather name="share-2" size={20} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.badgesRow}>
@@ -192,6 +233,24 @@ export default function CaseDetailScreen() {
             </Text>
           </View>
         </View>
+
+        {/* State / LGA row */}
+        {(incident.state || incident.lga) && (
+          <View style={[styles.metaRow, { flexDirection: "row", flexWrap: "wrap" }]}>
+            {incident.state ? (
+              <View style={[styles.metaChip, { backgroundColor: colors.infoLight }]}>
+                <Feather name="flag" size={11} color={colors.info} />
+                <Text style={[styles.metaChipText, { color: colors.info }]}>{incident.state}</Text>
+              </View>
+            ) : null}
+            {incident.lga ? (
+              <View style={[styles.metaChip, { backgroundColor: colors.muted }]}>
+                <Feather name="layers" size={11} color={colors.mutedForeground} />
+                <Text style={[styles.metaChipText, { color: colors.mutedForeground }]}>{incident.lga}</Text>
+              </View>
+            ) : null}
+          </View>
+        )}
       </View>
 
       <ScrollView
@@ -480,6 +539,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_400Regular",
     flex: 1,
+  },
+  metaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  metaChipText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
   },
   scroll: { flex: 1 },
   section: {

@@ -21,23 +21,37 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 ### FRSC Field Operations (Mobile — Expo)
 A full-featured Nigeria Road Safety / FRSC field operations mobile app.
 
-**Features:**
-- Role-based authentication (Field Officer, Supervisor, Commander)
-- Home dashboard with metrics and quick actions
-- Multi-step crash/incident reporting wizard
-- Live incident map (react-native-maps)
-- Case list with search and filters (status + severity)
-- Case detail with timeline, vehicle/victim records, and notes
-- Alerts and notifications (role-aware)
-- Analytics & hotspot dashboard
-- Profile and settings (offline mode toggle, auto-sync)
-- Offline-first with AsyncStorage persistence
-- Seeded demo incidents for immediate use
+**Features (all screens fully built):**
+- Role-based authentication (Field Officer, Supervisor, Commander) — PIN-based
+- Home dashboard with metrics, duty banner, quick actions, "My Recent Reports" section, analytics shortcut
+- Multi-step crash/incident reporting wizard (5 steps: type/severity, location+GPS, victims, vehicles, evidence+submit)
+- Live incident map (react-native-maps) — severity + type filters, floating count, selected-incident card with direct navigation
+- Case list with advanced filtering: status tabs, severity chips, "Mine" toggle, location filter (state + LGA multi-select with GPS detect), active filter strip
+- Case detail with timeline, vehicle/victim records, notes, assignment modal, share/export (native Share sheet)
+- Case assignment (supervisor/commander) — modal with officer list
+- Alerts screen (role-aware: fatal open + unassigned for supervisors; dismissable cards)
+- Tab bar alert badge (computed from fatal open incidents + unassigned count)
+- Analytics & hotspots dashboard: incident type, severity grid, status breakdown, top LGAs by count, hotspot states ranking, operational insights
+- Profile and settings (offline mode toggle, dark mode, auto-sync, manage users, vehicle lookup link)
+- User management (list + create/edit form, role/status filtering)
+- Vehicle lookup (plate search)
+- Patrol/duty log (start/end duty, break, encounter logging, history, live elapsed timer)
+- Change PIN (strength meter, current PIN verification)
+- Offline-first with AsyncStorage persistence; pendingSync flag; SyncBanner
 
-**Demo accounts (PIN for all: 1234):**
-- `FO-001` — Field Officer
-- `SV-042` — Supervisor
-- `CMD-007` — Commander
+**Incident card shows:**
+- State chip (blue) + LGA chip (muted) for each incident
+- Severity-coloured icon, status badges, pending-sync cloud icon
+
+**Demo accounts (PIN 1234):**
+- `FO-001` — Field Officer (Okafor Emmanuel)
+- `SV-042` — Supervisor (Adaeze Nwosu)
+- `CMD-007` — Commander (Babatunde Adeyemi)
+- `FO-022`, `FO-037` — PIN 5678
+
+**Seed data storage key:** `@frsc_incidents_v2` (multi-state: Plateau, Kaduna, Kano, Rivers, Lagos, Nasarawa, FCT)
+
+**Nigeria LGA data:** `artifacts/mobile/data/nigeriaLGAs.ts` — all 37 states + FCT with full LGA lists
 
 **Location:** `artifacts/mobile/`
 

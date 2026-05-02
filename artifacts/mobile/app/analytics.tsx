@@ -50,23 +50,26 @@ export default function AnalyticsScreen() {
     const byType: Record<string, number> = {};
     const bySeverity: Record<string, number> = {};
     const byState: Record<string, number> = {};
+    const byLGA: Record<string, number> = {};
     const byStatus: Record<string, number> = {};
     const byMonth: Record<string, number> = {};
 
     incidents.forEach((inc) => {
       byType[inc.type] = (byType[inc.type] || 0) + 1;
       bySeverity[inc.severity] = (bySeverity[inc.severity] || 0) + 1;
-      byState[inc.state] = (byState[inc.state] || 0) + 1;
+      if (inc.state) byState[inc.state] = (byState[inc.state] || 0) + 1;
+      if (inc.lga) byLGA[inc.lga] = (byLGA[inc.lga] || 0) + 1;
       byStatus[inc.status] = (byStatus[inc.status] || 0) + 1;
       const month = new Date(inc.dateTime).toLocaleDateString("en-GB", { month: "short" });
       byMonth[month] = (byMonth[month] || 0) + 1;
     });
 
-    return { byType, bySeverity, byState, byStatus, byMonth };
+    return { byType, bySeverity, byState, byLGA, byStatus, byMonth };
   }, [incidents]);
 
   const maxType = Math.max(...Object.values(stats.byType), 1);
   const maxState = Math.max(...Object.values(stats.byState), 1);
+  const maxLGA = Math.max(...Object.values(stats.byLGA), 1);
 
   const typeColors: Record<string, string> = {
     crash: "#C0392B",
@@ -196,8 +199,44 @@ export default function AnalyticsScreen() {
           })}
         </Section>
 
+        {/* By LGA */}
+        {Object.keys(stats.byLGA).length > 0 && (
+          <Section title="TOP LGAs BY INCIDENT COUNT" colors={colors}>
+            {Object.entries(stats.byLGA)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 6)
+              .map(([lga, count], idx) => (
+                <View key={lga} style={styles.hotspotRow}>
+                  <View
+                    style={[
+                      styles.hotspotRank,
+                      {
+                        backgroundColor: idx === 0 ? colors.fatal : idx === 1 ? colors.warning : colors.muted,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.hotspotRankText,
+                        { color: idx < 2 ? "#fff" : colors.mutedForeground },
+                      ]}
+                    >
+                      {idx + 1}
+                    </Text>
+                  </View>
+                  <HorizontalBar
+                    label={lga}
+                    value={count}
+                    max={maxLGA}
+                    color={idx === 0 ? colors.fatal : idx === 1 ? colors.warning : colors.info}
+                  />
+                </View>
+              ))}
+          </Section>
+        )}
+
         {/* By state */}
-        <Section title="HOTSPOT AREAS" colors={colors}>
+        <Section title="HOTSPOT AREAS BY STATE" colors={colors}>
           {Object.entries(stats.byState)
             .sort((a, b) => b[1] - a[1])
             .slice(0, 8)

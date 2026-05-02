@@ -28,18 +28,31 @@ export default function MapScreen() {
   const router = useRouter();
   const [selected, setSelected] = useState<Incident | null>(null);
   const [filter, setFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
 
   const topPad = insets.top;
   const bottomPad = insets.bottom + 90;
 
-  const FILTERS = [
+  const SEVERITY_FILTERS = [
     { label: "All", value: "all" },
     { label: "Fatal", value: "fatal" },
     { label: "Serious", value: "serious" },
     { label: "Minor", value: "minor" },
   ];
 
-  const filtered = filter === "all" ? incidents : incidents.filter((i) => i.severity === filter);
+  const TYPE_FILTERS = [
+    { label: "All Types", value: "all" },
+    { label: "Crash", value: "crash" },
+    { label: "Breakdown", value: "breakdown" },
+    { label: "Hazard", value: "hazard" },
+    { label: "Flooding", value: "flooding" },
+  ];
+
+  const filtered = incidents.filter((i) => {
+    const sev = filter === "all" || i.severity === filter;
+    const typ = typeFilter === "all" || i.type === typeFilter;
+    return sev && typ;
+  });
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -50,9 +63,15 @@ export default function MapScreen() {
           { top: topPad + 8, backgroundColor: colors.card, shadowColor: "#000" },
         ]}
       >
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Live Map</Text>
+        <View style={styles.headerRow}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Live Map</Text>
+          <Text style={[styles.headerCount, { color: colors.mutedForeground }]}>
+            {filtered.length} incident{filtered.length !== 1 ? "s" : ""}
+          </Text>
+        </View>
+        {/* Severity filter */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersRow}>
-          {FILTERS.map((f) => (
+          {SEVERITY_FILTERS.map((f) => (
             <TouchableOpacity
               key={f.value}
               style={[
@@ -65,6 +84,27 @@ export default function MapScreen() {
               onPress={() => setFilter(f.value)}
             >
               <Text style={[styles.chipText, { color: filter === f.value ? "#fff" : colors.mutedForeground }]}>
+                {f.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        {/* Type filter */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.filtersRow, { marginTop: 4 }]}>
+          {TYPE_FILTERS.map((f) => (
+            <TouchableOpacity
+              key={f.value}
+              style={[
+                styles.chip,
+                styles.chipSmall,
+                {
+                  backgroundColor: typeFilter === f.value ? colors.secondary : colors.muted,
+                  borderColor: typeFilter === f.value ? colors.secondary : colors.border,
+                },
+              ]}
+              onPress={() => setTypeFilter(f.value)}
+            >
+              <Text style={[styles.chipText, { color: typeFilter === f.value ? "#fff" : colors.mutedForeground }]}>
                 {f.label}
               </Text>
             </TouchableOpacity>
@@ -91,11 +131,6 @@ export default function MapScreen() {
             />
           ))}
         </MapView>
-
-      {/* Incident count pill */}
-      <View style={[styles.countPill, { backgroundColor: colors.primary }]}>
-        <Text style={styles.countText}>{filtered.length} incidents</Text>
-      </View>
 
       {/* Legend */}
       <View style={[styles.legend, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -172,10 +207,19 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 5,
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
   headerTitle: {
     fontSize: 18,
     fontFamily: "Inter_700Bold",
-    marginBottom: 8,
+  },
+  headerCount: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
   },
   filtersRow: {
     gap: 6,
@@ -186,6 +230,10 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1,
+  },
+  chipSmall: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
   chipText: {
     fontSize: 12,

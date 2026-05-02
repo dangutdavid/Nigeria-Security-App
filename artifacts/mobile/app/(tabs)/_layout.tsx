@@ -4,7 +4,7 @@ import { Redirect, Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
-import React from "react";
+import React, { useMemo } from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
@@ -43,7 +43,19 @@ function ClassicTabLayout() {
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
-  const { pendingCount } = useIncidents();
+  const { incidents } = useIncidents();
+  const { user } = useAuth();
+
+  const alertBadge = useMemo(() => {
+    let count = 0;
+    const fatalOpen = incidents.filter((i) => i.severity === "fatal" && i.status !== "closed").length;
+    count += Math.min(fatalOpen, 2);
+    if (user?.role === "supervisor" || user?.role === "commander") {
+      const unassigned = incidents.filter((i) => i.status === "submitted").length;
+      if (unassigned > 0) count += 1;
+    }
+    return count > 0 ? count : undefined;
+  }, [incidents, user?.role]);
 
   return (
     <Tabs
@@ -118,7 +130,7 @@ function ClassicTabLayout() {
         name="alerts"
         options={{
           title: "Alerts",
-          tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
+          tabBarBadge: alertBadge,
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="bell.fill" tintColor={color} size={22} />

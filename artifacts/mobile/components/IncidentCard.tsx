@@ -53,6 +53,24 @@ export function IncidentCard({ incident }: IncidentCardProps) {
         </Text>
       </View>
 
+      {/* State / LGA chips */}
+      {(incident.state || incident.lga) && (
+        <View style={styles.locationChips}>
+          {incident.state ? (
+            <View style={[styles.locChip, { backgroundColor: colors.infoLight }]}>
+              <Feather name="flag" size={10} color={colors.info} />
+              <Text style={[styles.locChipText, { color: colors.info }]}>{incident.state}</Text>
+            </View>
+          ) : null}
+          {incident.lga ? (
+            <View style={[styles.locChip, { backgroundColor: colors.muted }]}>
+              <Feather name="map" size={10} color={colors.mutedForeground} />
+              <Text style={[styles.locChipText, { color: colors.mutedForeground }]}>{incident.lga}</Text>
+            </View>
+          ) : null}
+        </View>
+      )}
+
       <View style={styles.footer}>
         <View style={styles.badges}>
           <StatusBadge type="severity" value={incident.severity} small />
@@ -157,5 +175,24 @@ const styles = StyleSheet.create({
   time: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
+  },
+  locationChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 10,
+    marginTop: -4,
+  },
+  locChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  locChipText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
   },
 });

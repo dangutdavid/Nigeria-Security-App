@@ -203,7 +203,7 @@ const SEED_INCIDENTS: Incident[] = [
       { id: "pv4", plate: "JOS-009-CC", make: "Bajaj", model: "Boxer", colour: "Black", type: "motorcycle" },
     ],
     victims: [
-      { id: "pvt4", name: "Sunday Pam", age: "22", gender: "male", condition: "stable", hospital: "Riyom Health Centre" },
+      { id: "pvt4", name: "Sunday Pam", age: "22", gender: "male", condition: "injured", hospital: "Riyom Health Centre" },
     ],
     evidence: [],
     reportedBy: "u1",
@@ -260,7 +260,7 @@ const SEED_INCIDENTS: Incident[] = [
     description: "Two vehicles collided in low-visibility conditions. No street lighting on this stretch.",
     vehicles: [
       { id: "kv1", plate: "KD-800-EE", make: "Peugeot", model: "307", colour: "Grey", type: "car" },
-      { id: "kv2", plate: "KD-300-FF", make: "Toyota", model: "Land Cruiser", colour: "White", type: "suv" },
+      { id: "kv2", plate: "KD-300-FF", make: "Toyota", model: "Land Cruiser", colour: "White", type: "other" },
     ],
     victims: [
       { id: "kvt1", name: "Aminu Bala", age: "42", gender: "male", condition: "deceased", hospital: "Barau Dikko Teaching Hospital" },

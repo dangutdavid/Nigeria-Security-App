@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -70,6 +70,13 @@ export default function PatrolLogScreen() {
   const [encounterDesc, setEncounterDesc] = useState("");
   const [encounterPlate, setEncounterPlate] = useState("");
   const [tab, setTab] = useState<"active" | "history">("active");
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!activeSession) return;
+    const id = setInterval(() => setTick((t) => t + 1), 30000);
+    return () => clearInterval(id);
+  }, [activeSession?.id]);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 20);

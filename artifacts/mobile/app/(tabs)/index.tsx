@@ -61,6 +61,11 @@ export default function HomeScreen() {
     [incidents]
   );
 
+  const myReports = useMemo(
+    () => incidents.filter((i) => i.reportedBy === user?.id).slice(0, 3),
+    [incidents, user?.id]
+  );
+
   const greeting = getGreeting();
 
   function onQuickAction(route: string) {
@@ -244,6 +249,23 @@ export default function HomeScreen() {
             </View>
             <Feather name="chevron-right" size={18} color="rgba(255,255,255,0.7)" />
           </TouchableOpacity>
+        )}
+
+        {/* My recent reports (field officers) */}
+        {myReports.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
+                MY RECENT REPORTS
+              </Text>
+              <TouchableOpacity onPress={() => router.push("/(tabs)/cases")}>
+                <Text style={[styles.seeAll, { color: colors.primary }]}>All cases</Text>
+              </TouchableOpacity>
+            </View>
+            {myReports.map((inc) => (
+              <IncidentCard key={inc.id} incident={inc} />
+            ))}
+          </View>
         )}
 
         {/* Recent incidents */}
