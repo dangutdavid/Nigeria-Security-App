@@ -60,6 +60,21 @@ const SEVERITY_LEVELS: Array<{ value: SeverityLevel; label: string; desc: string
   { value: "property_only", label: "Property Damage", desc: "No injuries", color: "#6B7A8A" },
 ];
 
+// Which severity levels are applicable per incident type
+const TYPE_SEVERITY_MAP: Record<IncidentType, SeverityLevel[]> = {
+  crash:     ["fatal", "serious", "minor", "property_only"],
+  breakdown: ["minor", "property_only"],
+  hazard:    ["fatal", "serious", "minor", "property_only"],
+  flooding:  ["fatal", "serious", "minor", "property_only"],
+};
+
+const TYPE_SEVERITY_HINT: Record<IncidentType, string> = {
+  crash:     "Select the highest level of injury sustained",
+  breakdown: "Breakdowns typically result in minor injury or property damage only",
+  hazard:    "Rate the actual or potential harm caused by this hazard",
+  flooding:  "Select based on persons affected or vehicles submerged",
+};
+
 const NIGERIA_STATES = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
   "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT", "Gombe", "Imo",
@@ -320,27 +335,43 @@ function Step1({ colors, form, update }: any) {
         ))}
       </View>
 
-      <Text style={[s.sectionTitle, { color: colors.mutedForeground, marginTop: 8 }]}>SEVERITY</Text>
-      <View style={{ gap: 8 }}>
-        {SEVERITY_LEVELS.map((sev) => (
-          <TouchableOpacity
-            key={sev.value}
-            style={[
-              s.sevCard,
-              { borderColor: form.severity === sev.value ? sev.color : colors.border, backgroundColor: form.severity === sev.value ? sev.color + "12" : colors.card },
-            ]}
-            onPress={() => update({ severity: sev.value })}
-            activeOpacity={0.75}
-          >
-            <View style={[s.sevDot, { backgroundColor: sev.color }]} />
-            <View style={{ flex: 1 }}>
-              <Text style={[s.sevLabel, { color: colors.text }]}>{sev.label}</Text>
-              <Text style={[s.sevDesc, { color: colors.mutedForeground }]}>{sev.desc}</Text>
-            </View>
-            {form.severity === sev.value && <Feather name="check-circle" size={20} color={sev.color} />}
-          </TouchableOpacity>
-        ))}
-      </View>
+      {form.type ? (
+        <>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+            <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>SEVERITY</Text>
+          </View>
+          <Text style={[s.sevHint, { color: colors.mutedForeground }]}>
+            {TYPE_SEVERITY_HINT[form.type as IncidentType]}
+          </Text>
+          <View style={{ gap: 8 }}>
+            {SEVERITY_LEVELS.filter((sev) => TYPE_SEVERITY_MAP[form.type as IncidentType].includes(sev.value)).map((sev) => (
+              <TouchableOpacity
+                key={sev.value}
+                style={[
+                  s.sevCard,
+                  { borderColor: form.severity === sev.value ? sev.color : colors.border, backgroundColor: form.severity === sev.value ? sev.color + "12" : colors.card },
+                ]}
+                onPress={() => update({ severity: sev.value })}
+                activeOpacity={0.75}
+              >
+                <View style={[s.sevDot, { backgroundColor: sev.color }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.sevLabel, { color: colors.text }]}>{sev.label}</Text>
+                  <Text style={[s.sevDesc, { color: colors.mutedForeground }]}>{sev.desc}</Text>
+                </View>
+                {form.severity === sev.value && <Feather name="check-circle" size={20} color={sev.color} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      ) : (
+        <View style={[s.sevPlaceholder, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+          <Feather name="arrow-up" size={16} color={colors.mutedForeground} />
+          <Text style={[s.sevPlaceholderText, { color: colors.mutedForeground }]}>
+            Select an incident type above to see severity options
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -787,6 +818,9 @@ const s = StyleSheet.create({
   sevDot: { width: 14, height: 14, borderRadius: 7 },
   sevLabel: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   sevDesc: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  sevHint: { fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 4, marginTop: -4, fontStyle: "italic" },
+  sevPlaceholder: { flexDirection: "row", alignItems: "center", gap: 8, padding: 16, borderRadius: 12, borderWidth: 1, borderStyle: "dashed" },
+  sevPlaceholderText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
   fieldLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6 },
   textInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: "Inter_400Regular" },
   stateChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
