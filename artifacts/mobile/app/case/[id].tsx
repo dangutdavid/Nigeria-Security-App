@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useIncidents, IncidentStatus, Victim, Vehicle } from "@/context/IncidentContext";
+import { Modal } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { StatusBadge } from "@/components/StatusBadge";
 
@@ -50,10 +51,14 @@ export default function CaseDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getIncident, updateIncident } = useIncidents();
-  const { user } = useAuth();
+  const { user, allUsers } = useAuth();
+  const assignableUsers = allUsers.filter(
+    (u) => u.status === "active" && u.id !== incident?.reportedBy
+  );
 
   const [noteText, setNoteText] = useState("");
   const [addingNote, setAddingNote] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
 
   const incident = getIncident(id as string);
 
@@ -103,6 +108,28 @@ export default function CaseDetailScreen() {
     setAddingNote(false);
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
+
+  async function assignToOfficer(officerId: string, officerName: string) {
+    const newTimeline = [
+      ...incident.timeline,
+      {
+        id: Date.now().toString(),
+        action: `Assigned to ${officerName}`,
+        by: user?.name || "",
+        timestamp: new Date().toISOString(),
+      },
+    ];
+    await updateIncident(id as string, {
+      assignedTo: officerId,
+      assignedToName: officerName,
+      timeline: newTimeline,
+    });
+    setShowAssignModal(false);
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert("Assigned", `Case assigned to ${officerName}.`);
+  }
+
+  const canAssign = (user?.role === "supervisor" || user?.role === "commander") && incident?.status !== "closed";
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 20);
@@ -253,14 +280,79 @@ export default function CaseDetailScreen() {
               <Text style={[styles.assignLabel, { color: colors.mutedForeground }]}>Reported by</Text>
               <Text style={[styles.assignValue, { color: colors.text }]}>{incident.reportedByName}</Text>
             </View>
-            {incident.assignedToName && (
-              <View style={styles.assignItem}>
-                <Text style={[styles.assignLabel, { color: colors.mutedForeground }]}>Assigned to</Text>
+            <View style={styles.assignItem}>
+              <Text style={[styles.assignLabel, { color: colors.mutedForeground }]}>Assigned to</Text>
+              {incident.assignedToName ? (
                 <Text style={[styles.assignValue, { color: colors.text }]}>{incident.assignedToName}</Text>
-              </View>
-            )}
+              ) : (
+                <Text style={[styles.assignValue, { color: colors.mutedForeground }]}>Unassigned</Text>
+              )}
+            </View>
           </View>
+          {canAssign && (
+            <TouchableOpacity
+              onPress={() => setShowAssignModal(true)}
+              style={[styles.assignBtn, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "30" }]}
+            >
+              <Feather name="user-check" size={15} color={colors.primary} />
+              <Text style={[styles.assignBtnText, { color: colors.primary }]}>
+                {incident.assignedToName ? "Reassign Case" : "Assign to Officer"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </Section>
+
+        {/* Assign modal */}
+        <Modal visible={showAssignModal} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Assign Case</Text>
+                <TouchableOpacity onPress={() => setShowAssignModal(false)}>
+                  <Feather name="x" size={20} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              </View>
+              <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
+                Select an active officer to assign this case
+              </Text>
+              <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+                {assignableUsers.map((u) => (
+                  <TouchableOpacity
+                    key={u.id}
+                    onPress={() => assignToOfficer(u.id, u.name)}
+                    style={[
+                      styles.assigneeRow,
+                      {
+                        backgroundColor: incident.assignedTo === u.id ? colors.primary + "12" : "transparent",
+                        borderColor: incident.assignedTo === u.id ? colors.primary + "40" : colors.border,
+                      },
+                    ]}
+                  >
+                    <View style={[styles.assigneeAvatar, { backgroundColor: colors.primary + "18" }]}>
+                      <Text style={[styles.assigneeInitials, { color: colors.primary }]}>
+                        {u.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.assigneeName, { color: colors.text }]}>{u.name}</Text>
+                      <Text style={[styles.assigneeBadge, { color: colors.mutedForeground }]}>
+                        {u.badgeNumber} · {u.station}
+                      </Text>
+                    </View>
+                    {incident.assignedTo === u.id && (
+                      <Feather name="check" size={18} color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+                {assignableUsers.length === 0 && (
+                  <Text style={[styles.modalSub, { color: colors.mutedForeground, textAlign: "center", padding: 20 }]}>
+                    No active officers available
+                  </Text>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
 
         {/* Timeline */}
         <Section title="TIMELINE" colors={colors}>
@@ -558,5 +650,73 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 13,
     fontFamily: "Inter_700Bold",
+  },
+  assignBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  assignBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 36,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
+  },
+  modalSub: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    marginBottom: 14,
+  },
+  assigneeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  assigneeAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  assigneeInitials: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+  },
+  assigneeName: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  assigneeBadge: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: 2,
   },
 });

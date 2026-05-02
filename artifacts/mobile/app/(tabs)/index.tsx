@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, UserRole } from "@/context/AuthContext";
 import { useIncidents } from "@/context/IncidentContext";
+import { usePatrol } from "@/context/PatrolContext";
 import { useColors } from "@/hooks/useColors";
 import { IncidentCard } from "@/components/IncidentCard";
 import { MetricCard } from "@/components/MetricCard";
@@ -26,9 +27,9 @@ const ROLE_LABEL: Record<UserRole, string> = {
 
 const QUICK_ACTIONS = [
   { label: "Report Crash", icon: "alert-triangle", color: "#C0392B", route: "/report" },
-  { label: "Breakdown", icon: "tool", color: "#E67E22", route: "/report?type=breakdown" },
-  { label: "Hazard", icon: "alert-circle", color: "#C8960C", route: "/report?type=hazard" },
-  { label: "View Map", icon: "map", color: "#2C7BE5", route: "/(tabs)/map" },
+  { label: "Vehicle Lookup", icon: "truck", color: "#2C7BE5", route: "/vehicle-lookup" },
+  { label: "Patrol Log", icon: "clipboard", color: "#1B5E3B", route: "/patrol-log" },
+  { label: "View Map", icon: "map", color: "#6B7A8A", route: "/(tabs)/map" },
 ];
 
 export default function HomeScreen() {
@@ -36,6 +37,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { incidents } = useIncidents();
+  const { activeSession } = usePatrol();
   const router = useRouter();
 
   const stats = useMemo(() => {
@@ -111,6 +113,57 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <SyncBanner />
+
+        {/* Duty status banner */}
+        {activeSession && (
+          <TouchableOpacity
+            onPress={() => router.push("/patrol-log")}
+            style={[
+              styles.dutyBanner,
+              {
+                backgroundColor:
+                  activeSession.status === "on_duty"
+                    ? colors.successLight
+                    : colors.warningLight,
+                borderColor:
+                  activeSession.status === "on_duty"
+                    ? colors.success + "40"
+                    : colors.warning + "40",
+              },
+            ]}
+            activeOpacity={0.8}
+          >
+            <View
+              style={[
+                styles.dutyDot,
+                {
+                  backgroundColor:
+                    activeSession.status === "on_duty" ? colors.success : colors.warning,
+                },
+              ]}
+            />
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[
+                  styles.dutyTitle,
+                  {
+                    color:
+                      activeSession.status === "on_duty" ? colors.success : colors.warning,
+                  },
+                ]}
+              >
+                {activeSession.status === "on_duty" ? "On Duty" : "On Break"}
+              </Text>
+              <Text
+                style={[styles.dutySub, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+              >
+                {activeSession.route} · {activeSession.encounters.length} entries
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        )}
 
         {/* Quick actions */}
         <View style={styles.section}>
@@ -393,5 +446,29 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 6,
+  },
+  dutyBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginHorizontal: 16,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  dutyDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  dutyTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+  },
+  dutySub: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: 1,
   },
 });

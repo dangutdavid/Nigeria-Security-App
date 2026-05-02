@@ -187,6 +187,16 @@ export default function ProfileScreen() {
             onPress={() => router.push("/analytics")}
           />
           <SettingRow
+            icon="truck"
+            label="Vehicle Lookup"
+            onPress={() => router.push("/vehicle-lookup")}
+          />
+          <SettingRow
+            icon="clipboard"
+            label="Duty & Patrol Log"
+            onPress={() => router.push("/patrol-log")}
+          />
+          <SettingRow
             icon="list"
             label="My Reports"
             onPress={() => router.push("/(tabs)/cases")}
@@ -277,7 +287,7 @@ export default function ProfileScreen() {
           <SettingRow
             icon="lock"
             label="Change PIN"
-            onPress={() => {}}
+            onPress={() => router.push("/change-pin")}
           />
         </View>
       </View>

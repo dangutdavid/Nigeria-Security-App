@@ -16,6 +16,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { IncidentProvider } from "@/context/IncidentContext";
+import { PatrolProvider } from "@/context/PatrolContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -30,14 +31,13 @@ function RootLayoutNav() {
         name="report"
         options={{ headerShown: false, presentation: "modal" }}
       />
-      <Stack.Screen
-        name="case/[id]"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="analytics"
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="case/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="analytics" options={{ headerShown: false }} />
+      <Stack.Screen name="users" options={{ headerShown: false }} />
+      <Stack.Screen name="user-form" options={{ headerShown: false }} />
+      <Stack.Screen name="vehicle-lookup" options={{ headerShown: false }} />
+      <Stack.Screen name="patrol-log" options={{ headerShown: false }} />
+      <Stack.Screen name="change-pin" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -64,11 +64,13 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <IncidentProvider>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <KeyboardProvider>
-                  <RootLayoutNav />
-                </KeyboardProvider>
-              </GestureHandlerRootView>
+              <PatrolProvider>
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <KeyboardProvider>
+                    <RootLayoutNav />
+                  </KeyboardProvider>
+                </GestureHandlerRootView>
+              </PatrolProvider>
             </IncidentProvider>
           </AuthProvider>
         </QueryClientProvider>
