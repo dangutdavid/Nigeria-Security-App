@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -270,6 +271,20 @@ export default function CaseDetailScreen() {
                 </Text>
               </View>
             ))}
+          </Section>
+        )}
+
+        {/* Evidence */}
+        {incident.evidence.length > 0 && (
+          <Section title={`EVIDENCE (${incident.evidence.length})`} colors={colors}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+              {incident.evidence.map((uri, idx) => (
+                <View key={uri} style={styles.evidenceItem}>
+                  <Image source={{ uri }} style={styles.evidenceImg} resizeMode="cover" />
+                  <Text style={[styles.evidenceIdx, { color: colors.mutedForeground }]}>#{idx + 1}</Text>
+                </View>
+              ))}
+            </ScrollView>
           </Section>
         )}
 
@@ -556,6 +571,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
+  },
+  evidenceItem: {
+    width: 110,
+    alignItems: "center",
+  },
+  evidenceImg: {
+    width: 110,
+    height: 90,
+    borderRadius: 10,
+  },
+  evidenceIdx: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    marginTop: 4,
+    textAlign: "center",
   },
   assignRow: {
     flexDirection: "row",

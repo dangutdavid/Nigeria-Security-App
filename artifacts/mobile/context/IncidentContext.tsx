@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import * as Network from "expo-network";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 
 export type IncidentType = "crash" | "breakdown" | "hazard" | "flooding";
 export type SeverityLevel = "fatal" | "serious" | "minor" | "property_only";
@@ -341,10 +342,25 @@ export function IncidentProvider({ children }: { children: React.ReactNode }) {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [isOffline, setIsOffline] = useState(false);
   const [draft, setDraft] = useState<DraftReport>(DEFAULT_DRAFT);
+  const isOfflineRef = useRef(false);
 
   useEffect(() => {
     loadIncidents();
+    checkNetwork();
+    const interval = setInterval(checkNetwork, 7000);
+    return () => clearInterval(interval);
   }, []);
+
+  async function checkNetwork() {
+    try {
+      const state = await Network.getNetworkStateAsync();
+      const offline = !state.isConnected || state.isInternetReachable === false;
+      isOfflineRef.current = offline;
+      setIsOffline(offline);
+    } catch {
+      // keep previous value
+    }
+  }
 
   async function loadIncidents() {
     try {
@@ -366,7 +382,8 @@ export function IncidentProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function addIncident(incident: Incident) {
-    const updated = [incident, ...incidents];
+    const toSave = { ...incident, pendingSync: isOfflineRef.current };
+    const updated = [toSave, ...incidents];
     await saveIncidents(updated);
   }
 
@@ -382,8 +399,17 @@ export function IncidentProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function syncPending() {
+    try {
+      const state = await Network.getNetworkStateAsync();
+      if (!state.isConnected) {
+        return;
+      }
+    } catch {
+      return;
+    }
     const updated = incidents.map((i) => ({ ...i, pendingSync: false }));
     await saveIncidents(updated);
+    isOfflineRef.current = false;
     setIsOffline(false);
   }
 
