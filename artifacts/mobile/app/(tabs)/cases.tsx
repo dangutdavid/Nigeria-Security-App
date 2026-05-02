@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Location from "expo-location";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -519,10 +519,24 @@ export default function CasesScreen() {
   const { incidents } = useIncidents();
   const { user } = useAuth();
   const router = useRouter();
+  const params = useLocalSearchParams<{ severity?: string; status?: string; filter?: string }>();
+
+  // Resolve initial filter from navigation params (deep-link from home/analytics cards)
+  const initSeverity = ((): SeverityLevel | "all" => {
+    const s = params.severity;
+    if (s === "fatal" || s === "serious" || s === "minor" || s === "property_only") return s;
+    return "all";
+  })();
+  const initStatus = ((): IncidentStatus | "all" => {
+    const s = params.status;
+    if (s === "submitted" || s === "assigned" || s === "under_review" || s === "closed") return s;
+    if (s === "open") return "submitted"; // "open" is a meta-filter; default to submitted tab
+    return "all";
+  })();
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<IncidentStatus | "all">("all");
-  const [severityFilter, setSeverityFilter] = useState<SeverityLevel | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<IncidentStatus | "all">(initStatus);
+  const [severityFilter, setSeverityFilter] = useState<SeverityLevel | "all">(initSeverity);
   const [mineOnly, setMineOnly] = useState(false);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [selectedStates, setSelectedStates] = useState<string[]>([]);

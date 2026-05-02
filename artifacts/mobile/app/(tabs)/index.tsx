@@ -105,10 +105,10 @@ export default function HomeScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.statsRow}
         >
-          <StatPill label="Total" value={stats.total} />
-          <StatPill label="Today" value={stats.today} />
-          <StatPill label="Open" value={stats.open} highlight />
-          <StatPill label="Fatal" value={stats.fatal} danger />
+          <StatPill label="Total" value={stats.total} onPress={() => router.push({ pathname: "/(tabs)/cases" } as any)} />
+          <StatPill label="Today" value={stats.today} onPress={() => router.push({ pathname: "/(tabs)/cases", params: { filter: "today" } } as any)} />
+          <StatPill label="Open" value={stats.open} highlight onPress={() => router.push({ pathname: "/(tabs)/cases", params: { status: "open" } } as any)} />
+          <StatPill label="Fatal" value={stats.fatal} danger onPress={() => router.push({ pathname: "/(tabs)/cases", params: { severity: "fatal" } } as any)} />
         </ScrollView>
       </View>
 
@@ -296,16 +296,25 @@ export default function HomeScreen() {
   );
 }
 
-function StatPill({ label, value, highlight, danger }: { label: string; value: number; highlight?: boolean; danger?: boolean }) {
+function StatPill({
+  label, value, highlight, danger, onPress,
+}: {
+  label: string; value: number; highlight?: boolean; danger?: boolean; onPress?: () => void;
+}) {
   return (
-    <View style={[
-      pillStyles.pill,
-      danger && { backgroundColor: "rgba(192,57,43,0.3)" },
-      highlight && { backgroundColor: "rgba(255,255,255,0.2)" },
-    ]}>
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={onPress ? 0.7 : 1}
+      style={[
+        pillStyles.pill,
+        danger && { backgroundColor: "rgba(192,57,43,0.3)" },
+        highlight && { backgroundColor: "rgba(255,255,255,0.2)" },
+        onPress && pillStyles.pillTappable,
+      ]}
+    >
       <Text style={pillStyles.value}>{value}</Text>
       <Text style={pillStyles.label}>{label}</Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -318,6 +327,10 @@ const pillStyles = StyleSheet.create({
     alignItems: "center",
     marginRight: 8,
     minWidth: 70,
+  },
+  pillTappable: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.25)",
   },
   value: {
     fontSize: 22,

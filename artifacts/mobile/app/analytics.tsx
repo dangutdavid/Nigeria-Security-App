@@ -127,14 +127,18 @@ export default function AnalyticsScreen() {
       >
         {/* Casualty summary */}
         <View style={styles.row}>
-          <SummaryCard colors={colors} label="Total Incidents" value={incidents.length} icon="activity" color={colors.primary} />
+          <SummaryCard colors={colors} label="Total Incidents" value={incidents.length} icon="activity" color={colors.primary}
+            onPress={() => router.push("/(tabs)/cases" as any)} />
           <View style={{ width: 10 }} />
-          <SummaryCard colors={colors} label="Fatalities" value={fatalVictims} icon="alert-octagon" color={colors.fatal} />
+          <SummaryCard colors={colors} label="Fatal Crashes" value={stats.bySeverity["fatal"] || 0} icon="alert-triangle" color={colors.fatal}
+            onPress={() => router.push({ pathname: "/(tabs)/cases", params: { severity: "fatal" } } as any)} />
         </View>
         <View style={[styles.row, { marginTop: 10 }]}>
-          <SummaryCard colors={colors} label="Serious Injuries" value={seriousVictims} icon="user-x" color={colors.warning} />
+          <SummaryCard colors={colors} label="Pending Review" value={(stats.byStatus["submitted"] || 0) + (stats.byStatus["under_review"] || 0)} icon="clock" color={colors.warning}
+            onPress={() => router.push({ pathname: "/(tabs)/cases", params: { status: "open" } } as any)} />
           <View style={{ width: 10 }} />
-          <SummaryCard colors={colors} label="Total Casualties" value={totalCasualties} icon="users" color={colors.info} />
+          <SummaryCard colors={colors} label="Closed Cases" value={stats.byStatus["closed"] || 0} icon="check-circle" color={colors.success}
+            onPress={() => router.push({ pathname: "/(tabs)/cases", params: { status: "closed" } } as any)} />
         </View>
 
         {/* By type */}
@@ -154,8 +158,10 @@ export default function AnalyticsScreen() {
         <Section title="BY SEVERITY" colors={colors}>
           <View style={styles.sevGrid}>
             {Object.entries(stats.bySeverity).map(([sev, count]) => (
-              <View
+              <TouchableOpacity
                 key={sev}
+                activeOpacity={0.75}
+                onPress={() => router.push({ pathname: "/(tabs)/cases", params: { severity: sev } } as any)}
                 style={[
                   styles.sevCard,
                   { borderColor: severityColors[sev] + "44", backgroundColor: severityColors[sev] + "10" },
@@ -165,7 +171,7 @@ export default function AnalyticsScreen() {
                 <Text style={[styles.sevLabel, { color: colors.mutedForeground }]}>
                   {sev.replace("_", " ")}
                 </Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         </Section>
@@ -176,7 +182,12 @@ export default function AnalyticsScreen() {
             const total = incidents.length;
             const pct = total > 0 ? Math.round((count / total) * 100) : 0;
             return (
-              <View key={status} style={styles.statusRow}>
+              <TouchableOpacity
+                key={status}
+                activeOpacity={0.75}
+                onPress={() => router.push({ pathname: "/(tabs)/cases", params: { status } } as any)}
+                style={styles.statusRow}
+              >
                 <Text style={[styles.statusLabel, { color: colors.text }]}>
                   {status.replace("_", " ")}
                 </Text>
@@ -194,7 +205,8 @@ export default function AnalyticsScreen() {
                 <Text style={[styles.statusPct, { color: colors.mutedForeground }]}>
                   {pct}%
                 </Text>
-              </View>
+                <Feather name="chevron-right" size={13} color={colors.mutedForeground} />
+              </TouchableOpacity>
             );
           })}
         </Section>
@@ -301,15 +313,24 @@ export default function AnalyticsScreen() {
   );
 }
 
-function SummaryCard({ colors, label, value, icon, color }: any) {
+function SummaryCard({ colors, label, value, icon, color, onPress }: any) {
   return (
-    <View style={[sc.card, { backgroundColor: colors.card, borderColor: colors.border, flex: 1 }]}>
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={onPress ? 0.75 : 1}
+      style={[sc.card, { backgroundColor: colors.card, borderColor: colors.border, flex: 1 }]}
+    >
       <View style={[sc.icon, { backgroundColor: color + "18" }]}>
         <Feather name={icon} size={20} color={color} />
       </View>
       <Text style={[sc.value, { color: colors.text }]}>{value}</Text>
       <Text style={[sc.label, { color: colors.mutedForeground }]}>{label}</Text>
-    </View>
+      {onPress && (
+        <View style={sc.drill}>
+          <Feather name="chevron-right" size={12} color={colors.mutedForeground} />
+        </View>
+      )}
+    </TouchableOpacity>
   );
 }
 
@@ -318,6 +339,7 @@ const sc = StyleSheet.create({
   icon: { width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center", marginBottom: 8 },
   value: { fontSize: 24, fontFamily: "Inter_700Bold" },
   label: { fontSize: 11, fontFamily: "Inter_500Medium", marginTop: 2 },
+  drill: { position: "absolute", top: 10, right: 10 },
 });
 
 function Section({ title, colors, children }: any) {
