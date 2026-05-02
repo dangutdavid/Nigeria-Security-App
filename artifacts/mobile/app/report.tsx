@@ -26,6 +26,7 @@ import {
   Incident,
 } from "@/context/IncidentContext";
 import { useColors } from "@/hooks/useColors";
+import { NIGERIA_STATE_LGAS } from "@/data/nigeriaLGAs";
 
 const TOTAL_STEPS = 5;
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -461,7 +462,7 @@ function Step2({ colors, form, update }: any) {
             <TouchableOpacity
               key={st}
               style={[s.stateChip, { backgroundColor: form.state === st ? colors.primary : colors.muted, borderColor: form.state === st ? colors.primary : colors.border }]}
-              onPress={() => update({ state: st })}
+              onPress={() => update({ state: st, lga: "" })}
             >
               <Text style={[s.stateChipText, { color: form.state === st ? "#fff" : colors.mutedForeground }]}>{st}</Text>
             </TouchableOpacity>
@@ -469,13 +470,59 @@ function Step2({ colors, form, update }: any) {
         </ScrollView>
       </View>
 
-      <FieldInput
-        colors={colors}
-        label="LGA"
-        placeholder="Local Government Area"
-        value={form.lga}
-        onChangeText={(t: string) => update({ lga: t })}
-      />
+      {/* LGA picker — chips drawn from selected state */}
+      <View>
+        <Text style={[s.fieldLabel, { color: colors.mutedForeground }]}>LGA</Text>
+        {form.state ? (() => {
+          const lgas = NIGERIA_STATE_LGAS.find((s) => s.name === form.state)?.lgas ?? [];
+          return (
+            <>
+              {form.lga ? (
+                <TouchableOpacity
+                  style={[s.lgaSelected, { backgroundColor: colors.primary + "15", borderColor: colors.primary }]}
+                  onPress={() => update({ lga: "" })}
+                >
+                  <Feather name="map-pin" size={14} color={colors.primary} />
+                  <Text style={[s.lgaSelectedText, { color: colors.primary }]}>{form.lga}</Text>
+                  <Feather name="x" size={14} color={colors.primary} />
+                </TouchableOpacity>
+              ) : (
+                <Text style={[s.lgaHint, { color: colors.mutedForeground }]}>
+                  Pick an LGA in {form.state}
+                </Text>
+              )}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, paddingVertical: 6 }}
+              >
+                {lgas.map((lga) => (
+                  <TouchableOpacity
+                    key={lga}
+                    style={[
+                      s.stateChip,
+                      {
+                        backgroundColor: form.lga === lga ? colors.primary : colors.muted,
+                        borderColor: form.lga === lga ? colors.primary : colors.border,
+                      },
+                    ]}
+                    onPress={() => update({ lga })}
+                  >
+                    <Text style={[s.stateChipText, { color: form.lga === lga ? "#fff" : colors.mutedForeground }]}>
+                      {lga}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </>
+          );
+        })() : (
+          <View style={[s.lgaDisabled, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+            <Feather name="map" size={14} color={colors.mutedForeground} />
+            <Text style={[s.lgaHint, { color: colors.mutedForeground }]}>Select a state first</Text>
+          </View>
+        )}
+      </View>
 
       <FieldInput
         colors={colors}
@@ -825,6 +872,10 @@ const s = StyleSheet.create({
   textInput: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, fontFamily: "Inter_400Regular" },
   stateChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
   stateChipText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  lgaSelected: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1.5, marginBottom: 2 },
+  lgaSelectedText: { flex: 1, fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  lgaHint: { fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 2, fontStyle: "italic" },
+  lgaDisabled: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
   addBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
   addBtnText: { fontSize: 13, fontFamily: "Inter_700Bold" },
   emptyHint: { fontSize: 13, fontFamily: "Inter_400Regular", fontStyle: "italic", marginBottom: 8 },
