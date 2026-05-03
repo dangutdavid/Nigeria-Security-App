@@ -192,6 +192,17 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.quickRow}>
+          <TouchableOpacity style={[styles.quickActionAlt, { borderColor: colors.primary, backgroundColor: colors.primary + "14" }]} onPress={() => router.push("/analytics")}>
+            <Feather name="bar-chart-2" size={18} color={colors.primary} />
+            <Text style={[styles.quickActionAltText, { color: colors.primary }]}>Analytics</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.quickActionAlt, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => router.push("/patrol-log")}>
+            <Feather name="anchor" size={18} color={colors.text} />
+            <Text style={[styles.quickActionAltText, { color: colors.text }]}>Patrol Log</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.section}>
           <TouchableOpacity
             style={[styles.analyticsCard, { backgroundColor: colors.card, borderColor: colors.border }]}
