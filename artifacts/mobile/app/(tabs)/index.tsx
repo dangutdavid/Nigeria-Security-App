@@ -17,6 +17,16 @@ export default function HomeScreen() {
   const recent = incidents.slice(0, 5);
   const openCount = incidents.filter((incident) => incident.status !== "closed").length;
   const fatalCount = incidents.filter((incident) => incident.severity === "fatal" && incident.status !== "closed").length;
+  const bySeverity = [
+    { key: "fatal", label: "Fatal", value: incidents.filter((incident) => incident.severity === "fatal").length, color: "#8B0000" },
+    { key: "serious", label: "Serious", value: incidents.filter((incident) => incident.severity === "serious").length, color: "#E67E22" },
+    { key: "minor", label: "Minor", value: incidents.filter((incident) => incident.severity === "minor").length, color: "#27AE60" },
+  ];
+  const byStatus = [
+    { key: "submitted", label: "Submitted", value: incidents.filter((incident) => incident.status === "submitted").length, color: colors.primary },
+    { key: "assigned", label: "Assigned", value: incidents.filter((incident) => incident.status === "assigned").length, color: colors.secondary },
+    { key: "review", label: "Under review", value: incidents.filter((incident) => incident.status === "under_review").length, color: colors.warning },
+  ];
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -49,6 +59,40 @@ export default function HomeScreen() {
               <Text style={styles.statValue}>{myReports.length}</Text>
               <Text style={styles.statLabel}>My reports</Text>
             </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>REPORT CHARTS</Text>
+            <Text style={[styles.sectionLink, { color: colors.primary }]}>Tap a bar to filter</Text>
+          </View>
+          <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.chartTitle, { color: colors.text }]}>Severity breakdown</Text>
+            <View style={styles.chartBars}>
+              {bySeverity.map((item) => (
+                <TouchableOpacity key={item.key} style={styles.chartBarWrap} onPress={() => router.push(`/(tabs)/cases?severity=${item.key}` as any)}>
+                  <View style={[styles.chartBarTrack, { backgroundColor: colors.muted }]}>
+                    <View style={[styles.chartBarFill, { height: `${Math.max(12, item.value ? item.value * 18 : 12)}%`, backgroundColor: item.color }]} />
+                  </View>
+                  <Text style={[styles.chartBarValue, { color: colors.text }]}>{item.value}</Text>
+                  <Text style={[styles.chartBarLabel, { color: colors.mutedForeground }]}>{item.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 12 }]}>
+            <Text style={[styles.chartTitle, { color: colors.text }]}>Status snapshot</Text>
+            {byStatus.map((item) => (
+              <TouchableOpacity key={item.key} style={styles.statusRow} onPress={() => router.push(`/(tabs)/cases?status=${item.key}` as any)}>
+                <View style={styles.statusLeft}>
+                  <View style={[styles.statusDot, { backgroundColor: item.color }]} />
+                  <Text style={[styles.statusLabel, { color: colors.text }]}>{item.label}</Text>
+                </View>
+                <Text style={[styles.statusValue, { color: colors.text }]}>{item.value}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
@@ -132,5 +176,19 @@ const styles = StyleSheet.create({
   sectionHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   sectionTitle: { fontSize: 12, fontFamily: "Inter_700Bold" },
   seeAll: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  sectionLink: { fontSize: 11, fontFamily: "Inter_500Medium" },
+  chartCard: { borderRadius: 18, borderWidth: 1, padding: 14 },
+  chartTitle: { fontSize: 15, fontFamily: "Inter_700Bold", marginBottom: 12 },
+  chartBars: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 10 },
+  chartBarWrap: { flex: 1, alignItems: "center", gap: 8 },
+  chartBarTrack: { width: "100%", height: 120, borderRadius: 14, overflow: "hidden", justifyContent: "flex-end" },
+  chartBarFill: { width: "100%", borderRadius: 14 },
+  chartBarValue: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  chartBarLabel: { fontSize: 11, fontFamily: "Inter_500Medium", textAlign: "center" },
+  statusRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 12, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.06)" },
+  statusLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
+  statusDot: { width: 10, height: 10, borderRadius: 5 },
+  statusLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  statusValue: { fontSize: 14, fontFamily: "Inter_700Bold" },
   fab: { position: "absolute", right: 20, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 6, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
 });
