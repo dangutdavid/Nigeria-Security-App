@@ -253,8 +253,14 @@ export function IncidentProvider({ children }: { children: React.ReactNode }) {
   async function load() {
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored) setIncidents(JSON.parse(stored));
+      if (stored) {
+        const parsed = JSON.parse(stored) as Incident[];
+        setIncidents(Array.isArray(parsed) && parsed.length > 0 ? parsed : SEED_INCIDENTS);
+      } else {
+        setIncidents(SEED_INCIDENTS);
+      }
     } catch {
+      setIncidents(SEED_INCIDENTS);
     } finally {
       setPendingCount(0);
     }
