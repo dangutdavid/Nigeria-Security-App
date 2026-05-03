@@ -72,6 +72,7 @@ export default function ForgotPinScreen() {
               params: { badge: badge.trim().toUpperCase(), email: email.trim() },
             }),
         },
+        { text: "Back to Sign In", style: "cancel", onPress: () => router.replace("/") },
       ]
     );
   }

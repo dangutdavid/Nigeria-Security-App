@@ -72,7 +72,7 @@ export default function OtpVerifyScreen() {
 
     if (result === "ok") {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace({
+      router.push({
         pathname: "/reset-pin",
         params: { badge },
       });
