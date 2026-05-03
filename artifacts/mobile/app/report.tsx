@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import {
   getProbableCauseLibrary,
+  groupProbableCauses,
   IncidentStatus,
   IncidentType,
   ProbableCause,
@@ -32,7 +33,7 @@ import { NIGERIA_STATE_LGAS } from "@/data/nigeriaLGAs";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 const TOTAL_STEPS = 5;
-const STEP_LABELS = ["Type", "Location", "Persons", "Evidence", "Review"];
+const STEP_LABELS = ["Type", "Location", "Causes", "Evidence", "Review"];
 
 const INCIDENT_TYPES: Array<{ value: IncidentType; label: string; icon: string; color: string }> = [
   { value: "crash", label: "Road Crash", icon: "alert-triangle", color: "#C0392B" },
@@ -60,15 +61,6 @@ const TYPE_SEVERITY_HINT: Record<IncidentType, string> = {
   breakdown: "Breakdowns usually involve minor injury or property damage.",
   hazard: "Pick the risk level this hazard created.",
   flooding: "Pick the impact level caused by the flooding.",
-};
-
-const PROBABLE_CAUSE_LABELS: Record<string, string> = {
-  driver: "Driver factors",
-  vehicle: "Vehicle factors",
-  environment: "Environmental factors",
-  temporal: "Temporal factors",
-  road: "Road factors",
-  other: "Other",
 };
 
 const NIGERIA_STATES = [
@@ -159,7 +151,7 @@ export default function ReportScreen() {
   const selectedLgas = useMemo(() => NIGERIA_STATE_LGAS.find((s) => s.name === form.state)?.lgas ?? [], [form.state]);
   const filteredLgas = useMemo(() => selectedLgas.filter((l) => !lgaSearch || l.toLowerCase().includes(lgaSearch.toLowerCase())), [selectedLgas, lgaSearch]);
   const allowedSeverities = form.type ? TYPE_SEVERITY_MAP[form.type] : [];
-  const probableCauseOptions = form.type ? getProbableCauseLibrary(form.type) : [];
+  const probableCauseGroups = groupProbableCauses(form.type);
 
   function update(fields: Partial<FormState>) {
     setForm((f) => ({ ...f, ...fields }));
@@ -399,57 +391,20 @@ export default function ReportScreen() {
         {step === 3 && (
           <View style={{ gap: 16 }}>
             <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>POTENTIAL CAUSES</Text>
-            {form.type ? (
-              <View style={{ gap: 12 }}>
-                {Object.entries(
-                  probableCauseOptions.reduce((acc, item) => {
-                    const key = item.category;
-                    if (!acc[key]) acc[key] = [];
-                    acc[key].push(item);
-                    return acc;
-                  }, {} as Record<string, ProbableCause[]>)
-                ).map(([category, items]) => (
-                  <View key={category} style={[s.block, { backgroundColor: colors.card, borderColor: colors.border }]}> 
-                    <Text style={[s.blockTitle, { color: colors.text }]}>{PROBABLE_CAUSE_LABELS[category] ?? category}</Text>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-                      {items.map((item) => {
-                        const selected = form.probableCauses.some((cause) => cause.code === item.code);
-                        return (
-                          <TouchableOpacity key={item.code} onPress={() => toggleProbableCause(item)} style={[s.causeChip, { backgroundColor: selected ? colors.primary : colors.muted, borderColor: selected ? colors.primary : colors.border }]}>
-                            <Text style={[s.causeCode, { color: selected ? "#fff" : colors.primary }]}>{item.code}</Text>
-                            <Text style={[s.causeLabel, { color: selected ? "#fff" : colors.mutedForeground }]}>{item.label}</Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-
-            <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>PEOPLE & VEHICLES</Text>
-            <TouchableOpacity style={[s.addBtn, { backgroundColor: colors.secondary }]} onPress={addVehicle}>
-              <Feather name="plus" size={14} color="#fff" />
-              <Text style={s.addBtnText}>Add Vehicle</Text>
-            </TouchableOpacity>
-            {form.vehicles.map((vehicle, idx) => (
-              <View key={vehicle.id} style={[s.block, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[s.blockTitle, { color: colors.text }]}>Vehicle {idx + 1}</Text>
-                <FieldInput colors={colors} label="Plate" value={vehicle.plate} onChangeText={(plate: string) => updateVehicle(vehicle.id, { plate })} placeholder="ABC-123XY" />
-                <FieldInput colors={colors} label="Make / Model" value={`${vehicle.make} ${vehicle.model}`.trim()} onChangeText={(t: string) => updateVehicle(vehicle.id, { make: t })} placeholder="Toyota Corolla" />
-                <TouchableOpacity onPress={() => removeVehicle(vehicle.id)}><Text style={{ color: colors.fatal, marginTop: 8 }}>Remove vehicle</Text></TouchableOpacity>
-              </View>
-            ))}
-            <TouchableOpacity style={[s.addBtn, { backgroundColor: colors.primary }]} onPress={addVictim}>
-              <Feather name="plus" size={14} color="#fff" />
-              <Text style={s.addBtnText}>Add Victim</Text>
-            </TouchableOpacity>
-            {form.victims.map((victim, idx) => (
-              <View key={victim.id} style={[s.block, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[s.blockTitle, { color: colors.text }]}>Victim {idx + 1}</Text>
-                <FieldInput colors={colors} label="Name" value={victim.name} onChangeText={(name: string) => updateVictim(victim.id, { name })} placeholder="Full name" />
-                <FieldInput colors={colors} label="Condition" value={victim.condition} onChangeText={(condition: string) => updateVictim(victim.id, { condition: condition as any })} placeholder="injured / treated / fatal" />
-                <TouchableOpacity onPress={() => removeVictim(victim.id)}><Text style={{ color: colors.fatal, marginTop: 8 }}>Remove victim</Text></TouchableOpacity>
+            {probableCauseGroups.map(([category, items]) => (
+              <View key={category} style={[s.block, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[s.blockTitle, { color: colors.text }]}>{category === "driver" ? "Driver factors" : category === "vehicle" ? "Vehicle factors" : category === "environment" ? "Environmental factors" : category === "temporal" ? "Temporal factors" : category === "road" ? "Road factors" : "Other"}</Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+                  {items.map((item) => {
+                    const selected = form.probableCauses.some((cause) => cause.code === item.code);
+                    return (
+                      <TouchableOpacity key={item.code} onPress={() => toggleProbableCause(item)} style={[s.causeChip, { backgroundColor: selected ? colors.primary : colors.muted, borderColor: selected ? colors.primary : colors.border }]}>
+                        <Text style={[s.causeCode, { color: selected ? "#fff" : colors.primary }]}>{item.code}</Text>
+                        <Text style={[s.causeLabel, { color: selected ? "#fff" : colors.mutedForeground }]}>{item.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
             ))}
           </View>

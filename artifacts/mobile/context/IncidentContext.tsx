@@ -25,6 +25,62 @@ export interface ProbableCause {
   label: string;
 }
 
+export const PROBABLE_CAUSE_GROUP_LABELS: Record<ProbableCauseCategory, string> = {
+  driver: "Driver factors",
+  vehicle: "Vehicle factors",
+  environment: "Environmental factors",
+  temporal: "Temporal factors",
+  road: "Road factors",
+  other: "Other",
+};
+
+export const PROBABLE_CAUSE_LIBRARY: Record<IncidentType, ProbableCause[]> = {
+  crash: [
+    { category: "driver", code: "DUI", label: "Alcohol / drug use" },
+    { category: "driver", code: "LOC", label: "Loss of control" },
+    { category: "driver", code: "SLV", label: "Signal light violation" },
+    { category: "driver", code: "FTQ", label: "Fatigue driving" },
+    { category: "driver", code: "DD", label: "Driver distraction" },
+    { category: "driver", code: "SOS", label: "Sleeping on steering" },
+    { category: "driver", code: "SPV", label: "Speed violation" },
+    { category: "driver", code: "DGD", label: "Dangerous overtaking" },
+    { category: "driver", code: "WOV", label: "Wrongful overtaking" },
+    { category: "driver", code: "UPD", label: "Phone use while driving" },
+    { category: "driver", code: "RTV", label: "Route violation" },
+    { category: "driver", code: "CSV", label: "Caution sign violation" },
+    { category: "driver", code: "UDR", label: "Underage driving / riding" },
+    { category: "vehicle", code: "TBT", label: "Tyre burst" },
+    { category: "vehicle", code: "BFL", label: "Brake failure" },
+    { category: "vehicle", code: "OVL", label: "Overloading" },
+    { category: "vehicle", code: "MDV", label: "Mechanically deficient vehicle" },
+    { category: "vehicle", code: "EWT", label: "Worn expired tyre" },
+    { category: "environment", code: "BRD", label: "Bad road" },
+    { category: "environment", code: "PWR", label: "Poor weather" },
+    { category: "environment", code: "ROB", label: "Road obstruction" },
+    { category: "temporal", code: "Season", label: "Seasonal factor" },
+    { category: "temporal", code: "BusiesMonth", label: "Busiest month / travel period" },
+    { category: "temporal", code: "Weekday", label: "Weekday factor" },
+    { category: "temporal", code: "Peak", label: "Peak hour" },
+    { category: "temporal", code: "Night", label: "Night time factor" },
+  ],
+  breakdown: [
+    { category: "vehicle", code: "BFL", label: "Brake failure" },
+    { category: "vehicle", code: "MDV", label: "Mechanically deficient vehicle" },
+    { category: "vehicle", code: "EWT", label: "Worn expired tyre" },
+    { category: "vehicle", code: "OVL", label: "Overloading" },
+    { category: "environment", code: "ROB", label: "Road obstruction" },
+  ],
+  hazard: [
+    { category: "environment", code: "BRD", label: "Bad road" },
+    { category: "environment", code: "PWR", label: "Poor weather" },
+    { category: "environment", code: "ROB", label: "Road obstruction" },
+  ],
+  flooding: [
+    { category: "environment", code: "PWR", label: "Poor weather" },
+    { category: "environment", code: "ROB", label: "Road obstruction" },
+  ],
+};
+
 export interface Vehicle {
   id: string;
   plate: string;
@@ -160,61 +216,19 @@ const SEED_INCIDENTS: Incident[] = [
 
 const DEFAULT_DRAFT: DraftReport = { probableCauses: [], vehicles: [], victims: [] };
 
-const PROBABLE_CAUSE_LIBRARY: Record<IncidentType, ProbableCause[]> = {
-  crash: [
-    { category: "driver", code: "DUI", label: "Alcohol / drug use" },
-    { category: "driver", code: "LOC", label: "Loss of control" },
-    { category: "driver", code: "SLV", label: "Signal light violation" },
-    { category: "driver", code: "FTQ", label: "Fatigue driving" },
-    { category: "driver", code: "DD", label: "Driver distraction" },
-    { category: "driver", code: "SOS", label: "Sleeping on steering" },
-    { category: "driver", code: "SPV", label: "Speed violation" },
-    { category: "driver", code: "DGD", label: "Dangerous overtaking" },
-    { category: "driver", code: "WOV", label: "Wrongful overtaking" },
-    { category: "driver", code: "UPD", label: "Phone use while driving" },
-    { category: "driver", code: "RTV", label: "Route violation" },
-    { category: "driver", code: "CSV", label: "Caution sign violation" },
-    { category: "driver", code: "UDR", label: "Underage driving / riding" },
-    { category: "vehicle", code: "TBT", label: "Tyre burst" },
-    { category: "vehicle", code: "BFL", label: "Brake failure" },
-    { category: "vehicle", code: "OVL", label: "Overloading" },
-    { category: "vehicle", code: "MDV", label: "Mechanically deficient vehicle" },
-    { category: "vehicle", code: "EWT", label: "Worn expired tyre" },
-    { category: "environment", code: "BRD", label: "Bad road" },
-    { category: "environment", code: "PWR", label: "Poor weather" },
-    { category: "environment", code: "ROB", label: "Road obstruction" },
-    { category: "temporal", code: "Season", label: "Seasonal factor" },
-    { category: "temporal", code: "BusiesMonth", label: "Busiest month / travel period" },
-    { category: "temporal", code: "Weekday", label: "Weekday factor" },
-    { category: "temporal", code: "Peak", label: "Peak hour" },
-    { category: "temporal", code: "Night", label: "Night time factor" },
-  ],
-  breakdown: [
-    { category: "vehicle", code: "BFL", label: "Brake failure" },
-    { category: "vehicle", code: "MDV", label: "Mechanically deficient vehicle" },
-    { category: "vehicle", code: "EWT", label: "Worn expired tyre" },
-    { category: "vehicle", code: "OVL", label: "Overloading" },
-    { category: "environment", code: "ROB", label: "Road obstruction" },
-  ],
-  hazard: [
-    { category: "environment", code: "BRD", label: "Bad road" },
-    { category: "environment", code: "PWR", label: "Poor weather" },
-    { category: "environment", code: "ROB", label: "Road obstruction" },
-  ],
-  flooding: [
-    { category: "environment", code: "PWR", label: "Poor weather" },
-    { category: "environment", code: "ROB", label: "Road obstruction" },
-  ],
-};
-
-export const PROBABLE_CAUSES = PROBABLE_CAUSE_LIBRARY;
-
 export function getProbableCauseLibrary(type: IncidentType) {
   return PROBABLE_CAUSE_LIBRARY[type] ?? [];
 }
 
-export function isProbableCauseCategory(value: string): value is ProbableCauseCategory {
-  return ["driver", "vehicle", "environment", "temporal", "road", "other"].includes(value);
+export function groupProbableCauses(type: IncidentType | null) {
+  const library = type ? getProbableCauseLibrary(type) : [];
+  return Object.entries(
+    library.reduce((acc, item) => {
+      if (!acc[item.category]) acc[item.category] = [];
+      acc[item.category].push(item);
+      return acc;
+    }, {} as Record<ProbableCauseCategory, ProbableCause[]>)
+  ) as Array<[ProbableCauseCategory, ProbableCause[]]>;
 }
 
 export function IncidentProvider({ children }: { children: React.ReactNode }) {
