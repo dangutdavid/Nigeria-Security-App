@@ -354,44 +354,34 @@ export default function CasesScreen() {
         </View>
       </View>
       <View style={[styles.headerActionRow, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
-        <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.secondary }]} onPress={() => router.push("/report")} activeOpacity={0.85}>
-          <Feather name="plus" size={18} color="#fff" />
-          <Text style={styles.headerBtnText}>Add incident</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.filterSummaryBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
-          onPress={() => setLocationModalVisible(true)}
-          activeOpacity={0.85}
-        >
-          <Feather name="sliders" size={16} color={colors.text} />
-          <Text style={[styles.filterSummaryText, { color: colors.text }]}>
-            {activeFiltersCount > 0 ? `${activeFiltersCount} filters` : "Filters"}
-          </Text>
-          <Text style={[styles.filterSummaryCount, { color: colors.mutedForeground }]}>
-            {filtered.length}/{incidents.length}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.headerActionsTop}>
+          <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.secondary }]} onPress={() => router.push("/report")} activeOpacity={0.85}>
+            <Feather name="plus" size={18} color="#fff" />
+            <Text style={styles.headerBtnText}>Add incident</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.filterSummaryBtn, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => setLocationModalVisible(true)} activeOpacity={0.85}>
+            <Feather name="sliders" size={16} color={colors.text} />
+            <Text style={[styles.filterSummaryText, { color: colors.text }]}>{activeFiltersCount > 0 ? `${activeFiltersCount} filters` : "Filters"}</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={[styles.filterMeta, { color: colors.mutedForeground }]}>
+          {filtered.length} of {incidents.length} cases shown
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetRow}>
+          <TouchableOpacity style={[styles.presetChip, { backgroundColor: mineOnly ? colors.primary + "18" : colors.card, borderColor: colors.border }]} onPress={() => setMineOnly((v) => !v)}>
+            <Text style={[styles.presetChipText, { color: colors.text }]}>{mineOnly ? "My cases ✓" : "My cases"}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.presetChip, { backgroundColor: todayOnly ? colors.primary + "18" : colors.card, borderColor: colors.border }]} onPress={() => setTodayOnly((v) => !v)}>
+            <Text style={[styles.presetChipText, { color: colors.text }]}>{todayOnly ? "Today ✓" : "Today"}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.presetChip, { backgroundColor: severityFilter === "fatal" ? colors.fatalLight : colors.card, borderColor: colors.border }]} onPress={() => setSeverityFilter((v) => (v === "fatal" ? "all" : "fatal"))}>
+            <Text style={[styles.presetChipText, { color: colors.text }]}>Fatal</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.presetChip, { backgroundColor: statusFilter === "open" ? colors.primary + "18" : colors.card, borderColor: colors.border }]} onPress={() => setStatusFilter((v) => (v === "open" ? "all" : "open"))}>
+            <Text style={[styles.presetChipText, { color: colors.text }]}>Open</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetRow}>
-        <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => { setMineOnly((v) => !v); }}>
-          <Text style={[styles.presetChipText, { color: colors.text }]}>{mineOnly ? "My cases ✓" : "My cases"}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => { setTodayOnly((v) => !v); }}>
-          <Text style={[styles.presetChipText, { color: colors.text }]}>{todayOnly ? "Today ✓" : "Today"}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.presetChip, { backgroundColor: severityFilter === "fatal" ? colors.fatalLight : colors.card, borderColor: colors.border }]}
-          onPress={() => setSeverityFilter((v) => (v === "fatal" ? "all" : "fatal"))}
-        >
-          <Text style={[styles.presetChipText, { color: colors.text }]}>Fatal</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.presetChip, { backgroundColor: statusFilter === "open" ? colors.primary + "18" : colors.card, borderColor: colors.border }]}
-          onPress={() => setStatusFilter((v) => (v === "open" ? "all" : "open"))}
-        >
-          <Text style={[styles.presetChipText, { color: colors.text }]}>Open</Text>
-        </TouchableOpacity>
-      </ScrollView>
       <FlatList
         data={filtered}
         keyExtractor={(i) => i.id}
@@ -428,8 +418,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 8,
-    alignItems: "flex-start",
+    gap: 10,
     borderBottomWidth: 1,
+  },
+  headerActionsTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   headerBtn: {
     flexDirection: "row",
@@ -441,18 +436,17 @@ const styles = StyleSheet.create({
   },
   headerBtnText: { color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 13 },
   filterSummaryBtn: {
-    marginTop: 10,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    height: 40,
     borderRadius: 14,
     borderWidth: 1,
   },
   filterSummaryText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  filterSummaryCount: { fontSize: 12, fontFamily: "Inter_500Medium", marginLeft: "auto" },
-  presetRow: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, gap: 8 },
+  filterMeta: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  presetRow: { paddingHorizontal: 0, paddingTop: 2, paddingBottom: 2, gap: 8 },
   presetChip: {
     flexDirection: "row",
     alignItems: "center",
