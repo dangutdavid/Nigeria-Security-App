@@ -330,8 +330,35 @@ export default function CasesScreen() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={<View style={styles.emptyState}><Feather name="map-pin" size={40} color={colors.mutedForeground} /><Text style={[styles.emptyTitle, { color: colors.text }]}>No cases found</Text></View>}
       />
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: colors.secondary, bottom: insets.bottom + 20 }]}
+        onPress={() => router.push("/report")}
+        activeOpacity={0.85}
+      >
+        <Feather name="plus" size={24} color="#fff" />
+      </TouchableOpacity>
     </View>
   );
 }
 
-const styles = StyleSheet.create({ root: { flex: 1 }, list: { padding: 16 }, emptyList: { flexGrow: 1 }, emptyState: { alignItems: "center", justifyContent: "center", paddingTop: 80 }, emptyTitle: { marginTop: 10, fontSize: 16, fontFamily: "Inter_700Bold" } });
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  list: { padding: 16 },
+  emptyList: { flexGrow: 1 },
+  emptyState: { alignItems: "center", justifyContent: "center", paddingTop: 80 },
+  emptyTitle: { marginTop: 10, fontSize: 16, fontFamily: "Inter_700Bold" },
+  fab: {
+    position: "absolute",
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+  },
+});
