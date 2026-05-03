@@ -23,12 +23,6 @@ const ROLE_LABEL: Record<UserRole, string> = {
   commander: "Operations Commander",
 };
 
-const ROLE_COLOR: Record<UserRole, string> = {
-  field_officer: "#2C7BE5",
-  supervisor: "#C8960C",
-  commander: "#1B5E3B",
-};
-
 function SettingRow({
   icon,
   label,
@@ -58,7 +52,7 @@ function SettingRow({
       disabled={toggle}
       activeOpacity={onPress ? 0.65 : 1}
     >
-      <View style={[styles.settingIcon, { backgroundColor: destructive ? colors.fatalLight : colors.muted }]}>
+      <View style={[styles.settingIcon, { backgroundColor: destructive ? colors.fatalLight : colors.muted }]}> 
         <Feather name={icon as any} size={18} color={destructive ? colors.fatal : colors.mutedForeground} />
       </View>
       <View style={{ flex: 1 }}>
@@ -95,63 +89,90 @@ export default function ProfileScreen() {
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
 
   function handleLogout() {
-    Alert.alert(
-      "Sign Out",
-      "Are you sure you want to sign out? Any unsynced reports will remain saved locally.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Sign Out",
-          style: "destructive",
-          onPress: async () => {
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            await logout();
-            router.replace("/");
-          },
+    Alert.alert("Sign Out", "Are you sure you want to sign out? Any unsynced reports will remain saved locally.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: async () => {
+          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          await logout();
+          router.replace("/");
         },
-      ]
-    );
+      },
+    ]);
   }
 
   if (!user) return null;
 
   return (
-    <ScrollView
-      style={[styles.root, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingBottom: bottomPad }}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
+    <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
       <View style={[styles.header, { backgroundColor: colors.primary, paddingTop: topPad + 16 }]}>
         <View style={styles.avatarWrap}>
           <View style={[styles.avatar, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
-            <Text style={styles.avatarText}>
-              {user.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-            </Text>
+            <Text style={styles.avatarText}>{user.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}</Text>
           </View>
         </View>
         <Text style={styles.userName}>{user.name}</Text>
-        <View style={[styles.roleChip, { backgroundColor: "rgba(255,255,255,0.15)" }]}> 
+        <View style={[styles.roleChip, { backgroundColor: "rgba(255,255,255,0.15)" }]}>
           <Text style={styles.roleText}>{ROLE_LABEL[user.role]}</Text>
         </View>
       </View>
 
-      {/* Section: Appearance */}
       <View style={styles.section}>
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>APPEARANCE</Text>
-        <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <SettingRow
-            icon={isDark ? "moon" : "sun"}
-            label="Theme"
-            subtitle={isDark ? "Dark mode on" : "Light mode on"}
-            toggle
-            toggled={isDark}
-            onToggle={toggleTheme}
-          />
+        <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+          <SettingRow icon={isDark ? "moon" : "sun"} label="Theme" subtitle={isDark ? "Dark mode on" : "Light mode on"} toggle toggled={isDark} onToggle={toggleTheme} />
         </View>
       </View>
 
-      {/* Section: Connectivity */}
       <View style={styles.section}>
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>CONNECTIVITY</Text>
-        <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>...
+        <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+          <SettingRow icon="cloud-off" label="Offline Mode" toggle toggled={offlineMode} onToggle={setOfflineMode} />
+          <SettingRow icon="upload-cloud" label="Auto Sync" toggle toggled={autoSync} onToggle={setAutoSync} />
+          <SettingRow icon="map-pin" label="Location Sharing" toggle toggled={locationSharing} onToggle={setLocationSharing} />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>ACCOUNT</Text>
+        <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+          <SettingRow icon="shield" label="Badge Number" value={user.badgeNumber} />
+          <SettingRow icon="briefcase" label="Role" value={ROLE_LABEL[user.role]} />
+          <SettingRow icon="map-pin" label="Station" value={user.station} />
+          <SettingRow icon="phone" label="Phone" value={user.phone} />
+          <SettingRow icon="key" label="Change PIN" onPress={() => router.push("/change-pin")} />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: colors.fatal }]} onPress={handleLogout}>
+          <Feather name="log-out" size={16} color="#fff" />
+          <Text style={styles.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  header: { paddingBottom: 20, alignItems: "center" },
+  avatarWrap: { marginBottom: 12 },
+  avatar: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: "#fff", fontSize: 26, fontFamily: "Inter_700Bold" },
+  userName: { color: "#fff", fontSize: 20, fontFamily: "Inter_700Bold" },
+  roleChip: { marginTop: 8, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  roleText: { color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  section: { paddingHorizontal: 16, marginTop: 18 },
+  sectionLabel: { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, marginBottom: 10 },
+  sectionCard: { borderRadius: 14, borderWidth: 1, overflow: "hidden" },
+  settingRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 14, borderBottomWidth: 1 },
+  settingIcon: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  settingLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  settingSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
+  settingValue: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  logoutBtn: { height: 50, borderRadius: 12, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
+  logoutText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 15 },
+});
