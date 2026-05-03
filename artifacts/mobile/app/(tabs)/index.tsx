@@ -84,7 +84,7 @@ export default function HomeScreen() {
           <View style={styles.monthGrid}>
             <TouchableOpacity
               style={[styles.monthCardLarge, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => router.push("/(tabs)/cases")}
+              onPress={() => router.push("/report")}
               activeOpacity={0.85}
             >
               <View style={styles.monthCardHeader}>
