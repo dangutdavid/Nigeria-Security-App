@@ -173,6 +173,7 @@ const IncidentContext = createContext<IncidentContextType>({
 });
 
 const STORAGE_KEY = "@frsc_incidents_v2";
+const STORAGE_RESET_KEY = "@frsc_incidents_v2_reset";
 
 const SEED_INCIDENTS: Incident[] = [
   {
@@ -252,6 +253,11 @@ export function IncidentProvider({ children }: { children: React.ReactNode }) {
 
   async function load() {
     try {
+      const resetDone = await AsyncStorage.getItem(STORAGE_RESET_KEY);
+      if (!resetDone) {
+        await AsyncStorage.removeItem(STORAGE_KEY);
+        await AsyncStorage.setItem(STORAGE_RESET_KEY, "1");
+      }
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as Incident[];
