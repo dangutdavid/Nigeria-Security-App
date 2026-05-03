@@ -83,17 +83,23 @@ export default function HomeScreen() {
           </View>
           <View style={styles.monthGrid}>
             <TouchableOpacity
-              style={[styles.monthCardLarge, { backgroundColor: colors.card, borderColor: colors.border }]}
+              style={[
+                styles.monthCardLarge,
+                {
+                  backgroundColor: colors.secondary + "10",
+                  borderColor: colors.secondary + "55",
+                },
+              ]}
               onPress={() => router.push("/report")}
               activeOpacity={0.85}
             >
               <View style={styles.monthCardHeader}>
-                <View style={[styles.monthIconLarge, { backgroundColor: colors.successLight }]}>
-                  <Feather name="activity" size={22} color={colors.success} />
+                <View style={[styles.monthIconLarge, { backgroundColor: colors.secondary + "20" }]}>
+                  <Feather name="plus" size={22} color={colors.secondary} />
                 </View>
                 <Text style={[styles.monthValueLarge, { color: colors.text }]}>{incidents.length}</Text>
               </View>
-              <Text style={[styles.monthLabelLarge, { color: colors.mutedForeground }]}>Incidents</Text>
+              <Text style={[styles.monthLabelLarge, { color: colors.secondary }]}>Add incident</Text>
             </TouchableOpacity>
 
             <View style={styles.monthSplitRow}>
