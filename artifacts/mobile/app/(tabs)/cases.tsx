@@ -417,12 +417,12 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 8,
+    paddingBottom: 14,
     borderBottomWidth: 1,
   },
-  headerText: { marginBottom: 2 },
+  headerText: { marginBottom: 8, paddingRight: 12 },
   headerTitle: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  headerSubtitle: { marginTop: 4, fontSize: 12, fontFamily: "Inter_400Regular" },
+  headerSubtitle: { marginTop: 6, fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 16 },
   headerActionRow: {
     paddingHorizontal: 16,
     paddingTop: 10,
