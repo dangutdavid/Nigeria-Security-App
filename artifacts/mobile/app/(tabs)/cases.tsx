@@ -352,6 +352,17 @@ export default function CasesScreen() {
             <Text style={[styles.filterSummaryText, { color: colors.text }]}>{activeFiltersCount > 0 ? `${activeFiltersCount} filters` : "Filters"}</Text>
           </TouchableOpacity>
         </View>
+        {locationActive && (
+          <View style={styles.locationSummaryRow}>
+            <Text style={[styles.locationSummaryText, { color: colors.mutedForeground }]}>
+              {selectedStates.length > 0 ? `State: ${selectedStates.join(", ")}` : "State: any"}
+              {selectedLGAs.length > 0 ? ` · LGA: ${selectedLGAs.join(", ")}` : ""}
+            </Text>
+            <TouchableOpacity onPress={() => { setSelectedStates([]); setSelectedLGAs([]); }} activeOpacity={0.8}>
+              <Text style={[styles.locationClearText, { color: colors.primary }]}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <Text style={[styles.filterMeta, { color: colors.mutedForeground }]}>
           {filtered.length} of {incidents.length} cases shown
         </Text>
@@ -443,6 +454,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   filterSummaryText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  locationSummaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  locationSummaryText: { flex: 1, fontSize: 12, fontFamily: "Inter_500Medium" },
+  locationClearText: { fontSize: 12, fontFamily: "Inter_700Bold" },
   filterMeta: { fontSize: 12, fontFamily: "Inter_500Medium" },
   presetRow: { paddingHorizontal: 0, paddingTop: 2, paddingBottom: 2, gap: 8 },
   presetChip: {
