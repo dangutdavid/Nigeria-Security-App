@@ -179,10 +179,41 @@ export default function ProfileScreen() {
           <SettingRow icon="mail" label="Email" value={user.email || "—"} />
           <SettingRow icon="map-pin" label="Station" value={user.station} />
           <SettingRow icon="phone" label="Phone" value={user.phone} />
-          <SettingRow icon="truck" label="Vehicle Lookup" subtitle="Check registration and owner records" onPress={() => router.push("/vehicle-lookup")} />
-          <SettingRow icon="users" label="Manage Users" onPress={() => router.push("/users")} />
-          <SettingRow icon="key" label="Change PIN" onPress={() => router.push("/change-pin")} />
         </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>TOOLS</Text>
+        <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+          <SettingRow
+            icon="truck"
+            label="Vehicle Lookup"
+            subtitle="Check registration and owner records"
+            onPress={() => router.push("/vehicle-lookup")}
+          />
+          <SettingRow icon="users" label="Manage Users" subtitle="Create and assign officers" onPress={() => router.push("/users")} />
+          <SettingRow icon="key" label="Change PIN" subtitle="Update your login PIN" onPress={() => router.push("/change-pin")} />
+          <SettingRow icon="help-circle" label="Forgot PIN" subtitle="Recover access with OTP" onPress={() => router.push("/forgot-pin")} />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <TouchableOpacity
+          style={[styles.analyticsCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => router.push("/analytics")}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.analyticsIcon, { backgroundColor: colors.primary + "14" }]}>
+            <Feather name="bar-chart-2" size={18} color={colors.primary} />
+          </View>
+          <View style={styles.analyticsCopy}>
+            <Text style={[styles.analyticsTitle, { color: colors.text }]}>Analytics & Hotspots</Text>
+            <Text style={[styles.analyticsSub, { color: colors.mutedForeground }]}>
+              View trends, crash patterns, and operational insights
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
@@ -220,6 +251,11 @@ const styles = StyleSheet.create({
   dutyCta: { borderRadius: 16, paddingHorizontal: 16, paddingVertical: 16, flexDirection: "row", alignItems: "center", gap: 12 },
   dutyCtaTitle: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
   dutyCtaSub: { color: "rgba(255,255,255,0.88)", fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 2 },
+  analyticsCard: { borderWidth: 1, borderRadius: 18, padding: 14, flexDirection: "row", alignItems: "center", gap: 12 },
+  analyticsIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  analyticsCopy: { flex: 1 },
+  analyticsTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  analyticsSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2, lineHeight: 16 },
   logoutBtn: { height: 50, borderRadius: 12, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   logoutBtnDisabled: { opacity: 0.75 },
   logoutText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 15 },
