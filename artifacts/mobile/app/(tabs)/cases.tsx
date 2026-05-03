@@ -322,13 +322,15 @@ export default function CasesScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
-        <View>
+        <View style={styles.headerText}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Cases</Text>
           <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>Browse and manage incidents</Text>
         </View>
+      </View>
+      <View style={styles.headerActionRow}>
         <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.secondary }]} onPress={() => router.push("/report")} activeOpacity={0.85}>
           <Feather name="plus" size={18} color="#fff" />
-          <Text style={styles.headerBtnText}>Add</Text>
+          <Text style={styles.headerBtnText}>Add incident</Text>
         </TouchableOpacity>
       </View>
       <FlatList
@@ -356,15 +358,18 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 12,
+    paddingBottom: 10,
     borderBottomWidth: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
   },
+  headerText: { marginBottom: 2 },
   headerTitle: { fontSize: 22, fontFamily: "Inter_700Bold" },
   headerSubtitle: { marginTop: 4, fontSize: 12, fontFamily: "Inter_400Regular" },
+  headerActionRow: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 6,
+    alignItems: "flex-start",
+  },
   headerBtn: {
     flexDirection: "row",
     alignItems: "center",
