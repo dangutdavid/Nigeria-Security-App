@@ -41,11 +41,48 @@ function formatDate(dateStr: string) {
 }
 
 const CONDITION_COLORS: Record<string, string> = {
-  deceased: "#8B0000",
+  fatal: "#8B0000",
   critical: "#C0392B",
   injured: "#E67E22",
   unhurt: "#27AE60",
 };
+
+function Field({
+  label,
+  value,
+  onChangeText,
+  colors,
+  multiline,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  colors: any;
+  multiline?: boolean;
+}) {
+  return (
+    <View style={{ gap: 8, marginBottom: 12 }}>
+      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        multiline={multiline}
+        placeholder={label}
+        placeholderTextColor={colors.mutedForeground}
+        style={[
+          styles.fieldInput,
+          {
+            backgroundColor: colors.muted,
+            borderColor: colors.border,
+            color: colors.text,
+            minHeight: multiline ? 100 : 46,
+            textAlignVertical: multiline ? "top" : "center",
+          },
+        ]}
+      />
+    </View>
+  );
+}
 
 export default function CaseDetailScreen() {
   const colors = useColors();
@@ -58,6 +95,11 @@ export default function CaseDetailScreen() {
   const [noteText, setNoteText] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editLocation, setEditLocation] = useState("");
+  const [editLga, setEditLga] = useState("");
+  const [editState, setEditState] = useState("");
+  const [editDescription, setEditDescription] = useState("");
 
   const incident = getIncident(id as string);
   const assignableUsers = allUsers.filter(
@@ -109,6 +151,8 @@ export default function CaseDetailScreen() {
       </View>
     );
   }
+
+  const canEditIncident = user?.id === incident.reportedBy || user?.role === "supervisor" || user?.role === "commander";
 
   const actions = STATUS_ACTIONS[incident.status];
   const canTakeAction =
@@ -178,6 +222,35 @@ export default function CaseDetailScreen() {
     property_only: colors.property,
   };
   const sevColor = sevColors[incident.severity] || colors.mutedForeground;
+
+  function openEditModal() {
+    setEditLocation(incident.location || "");
+    setEditLga(incident.lga || "");
+    setEditState(incident.state || "");
+    setEditDescription(incident.description || "");
+    setShowEditModal(true);
+  }
+
+  async function saveEdit() {
+    const newTimeline = [
+      ...(incident?.timeline ?? []),
+      {
+        id: Date.now().toString(),
+        action: "Incident details updated",
+        by: user?.name || "",
+        timestamp: new Date().toISOString(),
+      },
+    ];
+    await updateIncident(id as string, {
+      location: editLocation.trim(),
+      lga: editLga.trim(),
+      state: editState.trim(),
+      description: editDescription.trim(),
+      timeline: newTimeline,
+    });
+    setShowEditModal(false);
+    Alert.alert("Updated", "Incident details saved.");
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -278,6 +351,18 @@ export default function CaseDetailScreen() {
               ))}
             </View>
           </View>
+        )}
+
+        {canEditIncident && (
+          <Section title="EDIT INCIDENT" colors={colors}>
+            <TouchableOpacity
+              style={[styles.assignBtn, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "30" }]}
+              onPress={openEditModal}
+            >
+              <Feather name="edit-3" size={15} color={colors.primary} />
+              <Text style={[styles.assignBtnText, { color: colors.primary }]}>Edit incident details</Text>
+            </TouchableOpacity>
+          </Section>
         )}
 
         {/* Description */}
@@ -424,6 +509,28 @@ export default function CaseDetailScreen() {
                   </Text>
                 )}
               </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal visible={showEditModal} animationType="slide" transparent>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Incident</Text>
+                <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                  <Feather name="x" size={20} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Field label="State" value={editState} onChangeText={setEditState} colors={colors} />
+                <Field label="LGA" value={editLga} onChangeText={setEditLga} colors={colors} />
+                <Field label="Location" value={editLocation} onChangeText={setEditLocation} colors={colors} />
+                <Field label="Description" value={editDescription} onChangeText={setEditDescription} colors={colors} multiline />
+              </ScrollView>
+              <TouchableOpacity style={[styles.modalPrimaryBtn, { backgroundColor: colors.primary }]} onPress={saveEdit}>
+                <Text style={styles.modalPrimaryBtnText}>Save Changes</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>

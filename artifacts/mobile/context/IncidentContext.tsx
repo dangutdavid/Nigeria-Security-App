@@ -95,7 +95,7 @@ export interface Victim {
   name: string;
   age: string;
   gender: "male" | "female" | "unknown";
-  condition: "deceased" | "critical" | "injured" | "unhurt";
+  condition: "fatal" | "critical" | "injured" | "unhurt";
   hospital?: string;
 }
 
@@ -198,7 +198,7 @@ const SEED_INCIDENTS: Incident[] = [
       { id: "v2", plate: "KJA-456-EK", make: "Toyota", model: "Hiace Bus", colour: "White", type: "bus" },
     ],
     victims: [
-      { id: "vt1", name: "Unknown", age: "~40", gender: "male", condition: "deceased", hospital: "Keffi General Hospital" },
+      { id: "vt1", name: "Unknown", age: "~40", gender: "male", condition: "fatal", hospital: "Keffi General Hospital" },
       { id: "vt2", name: "Unknown", age: "~25", gender: "female", condition: "critical", hospital: "Keffi General Hospital" },
       { id: "vt3", name: "Unknown", age: "~35", gender: "male", condition: "injured", hospital: "Keffi General Hospital" },
     ],
@@ -296,7 +296,7 @@ const SEED_INCIDENTS: Incident[] = [
     description: "Overloaded truck lost balance on bend and overturned onto median.",
     probableCauses: [{ category: "vehicle", code: "OVL", label: "Overloading" }],
     vehicles: [{ id: "v4", plate: "ENU-778-TR", make: "Volvo", model: "Trailer", colour: "White", type: "truck" }],
-    victims: [{ id: "vt4", name: "Unknown", age: "~46", gender: "male", condition: "deceased" }],
+    victims: [{ id: "vt4", name: "Unknown", age: "~46", gender: "male", condition: "fatal" }],
     evidence: [],
     reportedBy: "u2",
     reportedByName: "Adaeze Nwosu",
