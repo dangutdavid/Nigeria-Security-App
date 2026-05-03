@@ -23,6 +23,7 @@ import { NIGERIA_STATE_LGAS } from "@/data/nigeriaLGAs";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 const TOTAL_STEPS = 5;
+const STEP_LABELS = ["Type", "Location", "Persons", "Evidence", "Review"];
 
 const INCIDENT_TYPES: Array<{ value: IncidentType; label: string; icon: string; color: string }> = [
   { value: "crash", label: "Road Crash", icon: "alert-triangle", color: "#C0392B" },
@@ -232,6 +233,15 @@ export default function ReportScreen() {
     update({ victims: form.victims.filter((v) => v.id !== id) });
   }
 
+  function prevStep() {
+    if (step > 1) setStep((s) => (s - 1) as Step);
+    else router.back();
+  }
+
+  function nextStep() {
+    if (step < TOTAL_STEPS) setStep((s) => (s + 1) as Step);
+  }
+
   function canContinue() {
     if (step === 1) return !!form.type && !!form.severity;
     if (step === 2) return !!form.state && !!form.lga && !!form.location;
@@ -395,7 +405,7 @@ export default function ReportScreen() {
               <View key={victim.id} style={[s.block, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={[s.blockTitle, { color: colors.text }]}>Victim {idx + 1}</Text>
                 <FieldInput colors={colors} label="Name" value={victim.name} onChangeText={(name: string) => updateVictim(victim.id, { name })} placeholder="Full name" />
-                <FieldInput colors={colors} label="Condition" value={victim.condition} onChangeText={(condition: string) => updateVictim(victim.id, { condition })} placeholder="injured / treated / fatal" />
+                <FieldInput colors={colors} label="Condition" value={victim.condition} onChangeText={(condition: string) => updateVictim(victim.id, { condition: condition as any })} placeholder="injured / treated / fatal" />
                 <TouchableOpacity onPress={() => removeVictim(victim.id)}><Text style={{ color: colors.fatal, marginTop: 8 }}>Remove victim</Text></TouchableOpacity>
               </View>
             ))}

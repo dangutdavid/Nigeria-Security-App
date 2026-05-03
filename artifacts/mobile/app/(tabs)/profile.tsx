@@ -146,6 +146,7 @@ export default function ProfileScreen() {
         <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
           <SettingRow icon="shield" label="Badge Number" value={user.badgeNumber} />
           <SettingRow icon="briefcase" label="Role" value={ROLE_LABEL[user.role]} />
+          <SettingRow icon="mail" label="Email" value={user.email || "—"} />
           <SettingRow icon="map-pin" label="Station" value={user.station} />
           <SettingRow icon="phone" label="Phone" value={user.phone} />
           <SettingRow icon="users" label="Manage Users" onPress={() => router.push("/users")} />

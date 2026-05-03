@@ -8,6 +8,7 @@ export interface User {
   id: string;
   name: string;
   badgeNumber: string;
+  email: string;
   role: UserRole;
   sector: string;
   station: string;
@@ -22,6 +23,14 @@ export interface UserRecord {
 }
 
 export type LoginResult = "ok" | "invalid" | "inactive" | "suspended";
+export type OtpResult = "sent" | "not_found" | "email_mismatch";
+export type OtpVerifyResult = "ok" | "invalid" | "expired";
+
+interface PendingOtp {
+  badgeNumber: string;
+  code: string;
+  expiresAt: number;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -34,6 +43,9 @@ interface AuthContextType {
   deleteUser: (id: string) => Promise<void>;
   resetPin: (id: string, newPin: string) => Promise<void>;
   getUserById: (id: string) => User | undefined;
+  requestOtp: (badgeNumber: string, email: string) => Promise<{ result: OtpResult; code?: string }>;
+  verifyOtp: (badgeNumber: string, code: string) => Promise<OtpVerifyResult>;
+  resetPinWithOtp: (badgeNumber: string, newPin: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -47,6 +59,9 @@ const AuthContext = createContext<AuthContextType>({
   deleteUser: async () => {},
   resetPin: async () => {},
   getUserById: () => undefined,
+  requestOtp: async () => ({ result: "not_found" }),
+  verifyOtp: async () => "invalid",
+  resetPinWithOtp: async () => false,
 });
 
 const SEED_RECORDS: UserRecord[] = [
@@ -56,6 +71,7 @@ const SEED_RECORDS: UserRecord[] = [
       id: "u1",
       name: "Okafor Emmanuel",
       badgeNumber: "FO-001",
+      email: "o.emmanuel@frsc.gov.ng",
       role: "field_officer",
       sector: "Abuja FCT",
       station: "Kubwa Outpost",
@@ -70,6 +86,7 @@ const SEED_RECORDS: UserRecord[] = [
       id: "u2",
       name: "Adaeze Nwosu",
       badgeNumber: "SV-042",
+      email: "a.nwosu@frsc.gov.ng",
       role: "supervisor",
       sector: "Abuja FCT",
       station: "FCT Sector Command",
@@ -84,6 +101,7 @@ const SEED_RECORDS: UserRecord[] = [
       id: "u3",
       name: "Brig. Usman Aliyu",
       badgeNumber: "CMD-007",
+      email: "u.aliyu@frsc.gov.ng",
       role: "commander",
       sector: "North Central Zone",
       station: "Zonal Command HQ",
@@ -98,6 +116,7 @@ const SEED_RECORDS: UserRecord[] = [
       id: "u4",
       name: "Chukwudi Eze",
       badgeNumber: "FO-022",
+      email: "c.eze@frsc.gov.ng",
       role: "field_officer",
       sector: "Lagos State",
       station: "Ikeja Checkpoint",
@@ -112,6 +131,7 @@ const SEED_RECORDS: UserRecord[] = [
       id: "u5",
       name: "Fatima Bello",
       badgeNumber: "FO-037",
+      email: "f.bello@frsc.gov.ng",
       role: "field_officer",
       sector: "Kano State",
       station: "Kano Metro Command",
@@ -124,6 +144,9 @@ const SEED_RECORDS: UserRecord[] = [
 
 const AUTH_STORAGE_KEY = "@frsc_auth_user";
 const USERS_STORAGE_KEY = "@frsc_users";
+const OTP_STORAGE_KEY = "@frsc_pending_otp";
+const OTP_VERIFIED_KEY = "@frsc_otp_verified";
+const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -141,7 +164,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.getItem(USERS_STORAGE_KEY),
       ]);
       if (storedUser) setUser(JSON.parse(storedUser));
-      if (storedUsers) setRecords(JSON.parse(storedUsers));
+      if (storedUsers) {
+        const parsed: UserRecord[] = JSON.parse(storedUsers);
+        // Backfill email for any legacy records missing it
+        const patched = parsed.map((r) => ({
+          ...r,
+          user: Object.assign({ email: "" }, r.user),
+        }));
+        setRecords(patched);
+      }
     } catch {
     } finally {
       setIsLoading(false);
@@ -154,7 +185,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function login(badgeNumber: string, pin: string): Promise<LoginResult> {
-    const entry = records.find((r) => r.user.badgeNumber.toUpperCase() === badgeNumber.toUpperCase());
+    const entry = records.find(
+      (r) => r.user.badgeNumber.toUpperCase() === badgeNumber.toUpperCase()
+    );
     if (!entry || entry.pin !== pin) return "invalid";
     if (entry.user.status === "inactive") return "inactive";
     if (entry.user.status === "suspended") return "suspended";
@@ -168,7 +201,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }
 
-  async function addUser(newUser: Omit<User, "id" | "createdAt">, pin: string): Promise<void> {
+  async function addUser(
+    newUser: Omit<User, "id" | "createdAt">,
+    pin: string
+  ): Promise<void> {
     const record: UserRecord = {
       pin,
       user: {
@@ -180,8 +216,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await persistRecords([...records, record]);
   }
 
-  async function updateUser(id: string, updates: Partial<Omit<User, "id" | "createdAt">>): Promise<void> {
-    const next = records.map((r) => (r.user.id === id ? { ...r, user: { ...r.user, ...updates } } : r));
+  async function updateUser(
+    id: string,
+    updates: Partial<Omit<User, "id" | "createdAt">>
+  ): Promise<void> {
+    const next = records.map((r) =>
+      r.user.id === id ? { ...r, user: { ...r.user, ...updates } } : r
+    );
     await persistRecords(next);
     if (user?.id === id) {
       const updated = next.find((r) => r.user.id === id)?.user ?? null;
@@ -198,12 +239,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function resetPin(id: string, newPin: string): Promise<void> {
-    const next = records.map((r) => (r.user.id === id ? { ...r, pin: newPin } : r));
+    const next = records.map((r) =>
+      r.user.id === id ? { ...r, pin: newPin } : r
+    );
     await persistRecords(next);
   }
 
   function getUserById(id: string): User | undefined {
     return records.find((r) => r.user.id === id)?.user;
+  }
+
+  // OTP: generate code, store with expiry, return code so caller can "display" it
+  async function requestOtp(
+    badgeNumber: string,
+    email: string
+  ): Promise<{ result: OtpResult; code?: string }> {
+    const entry = records.find(
+      (r) => r.user.badgeNumber.toUpperCase() === badgeNumber.toUpperCase()
+    );
+    if (!entry) return { result: "not_found" };
+    if (entry.user.email.toLowerCase() !== email.toLowerCase()) {
+      return { result: "email_mismatch" };
+    }
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const otp: PendingOtp = {
+      badgeNumber: badgeNumber.toUpperCase(),
+      code,
+      expiresAt: Date.now() + OTP_TTL_MS,
+    };
+    await AsyncStorage.setItem(OTP_STORAGE_KEY, JSON.stringify(otp));
+    await AsyncStorage.removeItem(OTP_VERIFIED_KEY);
+    return { result: "sent", code };
+  }
+
+  async function verifyOtp(
+    badgeNumber: string,
+    code: string
+  ): Promise<OtpVerifyResult> {
+    const raw = await AsyncStorage.getItem(OTP_STORAGE_KEY);
+    if (!raw) return "invalid";
+    const otp: PendingOtp = JSON.parse(raw);
+    if (otp.badgeNumber !== badgeNumber.toUpperCase()) return "invalid";
+    if (Date.now() > otp.expiresAt) {
+      await AsyncStorage.removeItem(OTP_STORAGE_KEY);
+      return "expired";
+    }
+    if (otp.code !== code.trim()) return "invalid";
+    // Mark as verified so reset-pin screen can proceed
+    await AsyncStorage.setItem(OTP_VERIFIED_KEY, badgeNumber.toUpperCase());
+    await AsyncStorage.removeItem(OTP_STORAGE_KEY);
+    return "ok";
+  }
+
+  async function resetPinWithOtp(
+    badgeNumber: string,
+    newPin: string
+  ): Promise<boolean> {
+    const verified = await AsyncStorage.getItem(OTP_VERIFIED_KEY);
+    if (verified !== badgeNumber.toUpperCase()) return false;
+    const entry = records.find(
+      (r) => r.user.badgeNumber.toUpperCase() === badgeNumber.toUpperCase()
+    );
+    if (!entry) return false;
+    await resetPin(entry.user.id, newPin);
+    await AsyncStorage.removeItem(OTP_VERIFIED_KEY);
+    return true;
   }
 
   const allUsers = records.map((r) => r.user);
@@ -221,6 +321,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         deleteUser,
         resetPin,
         getUserById,
+        requestOtp,
+        verifyOtp,
+        resetPinWithOtp,
       }}
     >
       {children}

@@ -154,6 +154,17 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
+          <TouchableOpacity
+            onPress={() => router.push("/forgot-pin")}
+            style={styles.forgotLink}
+            activeOpacity={0.7}
+          >
+            <Feather name="help-circle" size={14} color={colors.mutedForeground} />
+            <Text style={[styles.forgotLinkText, { color: colors.mutedForeground }]}>
+              Forgot your PIN?
+            </Text>
+          </TouchableOpacity>
+
           <View style={[styles.demoSection, { borderTopColor: colors.border }]}> 
             <Text style={[styles.demoTitle, { color: colors.mutedForeground }]}>Demo Accounts</Text>
             <View style={styles.demoList}>
@@ -195,6 +206,8 @@ const styles = StyleSheet.create({
   errorText: { flex: 1, fontSize: 13, fontFamily: "Inter_500Medium" },
   loginBtn: { marginTop: 4, height: 52, borderRadius: 14, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   loginBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
+  forgotLink: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 4 },
+  forgotLinkText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   demoSection: { marginTop: 18, paddingTop: 16, borderTopWidth: 1 },
   demoTitle: { fontSize: 12, fontFamily: "Inter_700Bold", marginBottom: 10, textTransform: "uppercase" },
   demoList: { gap: 10 },

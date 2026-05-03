@@ -32,6 +32,7 @@ const STATUS_OPTIONS: { label: string; value: UserStatus; color: string }[] = [
 interface FormState {
   name: string;
   badgeNumber: string;
+  email: string;
   role: UserRole;
   sector: string;
   station: string;
@@ -44,6 +45,7 @@ interface FormState {
 const EMPTY_FORM: FormState = {
   name: "",
   badgeNumber: "",
+  email: "",
   role: "field_officer",
   sector: "",
   station: "",
@@ -87,6 +89,7 @@ export default function UserFormScreen() {
       setForm({
         name: editTarget.name,
         badgeNumber: editTarget.badgeNumber,
+        email: editTarget.email ?? "",
         role: editTarget.role,
         sector: editTarget.sector,
         station: editTarget.station,
@@ -132,6 +135,7 @@ export default function UserFormScreen() {
         await updateUser(editTarget.id, {
           name: form.name.trim(),
           badgeNumber: form.badgeNumber.trim().toUpperCase(),
+          email: form.email.trim().toLowerCase(),
           role: form.role,
           sector: form.sector.trim(),
           station: form.station.trim(),
@@ -145,6 +149,7 @@ export default function UserFormScreen() {
           {
             name: form.name.trim(),
             badgeNumber: form.badgeNumber.trim().toUpperCase(),
+            email: form.email.trim().toLowerCase(),
             role: form.role,
             sector: form.sector.trim(),
             station: form.station.trim(),
@@ -256,6 +261,16 @@ export default function UserFormScreen() {
               placeholder="e.g. FO-012"
               autoCapitalize="characters"
               editable={!isEditing}
+              colors={colors}
+            />
+            <FormField
+              label="Email Address"
+              icon="mail"
+              value={form.email}
+              onChangeText={(v) => set("email", v)}
+              placeholder="officer@frsc.gov.ng"
+              keyboardType="email-address"
+              autoCapitalize="none"
               colors={colors}
             />
             <FormField
