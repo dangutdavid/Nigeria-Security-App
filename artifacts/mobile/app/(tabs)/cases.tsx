@@ -295,6 +295,17 @@ export default function CasesScreen() {
   const [selectedLGAs, setSelectedLGAs] = useState<string[]>([]);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
 
+  React.useEffect(() => {
+    const nextStatus = typeof params.status === "string" ? params.status : null;
+    const nextSeverity = typeof params.severity === "string" ? params.severity : null;
+    if (nextStatus && ["all", "open", "submitted", "assigned", "under_review", "closed"].includes(nextStatus)) {
+      setStatusFilter(nextStatus as StatusFilterValue);
+    }
+    if (nextSeverity && ["all", "fatal", "serious", "minor"].includes(nextSeverity)) {
+      setSeverityFilter(nextSeverity as SeverityLevel | "all");
+    }
+  }, [params.status, params.severity]);
+
   const filtered = incidents.filter((incident) => {
     if (mineOnly && incident.reportedBy !== user?.id) return false;
     if (todayOnly) {
