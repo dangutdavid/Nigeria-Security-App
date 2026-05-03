@@ -204,6 +204,22 @@ export default function HomeScreen() {
         </View>
         <View style={styles.quickRow}>
           <TouchableOpacity
+            style={[styles.quickActionAlt, { borderColor: colors.secondary, backgroundColor: colors.secondary + "14" }]}
+            onPress={() => router.push("/users")}
+          >
+            <Feather name="users" size={18} color={colors.secondary} />
+            <Text style={[styles.quickActionAltText, { color: colors.secondary }]}>Users</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.quickActionAlt, { borderColor: colors.border, backgroundColor: colors.card }]}
+            onPress={() => router.push("/change-pin")}
+          >
+            <Feather name="key" size={18} color={colors.text} />
+            <Text style={[styles.quickActionAltText, { color: colors.text }]}>Change PIN</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.quickRow}>
+          <TouchableOpacity
             style={[styles.quickActionAlt, { borderColor: colors.warning, backgroundColor: colors.warning + "14" }]}
             onPress={() => router.push("/vehicle-lookup")}
           >
