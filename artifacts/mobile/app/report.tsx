@@ -394,13 +394,16 @@ export default function ReportScreen() {
 
             <View style={[s.block, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={s.sectionHeaderRow}>
-                <Text style={[s.blockTitle, { color: colors.text }]}>Vehicles</Text>
+                <Text style={[s.blockTitle, { color: colors.text }]}>Vehicles ({form.vehicles.length})</Text>
                 <TouchableOpacity onPress={addVehicle}>
                   <Text style={[s.linkText, { color: colors.primary }]}>Add vehicle</Text>
                 </TouchableOpacity>
               </View>
               {form.vehicles.length === 0 ? (
-                <Text style={[s.emptyHint, { color: colors.mutedForeground }]}>No vehicles added yet.</Text>
+                <TouchableOpacity style={[s.emptyAction, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={addVehicle}>
+                  <Feather name="plus" size={14} color={colors.primary} />
+                  <Text style={[s.emptyActionText, { color: colors.text }]}>Add the first vehicle</Text>
+                </TouchableOpacity>
               ) : (
                 form.vehicles.map((vehicle) => (
                   <View key={vehicle.id} style={[s.entryCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
@@ -426,13 +429,16 @@ export default function ReportScreen() {
 
             <View style={[s.block, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={s.sectionHeaderRow}>
-                <Text style={[s.blockTitle, { color: colors.text }]}>Victims / persons</Text>
+                <Text style={[s.blockTitle, { color: colors.text }]}>Victims / persons ({form.victims.length})</Text>
                 <TouchableOpacity onPress={addVictim}>
                   <Text style={[s.linkText, { color: colors.primary }]}>Add person</Text>
                 </TouchableOpacity>
               </View>
               {form.victims.length === 0 ? (
-                <Text style={[s.emptyHint, { color: colors.mutedForeground }]}>No persons added yet.</Text>
+                <TouchableOpacity style={[s.emptyAction, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={addVictim}>
+                  <Feather name="plus" size={14} color={colors.primary} />
+                  <Text style={[s.emptyActionText, { color: colors.text }]}>Add the first person</Text>
+                </TouchableOpacity>
               ) : (
                 form.victims.map((victim) => (
                   <View key={victim.id} style={[s.entryCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
@@ -560,6 +566,8 @@ const s = StyleSheet.create({
   selectedText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   linkText: { fontSize: 12, fontFamily: "Inter_700Bold" },
   emptyHint: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  emptyAction: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12 },
+  emptyActionText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   entryCard: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 10 },
   entryTitle: { fontSize: 13, fontFamily: "Inter_700Bold" },
   twoCol: { flexDirection: "row", gap: 10 },
