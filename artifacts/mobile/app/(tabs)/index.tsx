@@ -5,9 +5,11 @@ import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { useIncidents } from "@/context/IncidentContext";
 import { IncidentCard } from "@/components/IncidentCard";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { incidents } = useIncidents();
 
@@ -16,7 +18,7 @@ export default function HomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, paddingBottom: insets.bottom + 96 }}>
         {myReports.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
@@ -43,7 +45,7 @@ export default function HomeScreen() {
           ))}
         </View>
       </View>
-      <TouchableOpacity style={[styles.fab, { backgroundColor: colors.secondary }]} onPress={() => router.push("/report")}>
+      <TouchableOpacity style={[styles.fab, { backgroundColor: colors.secondary, bottom: insets.bottom + 18 }]} onPress={() => router.push("/report")}>
         <Feather name="plus" size={26} color="#fff" />
       </TouchableOpacity>
     </View>

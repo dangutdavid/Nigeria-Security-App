@@ -327,7 +327,7 @@ export default function CasesScreen() {
           <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>Browse and manage incidents</Text>
         </View>
       </View>
-      <View style={styles.headerActionRow}>
+      <View style={[styles.headerActionRow, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
         <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.secondary }]} onPress={() => router.push("/report")} activeOpacity={0.85}>
           <Feather name="plus" size={18} color="#fff" />
           <Text style={styles.headerBtnText}>Add incident</Text>
@@ -357,8 +357,8 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   header: {
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 10,
+    paddingTop: 12,
+    paddingBottom: 8,
     borderBottomWidth: 1,
   },
   headerText: { marginBottom: 2 },
@@ -366,9 +366,10 @@ const styles = StyleSheet.create({
   headerSubtitle: { marginTop: 4, fontSize: 12, fontFamily: "Inter_400Regular" },
   headerActionRow: {
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 6,
+    paddingTop: 10,
+    paddingBottom: 8,
     alignItems: "flex-start",
+    borderBottomWidth: 1,
   },
   headerBtn: {
     flexDirection: "row",
