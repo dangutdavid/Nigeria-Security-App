@@ -45,7 +45,7 @@ export default function HomeScreen() {
           ))}
         </View>
       </View>
-      <TouchableOpacity style={[styles.fab, { backgroundColor: colors.secondary, bottom: insets.bottom + 18 }]} onPress={() => router.push("/report")}>
+      <TouchableOpacity style={[styles.fab, { backgroundColor: colors.secondary, bottom: insets.bottom + 92 }]} onPress={() => router.push("/report")}>
         <Feather name="plus" size={26} color="#fff" />
       </TouchableOpacity>
     </View>

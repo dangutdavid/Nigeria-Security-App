@@ -343,7 +343,7 @@ export default function CasesScreen() {
         ListEmptyComponent={<View style={styles.emptyState}><Feather name="map-pin" size={40} color={colors.mutedForeground} /><Text style={[styles.emptyTitle, { color: colors.text }]}>No cases found</Text></View>}
       />
       <TouchableOpacity
-        style={[styles.fab, { backgroundColor: colors.secondary, bottom: insets.bottom + 20 }]}
+        style={[styles.fab, { backgroundColor: colors.secondary, bottom: insets.bottom + 92 }]}
         onPress={() => router.push("/report")}
         activeOpacity={0.85}
       >
