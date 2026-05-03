@@ -90,6 +90,9 @@ export default function ProfileScreen() {
 
   async function doLogout() {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setOfflineMode(false);
+    setAutoSync(true);
+    setLocationSharing(true);
     await logout();
     router.replace("/");
   }

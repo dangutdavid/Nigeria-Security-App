@@ -301,7 +301,7 @@ export default function ReportScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 16 }}>
-          {STEP_LABELS.map((label, index) => <StepPill key={label} label={label} active={step === index + 1} colors={colors} />)}
+          {STEP_LABELS.map((label) => <StepPill key={label} label={label} active={step === STEP_LABELS.indexOf(label) + 1} colors={colors} />)}
         </ScrollView>
 
         {step === 1 && (
