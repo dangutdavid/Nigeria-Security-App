@@ -86,6 +86,7 @@ export default function ProfileScreen() {
   const [offlineMode, setOfflineMode] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
   const [locationSharing, setLocationSharing] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
@@ -95,8 +96,13 @@ export default function ProfileScreen() {
     setOfflineMode(false);
     setAutoSync(true);
     setLocationSharing(true);
-    await logout();
-    router.replace("/");
+    setLoggingOut(true);
+    try {
+      await logout();
+      router.replace("/");
+    } finally {
+      setLoggingOut(false);
+    }
   }
 
   function handleLogout() {
@@ -184,9 +190,14 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: colors.fatal }]} onPress={handleLogout} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={[styles.logoutBtn, { backgroundColor: colors.fatal }, loggingOut && styles.logoutBtnDisabled]}
+          onPress={handleLogout}
+          activeOpacity={0.85}
+          disabled={loggingOut}
+        >
           <Feather name="log-out" size={16} color="#fff" />
-          <Text style={styles.logoutText}>Logout</Text>
+          <Text style={styles.logoutText}>{loggingOut ? "Logging out..." : "Logout"}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -214,5 +225,6 @@ const styles = StyleSheet.create({
   dutyCtaTitle: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
   dutyCtaSub: { color: "rgba(255,255,255,0.88)", fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 2 },
   logoutBtn: { height: 50, borderRadius: 12, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
+  logoutBtnDisabled: { opacity: 0.75 },
   logoutText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 15 },
 });
