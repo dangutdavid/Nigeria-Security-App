@@ -1,6 +1,6 @@
 import { BlurView } from "expo-blur";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
-import { Redirect, Tabs } from "expo-router";
+import { Redirect, Tabs, useRouter } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
@@ -39,6 +39,7 @@ function NativeTabLayout() {
 
 function ClassicTabLayout() {
   const colors = useColors();
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
@@ -171,7 +172,10 @@ export default function TabLayout() {
   const { user, isLoading } = useAuth();
 
   if (isLoading) return null;
-  if (!user) return <Redirect href="/" />;
+  if (!user) {
+    router.replace("/");
+    return null;
+  }
 
   if (isLiquidGlassAvailable()) {
     return <NativeTabLayout />;
