@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useIncidents } from "@/context/IncidentContext";
+import { usePatrol } from "@/context/PatrolContext";
 import { IncidentCard } from "@/components/IncidentCard";
 
 export default function HomeScreen() {
@@ -12,6 +13,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { incidents } = useIncidents();
+  const { isOnDuty, activeSession } = usePatrol();
 
   const myReports = incidents.filter((incident) => incident.reportedBy === "u1");
   const recent = incidents.slice(0, 5);
@@ -42,10 +44,15 @@ export default function HomeScreen() {
               <Text style={styles.heroTitle}>Live duty overview</Text>
               <Text style={styles.heroSub}>Offline-first incident tracking and rapid reporting</Text>
             </View>
-            <View style={styles.heroBadge}>
-              <Feather name="shield" size={18} color={colors.primary} />
-            </View>
+            <TouchableOpacity style={styles.heroBadge} onPress={() => router.push("/patrol-log")}>
+              <Feather name={isOnDuty ? "check-circle" : "shield"} size={18} color={colors.primary} />
+            </TouchableOpacity>
           </View>
+          <TouchableOpacity style={styles.dutyPill} onPress={() => router.push("/patrol-log")}>
+            <View style={[styles.dutyDot, { backgroundColor: isOnDuty ? colors.success : colors.warning }]} />
+            <Text style={styles.dutyText}>{isOnDuty ? "On duty" : "Off duty"}</Text>
+            <Text style={styles.dutySub}>{activeSession ? activeSession.route : "Tap to start duty"}</Text>
+          </TouchableOpacity>
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <Text style={styles.statValue}>{openCount}</Text>
@@ -58,6 +65,35 @@ export default function HomeScreen() {
             <View style={styles.statCard}>
               <Text style={styles.statValue}>{myReports.length}</Text>
               <Text style={styles.statLabel}>My reports</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>THIS MONTH</Text>
+            <Text style={[styles.sectionLink, { color: colors.primary }]}>Tap to open cases</Text>
+          </View>
+          <View style={styles.monthGrid}>
+            <View style={[styles.monthCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.monthIcon, { backgroundColor: colors.successLight }]}><Feather name="activity" size={22} color={colors.success} /></View>
+              <Text style={[styles.monthValue, { color: colors.text }]}>{incidents.length}</Text>
+              <Text style={[styles.monthLabel, { color: colors.mutedForeground }]}>Incidents</Text>
+            </View>
+            <View style={[styles.monthCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.monthIcon, { backgroundColor: colors.fatalLight }]}><Feather name="alert-triangle" size={22} color={colors.fatal} /></View>
+              <Text style={[styles.monthValue, { color: colors.text }]}>{fatalCount}</Text>
+              <Text style={[styles.monthLabel, { color: colors.mutedForeground }]}>Fatal Crashes</Text>
+            </View>
+            <View style={[styles.monthCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.monthIcon, { backgroundColor: colors.warningLight }]}><Feather name="clock" size={22} color={colors.warning} /></View>
+              <Text style={[styles.monthValue, { color: colors.text }]}>{incidents.filter((incident) => incident.status === "submitted" || incident.status === "under_review").length}</Text>
+              <Text style={[styles.monthLabel, { color: colors.mutedForeground }]}>Pending Review</Text>
+            </View>
+            <View style={[styles.monthCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.monthIcon, { backgroundColor: colors.successLight }]}><Feather name="check-circle" size={22} color={colors.success} /></View>
+              <Text style={[styles.monthValue, { color: colors.text }]}>{incidents.filter((incident) => incident.status === "closed").length}</Text>
+              <Text style={[styles.monthLabel, { color: colors.mutedForeground }]}>Closed Cases</Text>
             </View>
           </View>
         </View>

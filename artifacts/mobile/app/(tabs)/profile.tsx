@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, UserRole } from "@/context/AuthContext";
+import { usePatrol } from "@/context/PatrolContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -80,6 +81,7 @@ export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
+  const { isOnDuty, activeSession } = usePatrol();
 
   const [offlineMode, setOfflineMode] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
@@ -131,6 +133,13 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>APPEARANCE</Text>
         <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+          <SettingRow
+            icon={isOnDuty ? "check-circle" : "power"}
+            label="Duty Status"
+            value={isOnDuty ? "On duty" : "Off duty"}
+            subtitle={activeSession ? activeSession.route : "Start a duty session"}
+            onPress={() => router.push("/patrol-log")}
+          />
           <SettingRow icon={isDark ? "moon" : "sun"} label="Theme" subtitle={isDark ? "Dark mode on" : "Light mode on"} toggle toggled={isDark} onToggle={toggleTheme} />
         </View>
       </View>
