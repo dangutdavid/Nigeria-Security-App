@@ -129,7 +129,9 @@ export default function HomeScreen() {
                   <View style={[styles.statusDot, { backgroundColor: item.color }]} />
                   <Text style={[styles.statusLabel, { color: colors.text }]}>{item.label}</Text>
                 </View>
-                <Text style={[styles.statusValue, { color: colors.text }]}>{item.value}</Text>
+                <View style={[styles.statusValueWrap, { backgroundColor: item.color + "18" }]}>
+                  <Text style={[styles.statusValue, { color: item.color }]}>{item.value}</Text>
+                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -186,7 +188,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingHorizontal: 16, paddingTop: 12 },
+  content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 },
   hero: {
     borderRadius: 24,
     padding: 18,
@@ -226,6 +228,7 @@ const styles = StyleSheet.create({
   statusLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   statusLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  statusValue: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  statusValueWrap: { minWidth: 28, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  statusValue: { fontSize: 13, fontFamily: "Inter_700Bold" },
   fab: { position: "absolute", right: 20, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 6, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
 });
