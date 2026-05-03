@@ -63,10 +63,10 @@ const TYPE_SEVERITY_HINT: Record<IncidentType, string> = {
   flooding: "Pick the impact level caused by the flooding.",
 };
 
-const VEHICLE_TYPES = ["car", "bus", "truck", "pickup", "van", "motorcycle", "tricycle", "suv", "other"];
-const VEHICLE_COLOURS = ["White", "Black", "Grey", "Silver", "Blue", "Red", "Green", "Yellow", "Other"];
+const VEHICLE_TYPES = ["car", "bus", "truck", "pickup", "van", "motorcycle", "tricycle", "suv", "jeep", "other"];
+const VEHICLE_COLOURS = ["White", "Black", "Grey", "Silver", "Blue", "Red", "Green", "Yellow", "Brown", "Other"];
 const GENDER_OPTIONS = ["male", "female", "unknown"];
-const CONDITION_OPTIONS = ["injured", "uninjured", "critical", "deceased", "unknown"];
+const CONDITION_OPTIONS = ["injured", "uninjured", "critical", "fatal", "unknown"];
 
 const NIGERIA_STATES = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
