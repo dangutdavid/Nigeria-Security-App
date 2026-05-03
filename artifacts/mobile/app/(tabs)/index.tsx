@@ -50,7 +50,15 @@ export default function HomeScreen() {
           </View>
           <TouchableOpacity style={styles.dutyPill} onPress={() => router.push("/patrol-log")}>
             <View style={[styles.dutyDot, { backgroundColor: isOnDuty ? colors.success : colors.warning }]} />
-            <Text style={styles.dutySub}>{activeSession ? activeSession.route : "Tap to start duty"}</Text>
+            <View style={styles.dutyTextWrap}>
+              <Text style={[styles.dutyText, { color: isOnDuty ? "#fff" : "#163A2A" }]}>
+                {isOnDuty ? "On duty" : "Start duty"}
+              </Text>
+              <Text style={[styles.dutySub, { color: isOnDuty ? "rgba(255,255,255,0.85)" : "#163A2A" }]}>
+                {activeSession ? activeSession.route : "Tap to start duty"}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={isOnDuty ? "#fff" : "#163A2A"} />
           </TouchableOpacity>
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
@@ -259,6 +267,11 @@ const styles = StyleSheet.create({
   heroTitle: { color: "#fff", fontSize: 26, fontFamily: "Inter_700Bold", marginTop: 4 },
   heroSub: { color: "rgba(255,255,255,0.9)", fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 6, lineHeight: 18 },
   heroBadge: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.92)", alignItems: "center", justifyContent: "center" },
+  dutyPill: { marginTop: 12, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: "rgba(255,255,255,0.14)", flexDirection: "row", alignItems: "center", gap: 10 },
+  dutyDot: { width: 10, height: 10, borderRadius: 5 },
+  dutyTextWrap: { flex: 1 },
+  dutyText: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  dutySub: { fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 2 },
   statsRow: { flexDirection: "row", gap: 10, marginTop: 16 },
   statCard: { flex: 1, backgroundColor: "rgba(255,255,255,0.14)", borderRadius: 16, paddingVertical: 12, alignItems: "center" },
   statValue: { color: "#fff", fontSize: 22, fontFamily: "Inter_700Bold" },
