@@ -171,7 +171,7 @@ export default function TabLayout() {
   const { user, isLoading } = useAuth();
 
   if (isLoading) return null;
-  if (!user) return <Redirect href="/login" />;
+  if (!user) return <Redirect href="/" />;
 
   if (isLiquidGlassAvailable()) {
     return <NativeTabLayout />;
