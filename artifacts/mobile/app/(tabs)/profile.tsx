@@ -88,7 +88,7 @@ export default function ProfileScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
 
-  function handleLogout() {
+  async function handleLogout() {
     Alert.alert("Sign Out", "Are you sure you want to sign out? Any unsynced reports will remain saved locally.", [
       { text: "Cancel", style: "cancel" },
       {
@@ -109,12 +109,12 @@ export default function ProfileScreen() {
     <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
       <View style={[styles.header, { backgroundColor: colors.primary, paddingTop: topPad + 16 }]}>
         <View style={styles.avatarWrap}>
-          <View style={[styles.avatar, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
+          <View style={[styles.avatar, { backgroundColor: "rgba(255,255,255,0.2)" }]}> 
             <Text style={styles.avatarText}>{user.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}</Text>
           </View>
         </View>
         <Text style={styles.userName}>{user.name}</Text>
-        <View style={[styles.roleChip, { backgroundColor: "rgba(255,255,255,0.15)" }]}>
+        <View style={[styles.roleChip, { backgroundColor: "rgba(255,255,255,0.15)" }]}> 
           <Text style={styles.roleText}>{ROLE_LABEL[user.role]}</Text>
         </View>
       </View>
@@ -147,7 +147,7 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: colors.fatal }]} onPress={handleLogout}>
+        <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: colors.fatal }]} onPress={handleLogout} activeOpacity={0.85}>
           <Feather name="log-out" size={16} color="#fff" />
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
