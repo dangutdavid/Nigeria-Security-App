@@ -186,8 +186,8 @@ function LocationFilterSheet({
 
             {draftStates.length > 0 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={sheetStyles.badgesRow}>
-                {draftStates.map((s, index) => (
-                  <TouchableOpacity key={`${s}-${index}`} style={[sheetStyles.badge, { backgroundColor: colors.primary }]} onPress={() => toggleState(s)}>
+                {draftStates.map((s) => (
+                  <TouchableOpacity key={`state-${s}`} style={[sheetStyles.badge, { backgroundColor: colors.primary }]} onPress={() => toggleState(s)}>
                     <Text style={sheetStyles.badgeText}>{s}</Text>
                     <Feather name="x" size={11} color="#fff" />
                   </TouchableOpacity>
@@ -224,8 +224,8 @@ function LocationFilterSheet({
 
               {draftLGAs.length > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={sheetStyles.badgesRow}>
-                  {draftLGAs.map((l, index) => (
-                    <TouchableOpacity key={`${l}-${index}`} style={[sheetStyles.badge, { backgroundColor: colors.secondary }]} onPress={() => toggleLGA(l)}>
+                  {draftLGAs.map((l) => (
+                    <TouchableOpacity key={`lga-${l}`} style={[sheetStyles.badge, { backgroundColor: colors.secondary }]} onPress={() => toggleLGA(l)}>
                       <Text style={sheetStyles.badgeText}>{l}</Text>
                       <Feather name="x" size={11} color="#fff" />
                     </TouchableOpacity>
