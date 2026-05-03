@@ -31,9 +31,9 @@ import {
 import { useColors } from "@/hooks/useColors";
 import { NIGERIA_STATE_LGAS } from "@/data/nigeriaLGAs";
 
-type Step = 1 | 2 | 3 | 4 | 5;
-const TOTAL_STEPS = 5;
-const STEP_LABELS = ["Type", "Location", "Causes", "Evidence", "Review"];
+type Step = 1 | 2 | 3 | 4;
+const TOTAL_STEPS = 4;
+const STEP_LABELS = ["Type", "Location", "People", "Evidence"];
 
 const INCIDENT_TYPES: Array<{ value: IncidentType; label: string; icon: string; color: string }> = [
   { value: "crash", label: "Road Crash", icon: "alert-triangle", color: "#C0392B" },
@@ -503,20 +503,6 @@ export default function ReportScreen() {
               ))}
             </ScrollView>
             <FieldInput colors={colors} label="Notes" value={form.notes} onChangeText={(notes: string) => update({ notes })} placeholder="Additional remarks…" multiline rows={4} />
-          </View>
-        )}
-
-        {step === 5 && (
-          <View style={{ gap: 14 }}>
-            <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>REVIEW</Text>
-            <View style={[s.reviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
-              <Text style={[s.reviewTitle, { color: colors.text }]}>{form.type?.toUpperCase() || "UNSET"}</Text>
-              <Text style={[s.reviewLine, { color: colors.mutedForeground }]}>Severity: {form.severity || "-"}</Text>
-              <Text style={[s.reviewLine, { color: colors.mutedForeground }]}>Probable causes: {form.probableCauses.length}</Text>
-              <Text style={[s.reviewLine, { color: colors.mutedForeground }]}>Location: {form.location || "-"}</Text>
-              <Text style={[s.reviewLine, { color: colors.mutedForeground }]}>State / LGA: {form.state} / {form.lga || "-"}</Text>
-              <Text style={[s.reviewLine, { color: colors.mutedForeground }]}>Vehicles: {form.vehicles.length} • Victims: {form.victims.length} • Photos: {form.evidence.length}</Text>
-            </View>
           </View>
         )}
       </ScrollView>
