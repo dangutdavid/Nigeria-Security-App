@@ -186,14 +186,32 @@ export default function ProfileScreen() {
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>TOOLS</Text>
         <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
           <SettingRow
+            icon="anchor"
+            label="Patrol Summary"
+            subtitle="View active and recent patrol sessions"
+            onPress={() => router.push("/patrol-log")}
+          />
+          <SettingRow
             icon="truck"
             label="Vehicle Lookup"
             subtitle="Check registration and owner records"
             onPress={() => router.push("/vehicle-lookup")}
           />
+          <SettingRow
+            icon="clipboard"
+            label="Case Assignment"
+            subtitle="Assign submitted incidents to officers"
+            onPress={() => router.push("/(tabs)/cases?status=submitted" as any)}
+          />
           <SettingRow icon="users" label="Manage Users" subtitle="Create and assign officers" onPress={() => router.push("/users")} />
           <SettingRow icon="key" label="Change PIN" subtitle="Update your login PIN" onPress={() => router.push("/change-pin")} />
           <SettingRow icon="help-circle" label="Forgot PIN" subtitle="Recover access with OTP" onPress={() => router.push("/forgot-pin")} />
+          <SettingRow
+            icon="settings"
+            label="Settings & Sync"
+            subtitle="Open profile settings and connectivity options"
+            onPress={() => router.push("/patrol-log")}
+          />
         </View>
       </View>
 
