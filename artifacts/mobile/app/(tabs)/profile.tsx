@@ -145,6 +145,23 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
+        <TouchableOpacity
+          style={[styles.dutyCta, { backgroundColor: isOnDuty ? colors.success : colors.primary }]}
+          onPress={() => router.push("/patrol-log")}
+          activeOpacity={0.85}
+        >
+          <Feather name={isOnDuty ? "check-circle" : "play"} size={18} color="#fff" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.dutyCtaTitle}>{isOnDuty ? "You’re on duty" : "Start duty now"}</Text>
+            <Text style={styles.dutyCtaSub}>
+              {activeSession ? activeSession.route : "Open your patrol log and begin a session"}
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={18} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>CONNECTIVITY</Text>
         <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
           <SettingRow icon="cloud-off" label="Offline Mode" toggle toggled={offlineMode} onToggle={setOfflineMode} />
@@ -193,6 +210,9 @@ const styles = StyleSheet.create({
   settingLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   settingSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
   settingValue: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  dutyCta: { borderRadius: 16, paddingHorizontal: 16, paddingVertical: 16, flexDirection: "row", alignItems: "center", gap: 12 },
+  dutyCtaTitle: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
+  dutyCtaSub: { color: "rgba(255,255,255,0.88)", fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 2 },
   logoutBtn: { height: 50, borderRadius: 12, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   logoutText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 15 },
 });

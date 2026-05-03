@@ -276,7 +276,10 @@ export default function PatrolLogScreen() {
                 onPress={() => setShowStartModal(true)}
               >
                 <Feather name="play" size={18} color="#fff" />
-                <Text style={styles.startBtnText}>Start Duty</Text>
+                <View style={styles.startBtnCopy}>
+                  <Text style={styles.startBtnText}>Start Duty</Text>
+                  <Text style={styles.startBtnSub}>Choose route and begin session</Text>
+                </View>
               </TouchableOpacity>
             </View>
           )}
@@ -745,10 +748,19 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginTop: 8,
   },
+  startBtnCopy: {
+    alignItems: "flex-start",
+  },
   startBtnText: {
     color: "#fff",
     fontSize: 16,
     fontFamily: "Inter_700Bold",
+  },
+  startBtnSub: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    marginTop: 2,
   },
   historyCard: {
     borderRadius: 14,
