@@ -148,6 +148,7 @@ export default function ProfileScreen() {
           <SettingRow icon="briefcase" label="Role" value={ROLE_LABEL[user.role]} />
           <SettingRow icon="map-pin" label="Station" value={user.station} />
           <SettingRow icon="phone" label="Phone" value={user.phone} />
+          <SettingRow icon="users" label="Manage Users" onPress={() => router.push("/users")} />
           <SettingRow icon="key" label="Change PIN" onPress={() => router.push("/change-pin")} />
         </View>
       </View>
