@@ -213,6 +213,96 @@ const SEED_INCIDENTS: Incident[] = [
     ],
     pendingSync: false,
   },
+  {
+    id: "INC-2024-002",
+    type: "breakdown",
+    severity: "serious",
+    status: "submitted",
+    title: "Bus breakdown — Airport Road",
+    location: "Murtala Muhammed Airport Road",
+    lga: "Ikeja",
+    state: "Lagos",
+    latitude: 6.577,
+    longitude: 3.321,
+    dateTime: new Date(Date.now() - 86400000 * 1).toISOString(),
+    description: "Commercial bus stalled during rush hour, causing heavy traffic buildup.",
+    probableCauses: [{ category: "vehicle", code: "BFL", label: "Brake failure" }],
+    vehicles: [{ id: "v3", plate: "LAG-201-BR", make: "Mercedes", model: "Sprinter", colour: "Blue", type: "bus" }],
+    victims: [],
+    evidence: [],
+    reportedBy: "u1",
+    reportedByName: "Okafor Emmanuel",
+    timeline: [{ id: "t3", action: "Incident reported", by: "Okafor Emmanuel", timestamp: new Date(Date.now() - 86400000 * 1).toISOString() }],
+    pendingSync: false,
+  },
+  {
+    id: "INC-2024-003",
+    type: "hazard",
+    severity: "minor",
+    status: "assigned",
+    title: "Fallen cargo on carriageway",
+    location: "Otedola Bridge",
+    lga: "Mushin",
+    state: "Lagos",
+    latitude: 6.607,
+    longitude: 3.354,
+    dateTime: new Date(Date.now() - 86400000 * 2).toISOString(),
+    description: "Loose cargo scattered on the road shoulder; scene secured and warning cones placed.",
+    probableCauses: [{ category: "environment", code: "ROB", label: "Road obstruction" }],
+    vehicles: [],
+    victims: [],
+    evidence: [],
+    reportedBy: "u1",
+    reportedByName: "Okafor Emmanuel",
+    assignedTo: "u3",
+    assignedToName: "Bello Ibrahim",
+    timeline: [{ id: "t4", action: "Assigned to patrol team", by: "System", timestamp: new Date(Date.now() - 86400000 * 2 + 1200000).toISOString() }],
+    pendingSync: false,
+  },
+  {
+    id: "INC-2024-004",
+    type: "flooding",
+    severity: "serious",
+    status: "under_review",
+    title: "Flash flood on expressway",
+    location: "Abuja–Kaduna Highway",
+    lga: "Bwari",
+    state: "FCT",
+    latitude: 9.185,
+    longitude: 7.145,
+    dateTime: new Date(Date.now() - 86400000 * 4).toISOString(),
+    description: "Water pooling on carriageway after heavy rain; drainage blocked at roadside culvert.",
+    probableCauses: [{ category: "environment", code: "PWR", label: "Poor weather" }],
+    vehicles: [],
+    victims: [],
+    evidence: [],
+    reportedBy: "u4",
+    reportedByName: "Amina Musa",
+    timeline: [{ id: "t5", action: "Sent for review", by: "System", timestamp: new Date(Date.now() - 86400000 * 4 + 2400000).toISOString() }],
+    pendingSync: false,
+  },
+  {
+    id: "INC-2024-005",
+    type: "crash",
+    severity: "fatal",
+    status: "submitted",
+    title: "Truck rollover — Enugu Port Road",
+    location: "Enugu Port Road",
+    lga: "Enugu East",
+    state: "Enugu",
+    latitude: 6.448,
+    longitude: 7.502,
+    dateTime: new Date(Date.now() - 86400000 * 5).toISOString(),
+    description: "Overloaded truck lost balance on bend and overturned onto median.",
+    probableCauses: [{ category: "vehicle", code: "OVL", label: "Overloading" }],
+    vehicles: [{ id: "v4", plate: "ENU-778-TR", make: "Volvo", model: "Trailer", colour: "White", type: "truck" }],
+    victims: [{ id: "vt4", name: "Unknown", age: "~46", gender: "male", condition: "deceased" }],
+    evidence: [],
+    reportedBy: "u2",
+    reportedByName: "Adaeze Nwosu",
+    timeline: [{ id: "t6", action: "Incident reported", by: "Adaeze Nwosu", timestamp: new Date(Date.now() - 86400000 * 5).toISOString() }],
+    pendingSync: false,
+  },
 ];
 
 const DEFAULT_DRAFT: DraftReport = { probableCauses: [], vehicles: [], victims: [] };
@@ -254,12 +344,8 @@ export function IncidentProvider({ children }: { children: React.ReactNode }) {
   async function load() {
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as Incident[];
-        setIncidents(Array.isArray(parsed) && parsed.length > 0 ? parsed : SEED_INCIDENTS);
-      } else {
-        setIncidents(SEED_INCIDENTS);
-      }
+      const parsed = stored ? (JSON.parse(stored) as Incident[]) : [];
+      setIncidents(Array.isArray(parsed) && parsed.length > 0 ? parsed : SEED_INCIDENTS);
     } catch {
       setIncidents(SEED_INCIDENTS);
     } finally {
