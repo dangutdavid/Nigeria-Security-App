@@ -4,7 +4,6 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { useIncidents } from "@/context/IncidentContext";
-import { IncidentCard } from "@/components/IncidentCard";
 
 export default function HomeScreen() {
   const colors = useColors();
@@ -25,7 +24,11 @@ export default function HomeScreen() {
                 <Text style={[styles.seeAll, { color: colors.primary }]}>All cases</Text>
               </TouchableOpacity>
             </View>
-            {myReports.map((inc) => <IncidentCard key={inc.id} incident={inc} />)}
+            {myReports.map((inc) => (
+              <View key={inc.id} style={styles.cardWrap}>
+                <Text style={{ color: colors.text }}>{inc.title}</Text>
+              </View>
+            ))}
           </View>
         )}
 
@@ -36,7 +39,11 @@ export default function HomeScreen() {
               <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
             </TouchableOpacity>
           </View>
-          {recent.map((inc) => <IncidentCard key={inc.id} incident={inc} />)}
+          {recent.map((inc) => (
+            <View key={inc.id} style={styles.cardWrap}>
+              <Text style={{ color: colors.text }}>{inc.title}</Text>
+            </View>
+          ))}
         </View>
       </View>
       <TouchableOpacity style={[styles.fab, { backgroundColor: colors.secondary }]} onPress={() => router.push("/report")}>
@@ -52,4 +59,5 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 12, fontFamily: "Inter_700Bold" },
   seeAll: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   fab: { position: "absolute", right: 20, bottom: 20, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center" },
+  cardWrap: { paddingVertical: 8 },
 });
