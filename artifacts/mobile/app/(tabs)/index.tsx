@@ -50,7 +50,6 @@ export default function HomeScreen() {
           </View>
           <TouchableOpacity style={styles.dutyPill} onPress={() => router.push("/patrol-log")}>
             <View style={[styles.dutyDot, { backgroundColor: isOnDuty ? colors.success : colors.warning }]} />
-            <Text style={styles.dutyText}>{isOnDuty ? "On duty" : "Off duty"}</Text>
             <Text style={styles.dutySub}>{activeSession ? activeSession.route : "Tap to start duty"}</Text>
           </TouchableOpacity>
           <View style={styles.statsRow}>
