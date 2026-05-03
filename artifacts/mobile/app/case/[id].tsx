@@ -667,7 +667,7 @@ export default function CaseDetailScreen() {
                 <Field label="LGA" value={editLga} onChangeText={setEditLga} colors={colors} />
                 <Field label="Location" value={editLocation} onChangeText={setEditLocation} colors={colors} />
                 <Field label="Description" value={editDescription} onChangeText={setEditDescription} colors={colors} multiline />
-                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Vehicles</Text>
+                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Related Vehicles</Text>
                 {editVehicles.map((v) => (
                   <View key={v.id} style={[styles.childRow, { borderColor: colors.border, backgroundColor: colors.muted }]}>
                     <View style={{ flex: 1 }}>
@@ -693,7 +693,7 @@ export default function CaseDetailScreen() {
                   <Text style={[styles.smallActionText, { color: colors.primary }]}>Add vehicle</Text>
                 </TouchableOpacity>
 
-                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Persons / casualties</Text>
+                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Related Persons</Text>
                 {editVictims.map((v) => (
                   <View key={v.id} style={[styles.childRow, { borderColor: colors.border, backgroundColor: colors.muted }]}>
                     <View style={{ flex: 1 }}>
@@ -725,7 +725,7 @@ export default function CaseDetailScreen() {
                   <Text style={[styles.smallActionText, { color: colors.primary }]}>Add person</Text>
                 </TouchableOpacity>
 
-                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Evidence</Text>
+                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Related Evidence</Text>
                 {editEvidence.map((e) => (
                   <View key={e.id} style={[styles.childRow, { borderColor: colors.border, backgroundColor: colors.muted }]}>
                     <View style={{ flex: 1 }}>
