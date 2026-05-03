@@ -69,14 +69,27 @@ export default function HomeScreen() {
           </View>
           <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.chartTitle, { color: colors.text }]}>Severity breakdown</Text>
-            <View style={styles.chartBars}>
+            <View style={styles.severityList}>
               {bySeverity.map((item) => (
-                <TouchableOpacity key={item.key} style={styles.chartBarWrap} onPress={() => router.push(`/(tabs)/cases?severity=${item.key}` as any)}>
-                  <View style={[styles.chartBarTrack, { backgroundColor: colors.muted }]}>
-                    <View style={[styles.chartBarFill, { height: `${Math.max(12, item.value ? item.value * 18 : 12)}%`, backgroundColor: item.color }]} />
+                <TouchableOpacity
+                  key={item.key}
+                  style={styles.severityRow}
+                  onPress={() => router.push(`/(tabs)/cases?severity=${item.key}` as any)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.severityLeft}>
+                    <View style={[styles.severityDot, { backgroundColor: item.color }]} />
+                    <Text style={[styles.statusLabel, { color: colors.text }]}>{item.label}</Text>
                   </View>
-                  <Text style={[styles.chartBarValue, { color: colors.text }]}>{item.value}</Text>
-                  <Text style={[styles.chartBarLabel, { color: colors.mutedForeground }]}>{item.label}</Text>
+                  <View style={styles.severityBarTrack}>
+                    <View
+                      style={[
+                        styles.severityBarFill,
+                        { width: `${Math.max(18, item.value ? item.value * 20 : 18)}%`, backgroundColor: item.color },
+                      ]}
+                    />
+                  </View>
+                  <Text style={[styles.severityValue, { color: colors.text }]}>{item.value}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -179,12 +192,12 @@ const styles = StyleSheet.create({
   sectionLink: { fontSize: 11, fontFamily: "Inter_500Medium" },
   chartCard: { borderRadius: 18, borderWidth: 1, padding: 14 },
   chartTitle: { fontSize: 15, fontFamily: "Inter_700Bold", marginBottom: 12 },
-  chartBars: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 10 },
-  chartBarWrap: { flex: 1, alignItems: "center", gap: 8 },
-  chartBarTrack: { width: "100%", height: 120, borderRadius: 14, overflow: "hidden", justifyContent: "flex-end" },
-  chartBarFill: { width: "100%", borderRadius: 14 },
-  chartBarValue: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  chartBarLabel: { fontSize: 11, fontFamily: "Inter_500Medium", textAlign: "center" },
+  severityList: { gap: 12 },
+  severityRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  severityLeft: { width: 78, flexDirection: "row", alignItems: "center", gap: 8 },
+  severityBarTrack: { flex: 1, height: 10, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.06)", overflow: "hidden" },
+  severityBarFill: { height: "100%", borderRadius: 999 },
+  severityValue: { width: 22, textAlign: "right", fontSize: 14, fontFamily: "Inter_700Bold" },
   statusRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 12, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.06)" },
   statusLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
