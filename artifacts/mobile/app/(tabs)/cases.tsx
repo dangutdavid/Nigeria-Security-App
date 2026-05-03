@@ -380,6 +380,16 @@ export default function CasesScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
         ListEmptyComponent={<View style={styles.emptyState}><Feather name="map-pin" size={40} color={colors.mutedForeground} /><Text style={[styles.emptyTitle, { color: colors.text }]}>No cases found</Text></View>}
       />
+      <LocationFilterSheet
+        visible={locationModalVisible}
+        selectedStates={selectedStates}
+        selectedLGAs={selectedLGAs}
+        onApply={(states, lgas) => {
+          setSelectedStates(states);
+          setSelectedLGAs(lgas);
+        }}
+        onClose={() => setLocationModalVisible(false)}
+      />
       <TouchableOpacity
         style={[styles.fab, { backgroundColor: colors.secondary, bottom: insets.bottom + 92 }]}
         onPress={() => router.push("/report")}
