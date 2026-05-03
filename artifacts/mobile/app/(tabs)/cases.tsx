@@ -237,7 +237,7 @@ function LocationFilterSheet({
                 <View style={sheetStyles.quickRow}>
                   <Text style={[sheetStyles.quickLabel, { color: colors.mutedForeground }]}>Quick pick:</Text>
                   {(NIGERIA_STATE_LGAS.find((s) => s.name === draftStates[0])?.lgas.slice(0, 5) ?? []).map((l, index) => (
-                    <TouchableOpacity key={`${l}-${index}`} style={[sheetStyles.quickChip, { borderColor: colors.secondary }]} onPress={() => toggleLGA(l)}>
+                    <TouchableOpacity key={`quick-${draftStates[0]}-${l}-${index}`} style={[sheetStyles.quickChip, { borderColor: colors.secondary }]} onPress={() => toggleLGA(l)}>
                       <Text style={[sheetStyles.quickChipText, { color: colors.secondary }]}>{l}</Text>
                     </TouchableOpacity>
                   ))}
