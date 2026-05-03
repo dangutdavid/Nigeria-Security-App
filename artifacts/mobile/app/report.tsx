@@ -17,7 +17,16 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
-import { useIncidents, IncidentStatus, IncidentType, SeverityLevel, Vehicle, Victim } from "@/context/IncidentContext";
+import {
+  getProbableCauseLibrary,
+  IncidentStatus,
+  IncidentType,
+  ProbableCause,
+  SeverityLevel,
+  Vehicle,
+  Victim,
+  useIncidents,
+} from "@/context/IncidentContext";
 import { useColors } from "@/hooks/useColors";
 import { NIGERIA_STATE_LGAS } from "@/data/nigeriaLGAs";
 
@@ -53,6 +62,15 @@ const TYPE_SEVERITY_HINT: Record<IncidentType, string> = {
   flooding: "Pick the impact level caused by the flooding.",
 };
 
+const PROBABLE_CAUSE_LABELS: Record<string, string> = {
+  driver: "Driver factors",
+  vehicle: "Vehicle factors",
+  environment: "Environmental factors",
+  temporal: "Temporal factors",
+  road: "Road factors",
+  other: "Other",
+};
+
 const NIGERIA_STATES = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
   "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT", "Gombe", "Imo",
@@ -71,6 +89,7 @@ interface FormState {
   latitude: number | null;
   longitude: number | null;
   gpsAccuracy: number | null;
+  probableCauses: ProbableCause[];
   vehicles: Vehicle[];
   victims: Victim[];
   evidence: string[];
@@ -130,33 +149,34 @@ export default function ReportScreen() {
     latitude: null,
     longitude: null,
     gpsAccuracy: null,
+    probableCauses: [],
     vehicles: [],
     victims: [],
     evidence: [],
     notes: "",
   });
 
-  const selectedLgas = useMemo(
-    () => NIGERIA_STATE_LGAS.find((s) => s.name === form.state)?.lgas ?? [],
-    [form.state]
-  );
-  const filteredLgas = useMemo(
-    () => selectedLgas.filter((l) => !lgaSearch || l.toLowerCase().includes(lgaSearch.toLowerCase())),
-    [selectedLgas, lgaSearch]
-  );
+  const selectedLgas = useMemo(() => NIGERIA_STATE_LGAS.find((s) => s.name === form.state)?.lgas ?? [], [form.state]);
+  const filteredLgas = useMemo(() => selectedLgas.filter((l) => !lgaSearch || l.toLowerCase().includes(lgaSearch.toLowerCase())), [selectedLgas, lgaSearch]);
   const allowedSeverities = form.type ? TYPE_SEVERITY_MAP[form.type] : [];
+  const probableCauseOptions = form.type ? getProbableCauseLibrary(form.type) : [];
 
   function update(fields: Partial<FormState>) {
     setForm((f) => ({ ...f, ...fields }));
   }
 
   function pickType(type: IncidentType) {
-    update({ type, severity: null });
+    update({ type, severity: null, probableCauses: [] });
   }
 
   function pickSeverity(severity: SeverityLevel) {
     if (form.type && !TYPE_SEVERITY_MAP[form.type].includes(severity)) return;
     update({ severity });
+  }
+
+  function toggleProbableCause(item: ProbableCause) {
+    const exists = form.probableCauses.some((cause) => cause.code === item.code);
+    update({ probableCauses: exists ? form.probableCauses.filter((cause) => cause.code !== item.code) : [...form.probableCauses, item] });
   }
 
   async function useGps() {
@@ -171,13 +191,7 @@ export default function ReportScreen() {
       if (geo?.region) {
         const detectedState = NIGERIA_STATES.find((s) => s.toLowerCase() === geo.region?.toLowerCase()) ?? form.state;
         const matchLga = selectedLgas.find((l) => geo.subregion?.toLowerCase().includes(l.toLowerCase()) || l.toLowerCase().includes((geo.subregion ?? "").toLowerCase()));
-        update({
-          state: detectedState,
-          lga: matchLga ?? form.lga,
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          gpsAccuracy: pos.coords.accuracy ?? null,
-        });
+        update({ state: detectedState, lga: matchLga ?? form.lga, latitude: pos.coords.latitude, longitude: pos.coords.longitude, gpsAccuracy: pos.coords.accuracy ?? null });
         if (detectedState !== form.state) setLgaSearch("");
       }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -196,9 +210,7 @@ export default function ReportScreen() {
       Alert.alert("Permission denied", "Please allow access to attach evidence photos.");
       return;
     }
-    const result = useCamera
-      ? await ImagePicker.launchCameraAsync({ quality: 0.75 })
-      : await ImagePicker.launchImageLibraryAsync({ quality: 0.75 });
+    const result = useCamera ? await ImagePicker.launchCameraAsync({ quality: 0.75 }) : await ImagePicker.launchImageLibraryAsync({ quality: 0.75 });
     if (!result.canceled && result.assets[0]) {
       update({ evidence: [...new Set([...form.evidence, result.assets[0].uri])] });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -245,35 +257,37 @@ export default function ReportScreen() {
   function canContinue() {
     if (step === 1) return !!form.type && !!form.severity;
     if (step === 2) return !!form.state && !!form.lga && !!form.location;
-    if (step === 3) return true;
-    if (step === 4) return true;
     return true;
   }
 
   function submit() {
     if (!user || !form.type || !form.severity) return;
     const incident = {
+      id: `INC-${Date.now()}`,
       title: `${form.type.toUpperCase()} - ${form.location || form.lga || form.state}`,
       type: form.type,
       severity: form.severity,
       status: "submitted" as IncidentStatus,
       reportedBy: user.id,
-      reporterName: user.name,
+      reportedByName: user.name,
       location: form.location || form.lga || form.state,
       state: form.state,
       lga: form.lga,
       description: form.description,
-      latitude: form.latitude,
-      longitude: form.longitude,
+      probableCauses: form.probableCauses,
+      latitude: form.latitude ?? 0,
+      longitude: form.longitude ?? 0,
       gpsAccuracy: form.gpsAccuracy,
       vehicles: form.vehicles,
       victims: form.victims,
       evidence: form.evidence,
       notes: form.notes,
       dateTime: new Date().toISOString(),
+      timeline: [{ id: `TL-${Date.now()}`, action: "Incident reported", by: user.name, timestamp: new Date().toISOString() }],
+      pendingSync: false,
     } as any;
-    addIncident(incident);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void addIncident(incident);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.replace("/(tabs)/cases");
   }
 
@@ -281,7 +295,7 @@ export default function ReportScreen() {
   const bottomPad = insets.bottom + 24;
 
   return (
-    <View style={[s.root, { backgroundColor: colors.background }]}>
+    <View style={[s.root, { backgroundColor: colors.background }]}> 
       <View style={[s.header, { paddingTop: topPad, borderBottomColor: colors.border, backgroundColor: colors.card }]}> 
         <TouchableOpacity onPress={() => router.back()}>
           <Feather name="x" size={22} color={colors.text} />
@@ -295,7 +309,7 @@ export default function ReportScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 16 }}>
-          {STEP_LABELS.map((label, index) => <StepPill key={label} label={label} active={step === index + 1} colors={colors} />)}
+          {STEP_LABELS.map((label, index) => <StepPill key={`${label}-${index}`} label={label} active={step === index + 1} colors={colors} />)}
         </ScrollView>
 
         {step === 1 && (
@@ -317,7 +331,7 @@ export default function ReportScreen() {
               <View style={{ gap: 10 }}>
                 <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>SEVERITY</Text>
                 <Text style={[s.helper, { color: colors.mutedForeground }]}>{TYPE_SEVERITY_HINT[form.type]}</Text>
-                {SEVERITY_LEVELS.filter((s) => allowedSeverities.includes(s.value)).map((sev) => {
+                {SEVERITY_LEVELS.filter((sev) => allowedSeverities.includes(sev.value)).map((sev) => {
                   const active = form.severity === sev.value;
                   return (
                     <TouchableOpacity key={sev.value} style={[s.severityRow, { backgroundColor: active ? sev.color : colors.card, borderColor: active ? sev.color : colors.border }]} onPress={() => pickSeverity(sev.value)}>
@@ -384,6 +398,35 @@ export default function ReportScreen() {
 
         {step === 3 && (
           <View style={{ gap: 16 }}>
+            <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>POTENTIAL CAUSES</Text>
+            {form.type ? (
+              <View style={{ gap: 12 }}>
+                {Object.entries(
+                  probableCauseOptions.reduce((acc, item) => {
+                    const key = item.category;
+                    if (!acc[key]) acc[key] = [];
+                    acc[key].push(item);
+                    return acc;
+                  }, {} as Record<string, ProbableCause[]>)
+                ).map(([category, items]) => (
+                  <View key={category} style={[s.block, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+                    <Text style={[s.blockTitle, { color: colors.text }]}>{PROBABLE_CAUSE_LABELS[category] ?? category}</Text>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+                      {items.map((item) => {
+                        const selected = form.probableCauses.some((cause) => cause.code === item.code);
+                        return (
+                          <TouchableOpacity key={item.code} onPress={() => toggleProbableCause(item)} style={[s.causeChip, { backgroundColor: selected ? colors.primary : colors.muted, borderColor: selected ? colors.primary : colors.border }]}>
+                            <Text style={[s.causeCode, { color: selected ? "#fff" : colors.primary }]}>{item.code}</Text>
+                            <Text style={[s.causeLabel, { color: selected ? "#fff" : colors.mutedForeground }]}>{item.label}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
             <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>PEOPLE & VEHICLES</Text>
             <TouchableOpacity style={[s.addBtn, { backgroundColor: colors.secondary }]} onPress={addVehicle}>
               <Feather name="plus" size={14} color="#fff" />
@@ -427,7 +470,7 @@ export default function ReportScreen() {
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
               {form.evidence.map((uri) => (
-                <View key={uri} style={[s.evidenceThumb, { borderColor: colors.border }]}>
+                <View key={uri} style={[s.evidenceThumb, { borderColor: colors.border }]}> 
                   <Image source={{ uri }} style={s.evidenceImage} />
                   <TouchableOpacity style={[s.evidenceRemove, { backgroundColor: colors.fatal }]} onPress={() => removeEvidence(uri)}>
                     <Feather name="x" size={12} color="#fff" />
@@ -442,9 +485,10 @@ export default function ReportScreen() {
         {step === 5 && (
           <View style={{ gap: 14 }}>
             <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>REVIEW</Text>
-            <View style={[s.reviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[s.reviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
               <Text style={[s.reviewTitle, { color: colors.text }]}>{form.type?.toUpperCase() || "UNSET"}</Text>
               <Text style={[s.reviewLine, { color: colors.mutedForeground }]}>Severity: {form.severity || "-"}</Text>
+              <Text style={[s.reviewLine, { color: colors.mutedForeground }]}>Probable causes: {form.probableCauses.length}</Text>
               <Text style={[s.reviewLine, { color: colors.mutedForeground }]}>Location: {form.location || "-"}</Text>
               <Text style={[s.reviewLine, { color: colors.mutedForeground }]}>State / LGA: {form.state} / {form.lga || "-"}</Text>
               <Text style={[s.reviewLine, { color: colors.mutedForeground }]}>Vehicles: {form.vehicles.length} • Victims: {form.victims.length} • Photos: {form.evidence.length}</Text>
@@ -501,6 +545,9 @@ const s = StyleSheet.create({
   addBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_700Bold" },
   block: { borderWidth: 1, borderRadius: 14, padding: 14, gap: 10 },
   blockTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  causeChip: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, minWidth: 120, flexGrow: 1 },
+  causeCode: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  causeLabel: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
   evidenceRow: { flexDirection: "row", gap: 10 },
   evidenceThumb: { width: 88, height: 88, borderRadius: 12, borderWidth: 1, overflow: "hidden" },
   evidenceImage: { width: "100%", height: "100%" },
