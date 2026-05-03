@@ -116,6 +116,8 @@ export default function AnalyticsScreen() {
     (sum, i) => sum + i.victims.filter((v) => v.condition === "critical" || v.condition === "injured").length,
     0
   );
+  const hasFilters =
+    typeFilter !== "all" || statusFilter !== "all" || query.trim().length > 0 || rangeFilter !== "all";
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 20);
@@ -150,6 +152,24 @@ export default function AnalyticsScreen() {
       >
         <Section title="FILTER INCIDENTS" colors={colors}>
           <View style={[styles.filterBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.filterHeaderRow}>
+              <Text style={[styles.filterMeta, { color: colors.mutedForeground }]}>
+                {hasFilters ? "Filters active" : "Showing all incidents"}
+              </Text>
+              {hasFilters ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    setTypeFilter("all");
+                    setStatusFilter("all");
+                    setQuery("");
+                    setRangeFilter("all");
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.resetText, { color: colors.primary }]}>Reset</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
             <TextInput
               value={query}
               onChangeText={setQuery}
@@ -578,6 +598,19 @@ const styles = StyleSheet.create({
   },
   filterBox: {
     gap: 10,
+  },
+  filterHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  filterMeta: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
+  resetText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
   },
   searchInput: {
     height: 44,
