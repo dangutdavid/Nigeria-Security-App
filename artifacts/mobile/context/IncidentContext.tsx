@@ -253,11 +253,6 @@ export function IncidentProvider({ children }: { children: React.ReactNode }) {
 
   async function load() {
     try {
-      const resetDone = await AsyncStorage.getItem(STORAGE_RESET_KEY);
-      if (!resetDone) {
-        await AsyncStorage.removeItem(STORAGE_KEY);
-        await AsyncStorage.setItem(STORAGE_RESET_KEY, "1");
-      }
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as Incident[];
@@ -275,6 +270,7 @@ export function IncidentProvider({ children }: { children: React.ReactNode }) {
   async function persist(next: Incident[]) {
     setIncidents(next);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    await AsyncStorage.removeItem(STORAGE_RESET_KEY);
     setPendingCount(next.filter((i) => i.pendingSync).length);
   }
 
