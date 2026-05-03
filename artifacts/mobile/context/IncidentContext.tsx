@@ -90,6 +90,12 @@ export interface Vehicle {
   type: "car" | "truck" | "bus" | "motorcycle" | "other";
 }
 
+export interface EvidenceItem {
+  id: string;
+  uri: string;
+  label?: string;
+}
+
 export interface Victim {
   id: string;
   name: string;
@@ -122,7 +128,7 @@ export interface Incident {
   probableCauses: ProbableCause[];
   vehicles: Vehicle[];
   victims: Victim[];
-  evidence: string[];
+  evidence: EvidenceItem[];
   reportedBy: string;
   reportedByName: string;
   assignedTo?: string;

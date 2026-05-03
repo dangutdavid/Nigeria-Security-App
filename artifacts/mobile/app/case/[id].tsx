@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
-import { useIncidents, IncidentStatus, Victim, Vehicle } from "@/context/IncidentContext";
+import { useIncidents, IncidentStatus, Victim, Vehicle, EvidenceItem } from "@/context/IncidentContext";
 import { Modal } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -84,6 +84,33 @@ function Field({
   );
 }
 
+function BadgeButton({
+  label,
+  selected,
+  onPress,
+  colors,
+}: {
+  label: string;
+  selected?: boolean;
+  onPress: () => void;
+  colors: any;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.badgeButton,
+        {
+          backgroundColor: selected ? colors.primary : colors.muted,
+          borderColor: selected ? colors.primary : colors.border,
+        },
+      ]}
+    >
+      <Text style={[styles.badgeButtonText, { color: selected ? "#fff" : colors.text }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function CaseDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -103,6 +130,21 @@ export default function CaseDetailScreen() {
   const [editTitle, setEditTitle] = useState("");
   const [editSeverity, setEditSeverity] = useState<"fatal" | "serious" | "minor" | "property_only">("fatal");
   const [editType, setEditType] = useState<"crash" | "breakdown" | "hazard" | "flooding">("crash");
+  const [editVehicles, setEditVehicles] = useState<Vehicle[]>([]);
+  const [editVictims, setEditVictims] = useState<Victim[]>([]);
+  const [editEvidence, setEditEvidence] = useState<EvidenceItem[]>([]);
+  const [vehiclePlate, setVehiclePlate] = useState("");
+  const [vehicleMake, setVehicleMake] = useState("");
+  const [vehicleModel, setVehicleModel] = useState("");
+  const [vehicleColour, setVehicleColour] = useState("");
+  const [vehicleType, setVehicleType] = useState<Vehicle["type"]>("car");
+  const [victimName, setVictimName] = useState("");
+  const [victimAge, setVictimAge] = useState("");
+  const [victimGender, setVictimGender] = useState<Victim["gender"]>("unknown");
+  const [victimCondition, setVictimCondition] = useState<Victim["condition"]>("injured");
+  const [victimHospital, setVictimHospital] = useState("");
+  const [evidenceUri, setEvidenceUri] = useState("");
+  const [evidenceLabel, setEvidenceLabel] = useState("");
 
   const incident = getIncident(id as string);
   const assignableUsers = allUsers.filter(
@@ -234,7 +276,64 @@ export default function CaseDetailScreen() {
     setEditLga(incident.lga || "");
     setEditState(incident.state || "");
     setEditDescription(incident.description || "");
+    setEditVehicles(incident.vehicles ?? []);
+    setEditVictims(incident.victims ?? []);
+    setEditEvidence(incident.evidence ?? []);
     setShowEditModal(true);
+  }
+
+  function addVehicle() {
+    if (!vehiclePlate.trim() && !vehicleMake.trim() && !vehicleModel.trim()) return;
+    setEditVehicles((current) => [
+      ...current,
+      {
+        id: Date.now().toString(),
+        plate: vehiclePlate.trim(),
+        make: vehicleMake.trim(),
+        model: vehicleModel.trim(),
+        colour: vehicleColour.trim(),
+        type: vehicleType,
+      },
+    ]);
+    setVehiclePlate("");
+    setVehicleMake("");
+    setVehicleModel("");
+    setVehicleColour("");
+    setVehicleType("car");
+  }
+
+  function addVictim() {
+    if (!victimName.trim() && !victimAge.trim()) return;
+    setEditVictims((current) => [
+      ...current,
+      {
+        id: Date.now().toString(),
+        name: victimName.trim(),
+        age: victimAge.trim(),
+        gender: victimGender,
+        condition: victimCondition,
+        hospital: victimHospital.trim() || undefined,
+      },
+    ]);
+    setVictimName("");
+    setVictimAge("");
+    setVictimGender("unknown");
+    setVictimCondition("injured");
+    setVictimHospital("");
+  }
+
+  function addEvidence() {
+    if (!evidenceUri.trim()) return;
+    setEditEvidence((current) => [
+      ...current,
+      {
+        id: Date.now().toString(),
+        uri: evidenceUri.trim(),
+        label: evidenceLabel.trim() || undefined,
+      },
+    ]);
+    setEvidenceUri("");
+    setEvidenceLabel("");
   }
 
   async function saveEdit() {
@@ -256,6 +355,9 @@ export default function CaseDetailScreen() {
       state: editState.trim(),
       description: editDescription.trim(),
       timeline: newTimeline,
+      vehicles: editVehicles,
+      victims: editVictims,
+      evidence: editEvidence,
     });
     setShowEditModal(false);
     Alert.alert("Updated", "Incident details saved.");
@@ -565,9 +667,82 @@ export default function CaseDetailScreen() {
                 <Field label="LGA" value={editLga} onChangeText={setEditLga} colors={colors} />
                 <Field label="Location" value={editLocation} onChangeText={setEditLocation} colors={colors} />
                 <Field label="Description" value={editDescription} onChangeText={setEditDescription} colors={colors} multiline />
-                <Text style={[styles.helperText, { color: colors.mutedForeground }]}>
-                  For vehicles, casualties, photos, and causes, continue in the reporting flow or re-open the case from its source draft.
-                </Text>
+                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Vehicles</Text>
+                {editVehicles.map((v) => (
+                  <View key={v.id} style={[styles.childRow, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.childTitle, { color: colors.text }]}>{[v.make, v.model].filter(Boolean).join(" · ") || "Vehicle"}</Text>
+                      <Text style={[styles.childMeta, { color: colors.mutedForeground }]}>{[v.plate, v.colour, v.type].filter(Boolean).join(" · ")}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setEditVehicles((current) => current.filter((x) => x.id !== v.id))}>
+                      <Feather name="trash-2" size={18} color={colors.destructive} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <Field label="Plate" value={vehiclePlate} onChangeText={setVehiclePlate} colors={colors} />
+                <Field label="Make" value={vehicleMake} onChangeText={setVehicleMake} colors={colors} />
+                <Field label="Model" value={vehicleModel} onChangeText={setVehicleModel} colors={colors} />
+                <Field label="Colour" value={vehicleColour} onChangeText={setVehicleColour} colors={colors} />
+                <View style={styles.badgeWrap}>
+                  {(["car", "truck", "bus", "motorcycle", "other"] as Vehicle["type"][]).map((t) => (
+                    <BadgeButton key={t} label={t} selected={vehicleType === t} onPress={() => setVehicleType(t)} colors={colors} />
+                  ))}
+                </View>
+                <TouchableOpacity style={[styles.smallAction, { borderColor: colors.primary + "30", backgroundColor: colors.primary + "12" }]} onPress={addVehicle}>
+                  <Feather name="plus" size={14} color={colors.primary} />
+                  <Text style={[styles.smallActionText, { color: colors.primary }]}>Add vehicle</Text>
+                </TouchableOpacity>
+
+                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Persons / casualties</Text>
+                {editVictims.map((v) => (
+                  <View key={v.id} style={[styles.childRow, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.childTitle, { color: colors.text }]}>{v.name || "Unknown"}</Text>
+                      <Text style={[styles.childMeta, { color: colors.mutedForeground }]}>{[v.age, v.gender, v.condition].filter(Boolean).join(" · ")}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setEditVictims((current) => current.filter((x) => x.id !== v.id))}>
+                      <Feather name="trash-2" size={18} color={colors.destructive} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <Field label="Name" value={victimName} onChangeText={setVictimName} colors={colors} />
+                <Field label="Age" value={victimAge} onChangeText={setVictimAge} colors={colors} />
+                <Text style={[styles.smallLabel, { color: colors.mutedForeground }]}>Gender</Text>
+                <View style={styles.badgeWrap}>
+                  {(["male", "female", "unknown"] as Victim["gender"][]).map((g) => (
+                    <BadgeButton key={g} label={g} selected={victimGender === g} onPress={() => setVictimGender(g)} colors={colors} />
+                  ))}
+                </View>
+                <Text style={[styles.smallLabel, { color: colors.mutedForeground }]}>Condition</Text>
+                <View style={styles.badgeWrap}>
+                  {(["fatal", "critical", "injured", "unhurt"] as Victim["condition"][]).map((c) => (
+                    <BadgeButton key={c} label={c} selected={victimCondition === c} onPress={() => setVictimCondition(c)} colors={colors} />
+                  ))}
+                </View>
+                <Field label="Hospital" value={victimHospital} onChangeText={setVictimHospital} colors={colors} />
+                <TouchableOpacity style={[styles.smallAction, { borderColor: colors.primary + "30", backgroundColor: colors.primary + "12" }]} onPress={addVictim}>
+                  <Feather name="plus" size={14} color={colors.primary} />
+                  <Text style={[styles.smallActionText, { color: colors.primary }]}>Add person</Text>
+                </TouchableOpacity>
+
+                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Evidence</Text>
+                {editEvidence.map((e) => (
+                  <View key={e.id} style={[styles.childRow, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.childTitle, { color: colors.text }]} numberOfLines={1}>{e.label || "Evidence item"}</Text>
+                      <Text style={[styles.childMeta, { color: colors.mutedForeground }]} numberOfLines={1}>{e.uri}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setEditEvidence((current) => current.filter((x) => x.id !== e.id))}>
+                      <Feather name="trash-2" size={18} color={colors.destructive} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <Field label="Evidence URL" value={evidenceUri} onChangeText={setEvidenceUri} colors={colors} />
+                <Field label="Label" value={evidenceLabel} onChangeText={setEvidenceLabel} colors={colors} />
+                <TouchableOpacity style={[styles.smallAction, { borderColor: colors.primary + "30", backgroundColor: colors.primary + "12" }]} onPress={addEvidence}>
+                  <Feather name="plus" size={14} color={colors.primary} />
+                  <Text style={[styles.smallActionText, { color: colors.primary }]}>Add evidence</Text>
+                </TouchableOpacity>
               </ScrollView>
               <View style={styles.modalActions}>
                 <TouchableOpacity style={[styles.secondaryBtn, { borderColor: colors.border }]} onPress={() => setShowEditModal(false)}>
@@ -951,6 +1126,68 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     lineHeight: 18,
     marginBottom: 12,
+  },
+  badgeWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+  },
+  badgeButton: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  badgeButtonText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    textTransform: "capitalize",
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.7,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  smallLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    marginBottom: 8,
+  },
+  childRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  childTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+  },
+  childMeta: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: 2,
+  },
+  smallAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 11,
+    marginTop: 8,
+  },
+  smallActionText: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
   },
   modalOverlay: {
     flex: 1,
