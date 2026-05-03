@@ -152,6 +152,7 @@ interface IncidentContextType {
   isOffline: boolean;
   addIncident: (incident: Incident) => Promise<void>;
   updateIncident: (id: string, updates: Partial<Incident>) => Promise<void>;
+  deleteIncident: (id: string) => Promise<void>;
   getIncident: (id: string) => Incident | undefined;
   syncPending: () => Promise<void>;
   draft: DraftReport;
@@ -165,6 +166,7 @@ const IncidentContext = createContext<IncidentContextType>({
   isOffline: false,
   addIncident: async () => {},
   updateIncident: async () => {},
+  deleteIncident: async () => {},
   getIncident: () => undefined,
   syncPending: async () => {},
   draft: { probableCauses: [], vehicles: [], victims: [] },
@@ -373,6 +375,11 @@ export function IncidentProvider({ children }: { children: React.ReactNode }) {
     await persist(next);
   }
 
+  async function deleteIncident(id: string) {
+    const next = incidents.filter((incident) => incident.id !== id);
+    await persist(next);
+  }
+
   function getIncident(id: string) {
     return incidents.find((incident) => incident.id === id);
   }
@@ -398,7 +405,7 @@ export function IncidentProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <IncidentContext.Provider value={{ incidents, pendingCount, isOffline, addIncident, updateIncident, getIncident, syncPending, draft, updateDraft, clearDraft }}>
+    <IncidentContext.Provider value={{ incidents, pendingCount, isOffline, addIncident, updateIncident, deleteIncident, getIncident, syncPending, draft, updateDraft, clearDraft }}>
       {children}
     </IncidentContext.Provider>
   );

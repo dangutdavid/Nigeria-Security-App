@@ -89,7 +89,7 @@ export default function CaseDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getIncident, updateIncident } = useIncidents();
+  const { getIncident, updateIncident, deleteIncident } = useIncidents();
   const { user, allUsers } = useAuth();
 
   const [noteText, setNoteText] = useState("");
@@ -100,6 +100,9 @@ export default function CaseDetailScreen() {
   const [editLga, setEditLga] = useState("");
   const [editState, setEditState] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editTitle, setEditTitle] = useState("");
+  const [editSeverity, setEditSeverity] = useState<"fatal" | "serious" | "minor" | "property_only">("fatal");
+  const [editType, setEditType] = useState<"crash" | "breakdown" | "hazard" | "flooding">("crash");
 
   const incident = getIncident(id as string);
   const assignableUsers = allUsers.filter(
@@ -224,6 +227,9 @@ export default function CaseDetailScreen() {
   const sevColor = sevColors[incident.severity] || colors.mutedForeground;
 
   function openEditModal() {
+    setEditTitle(incident.title || "");
+    setEditType(incident.type);
+    setEditSeverity(incident.severity);
     setEditLocation(incident.location || "");
     setEditLga(incident.lga || "");
     setEditState(incident.state || "");
@@ -242,6 +248,9 @@ export default function CaseDetailScreen() {
       },
     ];
     await updateIncident(id as string, {
+      title: editTitle.trim(),
+      type: editType,
+      severity: editSeverity,
       location: editLocation.trim(),
       lga: editLga.trim(),
       state: editState.trim(),
@@ -250,6 +259,20 @@ export default function CaseDetailScreen() {
     });
     setShowEditModal(false);
     Alert.alert("Updated", "Incident details saved.");
+  }
+
+  function confirmDelete() {
+    Alert.alert("Delete incident?", "This will permanently remove the incident record.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          await deleteIncident(id as string);
+          router.back();
+        },
+      },
+    ]);
   }
 
   return (
@@ -355,13 +378,22 @@ export default function CaseDetailScreen() {
 
         {canEditIncident && (
           <Section title="EDIT INCIDENT" colors={colors}>
-            <TouchableOpacity
-              style={[styles.assignBtn, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "30" }]}
-              onPress={openEditModal}
-            >
-              <Feather name="edit-3" size={15} color={colors.primary} />
-              <Text style={[styles.assignBtnText, { color: colors.primary }]}>Edit incident details</Text>
-            </TouchableOpacity>
+            <View style={styles.editActions}>
+              <TouchableOpacity
+                style={[styles.assignBtn, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "30" }]}
+                onPress={openEditModal}
+              >
+                <Feather name="edit-3" size={15} color={colors.primary} />
+                <Text style={[styles.assignBtnText, { color: colors.primary }]}>Edit incident details</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteBtn, { backgroundColor: colors.destructive + "12", borderColor: colors.destructive + "30" }]}
+                onPress={confirmDelete}
+              >
+                <Feather name="trash-2" size={15} color={colors.destructive} />
+                <Text style={[styles.assignBtnText, { color: colors.destructive }]}>Delete</Text>
+              </TouchableOpacity>
+            </View>
           </Section>
         )}
 
@@ -522,15 +554,29 @@ export default function CaseDetailScreen() {
                   <Feather name="x" size={20} color={colors.mutedForeground} />
                 </TouchableOpacity>
               </View>
+              <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
+                Update any section of the submitted record.
+              </Text>
               <ScrollView showsVerticalScrollIndicator={false}>
+                <Field label="Case title" value={editTitle} onChangeText={setEditTitle} colors={colors} />
+                <Field label="Incident type" value={editType} onChangeText={setEditType as any} colors={colors} />
+                <Field label="Severity" value={editSeverity} onChangeText={setEditSeverity as any} colors={colors} />
                 <Field label="State" value={editState} onChangeText={setEditState} colors={colors} />
                 <Field label="LGA" value={editLga} onChangeText={setEditLga} colors={colors} />
                 <Field label="Location" value={editLocation} onChangeText={setEditLocation} colors={colors} />
                 <Field label="Description" value={editDescription} onChangeText={setEditDescription} colors={colors} multiline />
+                <Text style={[styles.helperText, { color: colors.mutedForeground }]}>
+                  For vehicles, casualties, photos, and causes, continue in the reporting flow or re-open the case from its source draft.
+                </Text>
               </ScrollView>
-              <TouchableOpacity style={[styles.modalPrimaryBtn, { backgroundColor: colors.primary }]} onPress={saveEdit}>
-                <Text style={styles.modalPrimaryBtnText}>Save Changes</Text>
-              </TouchableOpacity>
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={[styles.secondaryBtn, { borderColor: colors.border }]} onPress={() => setShowEditModal(false)}>
+                  <Text style={[styles.secondaryBtnText, { color: colors.text }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalPrimaryBtn, { backgroundColor: colors.primary }]} onPress={saveEdit}>
+                  <Text style={styles.modalPrimaryBtnText}>Save Changes</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
@@ -872,6 +918,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
   },
+  deleteBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  editActions: {
+    flexDirection: "row",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  fieldLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  fieldInput: {
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+  },
+  helperText: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 18,
+    marginBottom: 12,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -882,6 +962,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     padding: 20,
     paddingBottom: 36,
+    maxHeight: "88%",
   },
   modalHeader: {
     flexDirection: "row",
@@ -897,6 +978,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_400Regular",
     marginBottom: 14,
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+  secondaryBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+  },
+  secondaryBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+  },
+  modalPrimaryBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    paddingVertical: 14,
+  },
+  modalPrimaryBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
   },
   assigneeRow: {
     flexDirection: "row",
