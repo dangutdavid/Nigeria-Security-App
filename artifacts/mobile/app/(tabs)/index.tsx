@@ -4,7 +4,7 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import { useIncidents } from "@/context/IncidentContext";
-import IncidentCard from "@/components/IncidentCard";
+import { IncidentCard } from "@/components/IncidentCard";
 
 export default function HomeScreen() {
   const colors = useColors();
