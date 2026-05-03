@@ -75,26 +75,65 @@ export default function HomeScreen() {
             <Text style={[styles.sectionLink, { color: colors.primary }]}>Tap to open cases</Text>
           </View>
           <View style={styles.monthGrid}>
-            <View style={[styles.monthCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.monthIcon, { backgroundColor: colors.successLight }]}><Feather name="activity" size={22} color={colors.success} /></View>
-              <Text style={[styles.monthValue, { color: colors.text }]}>{incidents.length}</Text>
-              <Text style={[styles.monthLabel, { color: colors.mutedForeground }]}>Incidents</Text>
+            <TouchableOpacity
+              style={[styles.monthCardLarge, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => router.push("/(tabs)/cases")}
+              activeOpacity={0.85}
+            >
+              <View style={styles.monthCardHeader}>
+                <View style={[styles.monthIconLarge, { backgroundColor: colors.successLight }]}>
+                  <Feather name="activity" size={22} color={colors.success} />
+                </View>
+                <Text style={[styles.monthValueLarge, { color: colors.text }]}>{incidents.length}</Text>
+              </View>
+              <Text style={[styles.monthLabelLarge, { color: colors.mutedForeground }]}>Incidents</Text>
+            </TouchableOpacity>
+
+            <View style={styles.monthSplitRow}>
+              <TouchableOpacity
+                style={[styles.monthCardSmall, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => router.push("/(tabs)/cases?severity=fatal" as any)}
+                activeOpacity={0.85}
+              >
+                <View style={[styles.monthIconSmall, { backgroundColor: colors.fatalLight }]}>
+                  <Feather name="alert-triangle" size={18} color={colors.fatal} />
+                </View>
+                <View style={styles.monthCopy}>
+                  <Text style={[styles.monthValueSmall, { color: colors.text }]}>{fatalCount}</Text>
+                  <Text style={[styles.monthLabelSmall, { color: colors.mutedForeground }]}>Fatal Crashes</Text>
+                </View>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.monthCardSmall, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => router.push("/(tabs)/cases?status=closed" as any)}
+                activeOpacity={0.85}
+              >
+                <View style={[styles.monthIconSmall, { backgroundColor: colors.successLight }]}>
+                  <Feather name="check-circle" size={18} color={colors.success} />
+                </View>
+                <View style={styles.monthCopy}>
+                  <Text style={[styles.monthValueSmall, { color: colors.text }]}>{incidents.filter((incident) => incident.status === "closed").length}</Text>
+                  <Text style={[styles.monthLabelSmall, { color: colors.mutedForeground }]}>Closed Cases</Text>
+                </View>
+              </TouchableOpacity>
             </View>
-            <View style={[styles.monthCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.monthIcon, { backgroundColor: colors.fatalLight }]}><Feather name="alert-triangle" size={22} color={colors.fatal} /></View>
-              <Text style={[styles.monthValue, { color: colors.text }]}>{fatalCount}</Text>
-              <Text style={[styles.monthLabel, { color: colors.mutedForeground }]}>Fatal Crashes</Text>
-            </View>
-            <View style={[styles.monthCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.monthIcon, { backgroundColor: colors.warningLight }]}><Feather name="clock" size={22} color={colors.warning} /></View>
-              <Text style={[styles.monthValue, { color: colors.text }]}>{incidents.filter((incident) => incident.status === "submitted" || incident.status === "under_review").length}</Text>
-              <Text style={[styles.monthLabel, { color: colors.mutedForeground }]}>Pending Review</Text>
-            </View>
-            <View style={[styles.monthCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.monthIcon, { backgroundColor: colors.successLight }]}><Feather name="check-circle" size={22} color={colors.success} /></View>
-              <Text style={[styles.monthValue, { color: colors.text }]}>{incidents.filter((incident) => incident.status === "closed").length}</Text>
-              <Text style={[styles.monthLabel, { color: colors.mutedForeground }]}>Closed Cases</Text>
-            </View>
+
+            <TouchableOpacity
+              style={[styles.monthCardWide, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => router.push("/(tabs)/cases?status=under_review" as any)}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.monthIconSmall, { backgroundColor: colors.warningLight }]}>
+                <Feather name="clock" size={18} color={colors.warning} />
+              </View>
+              <View style={styles.monthCopy}>
+                <Text style={[styles.monthValueSmall, { color: colors.text }]}>
+                  {incidents.filter((incident) => incident.status === "submitted" || incident.status === "under_review").length}
+                </Text>
+                <Text style={[styles.monthLabelSmall, { color: colors.mutedForeground }]}>Pending Review</Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -129,9 +168,7 @@ export default function HomeScreen() {
                   <View style={[styles.statusDot, { backgroundColor: item.color }]} />
                   <Text style={[styles.statusLabel, { color: colors.text }]}>{item.label}</Text>
                 </View>
-                <View style={[styles.statusValueWrap, { backgroundColor: item.color + "18" }]}>
-                  <Text style={[styles.statusValue, { color: item.color }]}>{item.value}</Text>
-                </View>
+                <Text style={[styles.statusValue, { color: colors.mutedForeground }]}>{item.value}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -218,17 +255,29 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 12, fontFamily: "Inter_700Bold" },
   seeAll: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   sectionLink: { fontSize: 11, fontFamily: "Inter_500Medium" },
+  monthGrid: { gap: 10 },
+  monthCardLarge: { borderWidth: 1, borderRadius: 20, padding: 16 },
+  monthCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  monthIconLarge: { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  monthValueLarge: { fontSize: 30, fontFamily: "Inter_700Bold" },
+  monthLabelLarge: { marginTop: 12, fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  monthSplitRow: { flexDirection: "row", gap: 10 },
+  monthCardSmall: { flex: 1, borderWidth: 1, borderRadius: 20, padding: 14, flexDirection: "row", alignItems: "center", gap: 10 },
+  monthCardWide: { borderWidth: 1, borderRadius: 20, padding: 14, flexDirection: "row", alignItems: "center", gap: 10 },
+  monthIconSmall: { width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  monthCopy: { flex: 1 },
+  monthValueSmall: { fontSize: 18, fontFamily: "Inter_700Bold", lineHeight: 20 },
+  monthLabelSmall: { marginTop: 2, fontSize: 11, fontFamily: "Inter_500Medium" },
   filterChipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
   filterChip: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   filterDot: { width: 8, height: 8, borderRadius: 4 },
   filterChipText: { fontSize: 12, fontFamily: "Inter_700Bold" },
   filterChipCount: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-  statusPillsCard: { borderRadius: 18, borderWidth: 1, paddingHorizontal: 14 },
+  statusPillsCard: { borderRadius: 18, borderWidth: 1, paddingHorizontal: 14, overflow: "hidden" },
   statusPillRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 12, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.06)" },
   statusLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   statusLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  statusValueWrap: { minWidth: 28, alignItems: "center", justifyContent: "center", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
   statusValue: { fontSize: 13, fontFamily: "Inter_700Bold" },
   fab: { position: "absolute", right: 20, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 6, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
 });
