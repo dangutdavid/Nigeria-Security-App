@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -70,36 +70,29 @@ function LocationFilterSheet({
 
   const [draftStates, setDraftStates] = useState<string[]>(selectedStates);
   const [draftLGAs, setDraftLGAs] = useState<string[]>(selectedLGAs);
-  const [stateSearch, setStateSearch] = useState("");
-  const [lgaSearch, setLGASearch] = useState("");
+  const [activeState, setActiveState] = useState(selectedStates[0] ?? "");
   const [locating, setLocating] = useState(false);
   const [locMsg, setLocMsg] = useState("");
 
   const onShow = useCallback(() => {
     setDraftStates(selectedStates);
     setDraftLGAs(selectedLGAs);
-    setStateSearch("");
-    setLGASearch("");
+    setActiveState(selectedStates[0] ?? "");
     setLocMsg("");
   }, [selectedStates, selectedLGAs]);
 
-  const availableLGAs = useMemo(() => getLGAsForStates(draftStates), [draftStates]);
+  const availableLGAs = useMemo(() => getLGAsForStates(activeState ? [activeState] : draftStates), [activeState, draftStates]);
+  const selectedStateLabel = activeState || "Select a state";
 
   const toggleState = (s: string) => {
-    setDraftStates((prev) => {
-      const next = prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s];
-      const validLGAs = getLGAsForStates(next);
-      setDraftLGAs((prev2) => prev2.filter((l) => validLGAs.includes(l)));
-      return next;
-    });
+    setActiveState(s);
+    setDraftStates([s]);
+    setDraftLGAs([]);
   };
 
   const toggleLGA = (l: string) => {
     setDraftLGAs((prev) => prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l]);
   };
-
-  const filteredStates = useMemo(() => ALL_STATE_NAMES.filter((s) => s.toLowerCase().includes(stateSearch.toLowerCase())), [stateSearch]);
-  const filteredLGAs = useMemo(() => availableLGAs.filter((l) => l.toLowerCase().includes(lgaSearch.toLowerCase())), [availableLGAs, lgaSearch]);
 
   const handleNearMe = async () => {
     setLocating(true);
@@ -138,8 +131,7 @@ function LocationFilterSheet({
   const clearAll = () => {
     setDraftStates([]);
     setDraftLGAs([]);
-    setStateSearch("");
-    setLGASearch("");
+    setActiveState("");
     setLocMsg("");
   };
 
@@ -196,15 +188,17 @@ function LocationFilterSheet({
               </ScrollView>
             )}
 
-            <View style={[sheetStyles.searchBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-              <Feather name="search" size={14} color={colors.mutedForeground} />
-              <TextInput style={[sheetStyles.searchInput, { color: colors.text }]} placeholder="Search state…" placeholderTextColor={colors.mutedForeground} value={stateSearch} onChangeText={setStateSearch} />
-              {stateSearch ? <TouchableOpacity onPress={() => setStateSearch("")}><Feather name="x" size={14} color={colors.mutedForeground} /></TouchableOpacity> : null}
-            </View>
+            <TouchableOpacity style={[sheetStyles.picker, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={() => {
+              if (!activeState) setActiveState(ALL_STATE_NAMES[0]);
+            }}>
+              <Feather name="map" size={14} color={colors.mutedForeground} />
+              <Text style={[sheetStyles.pickerText, { color: colors.text }]}>{selectedStateLabel}</Text>
+              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
 
             <View style={sheetStyles.chipGrid}>
-              {filteredStates.map((s) => {
-                const active = draftStates.includes(s);
+              {ALL_STATE_NAMES.map((s) => {
+                const active = activeState === s;
                 return (
                   <TouchableOpacity key={s} style={[sheetStyles.chip, { backgroundColor: active ? colors.primary : colors.muted, borderColor: active ? colors.primary : colors.border }]} onPress={() => toggleState(s)}>
                     {active && <Feather name="check" size={11} color="#fff" style={{ marginRight: 3 }} />}
@@ -215,13 +209,13 @@ function LocationFilterSheet({
             </View>
           </View>
 
-          {draftStates.length > 0 && (
+          {activeState && (
             <View style={sheetStyles.section}>
               <View style={sheetStyles.sectionHeader}>
                 <Feather name="map-pin" size={14} color={colors.secondary} />
                 <Text style={[sheetStyles.sectionTitle, { color: colors.text }]}>Local Government{draftLGAs.length > 0 ? ` (${draftLGAs.length} selected)` : ""}</Text>
               </View>
-              <Text style={[sheetStyles.sectionHint, { color: colors.mutedForeground }]}>Showing LGAs from: {draftStates.join(", ")}</Text>
+              <Text style={[sheetStyles.sectionHint, { color: colors.mutedForeground }]}>{activeState}</Text>
 
               {draftLGAs.length > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={sheetStyles.badgesRow}>
@@ -234,25 +228,19 @@ function LocationFilterSheet({
                 </ScrollView>
               )}
 
-              {draftStates.length === 1 && draftLGAs.length === 0 && (
+              {draftLGAs.length === 0 && (
                 <View style={sheetStyles.quickRow}>
                   <Text style={[sheetStyles.quickLabel, { color: colors.mutedForeground }]}>Quick pick:</Text>
-                  {(NIGERIA_STATE_LGAS.find((s) => s.name === draftStates[0])?.lgas.slice(0, 5) ?? []).map((l) => (
-                    <TouchableOpacity key={`quick-${draftStates[0]}-${l}`} style={[sheetStyles.quickChip, { borderColor: colors.secondary }]} onPress={() => toggleLGA(l)}>
+                  {(NIGERIA_STATE_LGAS.find((s) => s.name === activeState)?.lgas.slice(0, 5) ?? []).map((l) => (
+                    <TouchableOpacity key={`quick-${activeState}-${l}`} style={[sheetStyles.quickChip, { borderColor: colors.secondary }]} onPress={() => toggleLGA(l)}>
                       <Text style={[sheetStyles.quickChipText, { color: colors.secondary }]}>{l}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
 
-              <View style={[sheetStyles.searchBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-                <Feather name="search" size={14} color={colors.mutedForeground} />
-                <TextInput style={[sheetStyles.searchInput, { color: colors.text }]} placeholder="Search LGA…" placeholderTextColor={colors.mutedForeground} value={lgaSearch} onChangeText={setLGASearch} />
-                {lgaSearch ? <TouchableOpacity onPress={() => setLGASearch("")}><Feather name="x" size={14} color={colors.mutedForeground} /></TouchableOpacity> : null}
-              </View>
-
               <View style={sheetStyles.chipGrid}>
-                {filteredLGAs.map((l) => {
+                {availableLGAs.map((l) => {
                   const active = draftLGAs.includes(l);
                   return (
                     <TouchableOpacity key={l} style={[sheetStyles.chip, { backgroundColor: active ? colors.secondary : colors.muted, borderColor: active ? colors.secondary : colors.border }]} onPress={() => toggleLGA(l)}>
@@ -269,7 +257,7 @@ function LocationFilterSheet({
         </ScrollView>
 
         <View style={[sheetStyles.footer, { borderTopColor: colors.border }]}>
-          {totalSelected > 0 && <Text style={[sheetStyles.footerHint, { color: colors.mutedForeground }]}>{draftStates.length > 0 ? `${draftStates.length} state${draftStates.length > 1 ? "s" : ""}` : ""}{draftStates.length > 0 && draftLGAs.length > 0 ? " · " : ""}{draftLGAs.length > 0 ? `${draftLGAs.length} LGA${draftLGAs.length > 1 ? "s" : ""}` : ""}{" selected"}</Text>}
+          {totalSelected > 0 && <Text style={[sheetStyles.footerHint, { color: colors.mutedForeground }]}>{draftStates.length > 0 ? `${draftStates.length} state${draftStates.length > 1 ? "s" : ""}` : ""}{draftStates.length > 0 && draftLGAs.length > 0 ? " · " : ""}{draftLGAs.length > 0 ? `${draftLGAs.length} LGA${draftLGAs.length > 1 ? "s" : ""}` : ""} selected</Text>}
           <TouchableOpacity style={[sheetStyles.applyBtn, { backgroundColor: colors.primary }]} onPress={apply}>
             <Text style={sheetStyles.applyBtnText}>Apply</Text>
           </TouchableOpacity>
