@@ -144,65 +144,65 @@ function LocationFilterSheet({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onShow={onShow} onRequestClose={onClose}>
-      <View style={[sheetStyles.root, { backgroundColor: colors.background, paddingBottom: insets.bottom + 12 }]}>
-        <View style={[sheetStyles.header, { borderBottomColor: colors.border }]}>
+      <View style={[styles.root, { backgroundColor: colors.background, paddingBottom: insets.bottom + 12 }]}>
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Feather name="x" size={22} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[sheetStyles.headerTitle, { color: colors.text }]}>Location Filter</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Location Filter</Text>
           <TouchableOpacity onPress={clearAll}>
-            <Text style={[sheetStyles.clearBtn, { color: colors.primary }]}>Clear all</Text>
+            <Text style={[styles.clearBtn, { color: colors.primary }]}>Clear all</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={[sheetStyles.gpsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.gpsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Feather name="navigation" size={16} color={colors.primary} />
           <View style={{ flex: 1 }}>
-            <Text style={[sheetStyles.gpsTitle, { color: colors.text }]}>Use My Location</Text>
-            {locMsg ? <Text style={[sheetStyles.gpsMsg, { color: colors.mutedForeground }]}>{locMsg}</Text> : <Text style={[sheetStyles.gpsMsg, { color: colors.mutedForeground }]}>Auto-detect your state &amp; LGA from GPS</Text>}
+            <Text style={[styles.gpsTitle, { color: colors.text }]}>Use My Location</Text>
+            {locMsg ? <Text style={[styles.gpsMsg, { color: colors.mutedForeground }]}>{locMsg}</Text> : <Text style={[styles.gpsMsg, { color: colors.mutedForeground }]}>Auto-detect your state &amp; LGA from GPS</Text>}
           </View>
           {locating ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : (
-            <TouchableOpacity style={[sheetStyles.gpsBtn, { backgroundColor: colors.primary }]} onPress={handleNearMe}>
-              <Text style={sheetStyles.gpsBtnText}>Detect</Text>
+            <TouchableOpacity style={[styles.gpsBtn, { backgroundColor: colors.primary }]} onPress={handleNearMe}>
+              <Text style={styles.gpsBtnText}>Detect</Text>
             </TouchableOpacity>
           )}
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-          <View style={sheetStyles.section}>
-            <View style={sheetStyles.sectionHeader}>
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
               <Feather name="map" size={14} color={colors.primary} />
-              <Text style={[sheetStyles.sectionTitle, { color: colors.text }]}>State{draftStates.length > 0 ? ` (${draftStates.length} selected)` : ""}</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>State{draftStates.length > 0 ? ` (${draftStates.length} selected)` : ""}</Text>
             </View>
 
             {draftStates.length > 0 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={sheetStyles.badgesRow}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.badgesRow}>
                 {draftStates.map((s) => (
-                  <TouchableOpacity key={`state-${s}`} style={[sheetStyles.badge, { backgroundColor: colors.primary }]} onPress={() => toggleState(s)}>
-                    <Text style={sheetStyles.badgeText}>{s}</Text>
+                  <TouchableOpacity key={`state-${s}`} style={[styles.badge, { backgroundColor: colors.primary }]} onPress={() => toggleState(s)}>
+                    <Text style={styles.badgeText}>{s}</Text>
                     <Feather name="x" size={11} color="#fff" />
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             )}
 
-            <TouchableOpacity style={[sheetStyles.picker, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={() => {
+            <TouchableOpacity style={[styles.picker, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={() => {
               if (!activeState) setActiveState(ALL_STATE_NAMES[0]);
             }}>
               <Feather name="map" size={14} color={colors.mutedForeground} />
-              <Text style={[sheetStyles.pickerText, { color: colors.text }]}>{selectedStateLabel}</Text>
+              <Text style={[styles.pickerText, { color: colors.text }]}>{selectedStateLabel}</Text>
               <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
 
-            <View style={sheetStyles.chipGrid}>
+            <View style={styles.chipGrid}>
               {ALL_STATE_NAMES.map((s) => {
                 const active = activeState === s;
                 return (
-                  <TouchableOpacity key={s} style={[sheetStyles.chip, { backgroundColor: active ? colors.primary : colors.muted, borderColor: active ? colors.primary : colors.border }]} onPress={() => toggleState(s)}>
+                  <TouchableOpacity key={s} style={[styles.chip, { backgroundColor: active ? colors.primary : colors.muted, borderColor: active ? colors.primary : colors.border }]} onPress={() => toggleState(s)}>
                     {active && <Feather name="check" size={11} color="#fff" style={{ marginRight: 3 }} />}
-                    <Text style={[sheetStyles.chipText, { color: active ? "#fff" : colors.text }]}>{s}</Text>
+                    <Text style={[styles.chipText, { color: active ? "#fff" : colors.text }]}>{s}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -210,18 +210,18 @@ function LocationFilterSheet({
           </View>
 
           {activeState && (
-            <View style={sheetStyles.section}>
-              <View style={sheetStyles.sectionHeader}>
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
                 <Feather name="map-pin" size={14} color={colors.secondary} />
-                <Text style={[sheetStyles.sectionTitle, { color: colors.text }]}>Local Government{draftLGAs.length > 0 ? ` (${draftLGAs.length} selected)` : ""}</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Local Government{draftLGAs.length > 0 ? ` (${draftLGAs.length} selected)` : ""}</Text>
               </View>
-              <Text style={[sheetStyles.sectionHint, { color: colors.mutedForeground }]}>{activeState}</Text>
+              <Text style={[styles.sectionHint, { color: colors.mutedForeground }]}>{activeState}</Text>
 
               {draftLGAs.length > 0 && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={sheetStyles.badgesRow}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.badgesRow}>
                   {draftLGAs.map((l) => (
-                    <TouchableOpacity key={`lga-${l}`} style={[sheetStyles.badge, { backgroundColor: colors.secondary }]} onPress={() => toggleLGA(l)}>
-                      <Text style={sheetStyles.badgeText}>{l}</Text>
+                    <TouchableOpacity key={`lga-${l}`} style={[styles.badge, { backgroundColor: colors.secondary }]} onPress={() => toggleLGA(l)}>
+                      <Text style={styles.badgeText}>{l}</Text>
                       <Feather name="x" size={11} color="#fff" />
                     </TouchableOpacity>
                   ))}
@@ -229,23 +229,23 @@ function LocationFilterSheet({
               )}
 
               {draftLGAs.length === 0 && (
-                <View style={sheetStyles.quickRow}>
-                  <Text style={[sheetStyles.quickLabel, { color: colors.mutedForeground }]}>Quick pick:</Text>
+                <View style={styles.quickRow}>
+                  <Text style={[styles.quickLabel, { color: colors.mutedForeground }]}>Quick pick:</Text>
                   {(NIGERIA_STATE_LGAS.find((s) => s.name === activeState)?.lgas.slice(0, 5) ?? []).map((l) => (
-                    <TouchableOpacity key={`quick-${activeState}-${l}`} style={[sheetStyles.quickChip, { borderColor: colors.secondary }]} onPress={() => toggleLGA(l)}>
-                      <Text style={[sheetStyles.quickChipText, { color: colors.secondary }]}>{l}</Text>
+                    <TouchableOpacity key={`quick-${activeState}-${l}`} style={[styles.quickChip, { borderColor: colors.secondary }]} onPress={() => toggleLGA(l)}>
+                      <Text style={[styles.quickChipText, { color: colors.secondary }]}>{l}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
 
-              <View style={sheetStyles.chipGrid}>
+              <View style={styles.chipGrid}>
                 {availableLGAs.map((l) => {
                   const active = draftLGAs.includes(l);
                   return (
-                    <TouchableOpacity key={l} style={[sheetStyles.chip, { backgroundColor: active ? colors.secondary : colors.muted, borderColor: active ? colors.secondary : colors.border }]} onPress={() => toggleLGA(l)}>
+                    <TouchableOpacity key={l} style={[styles.chip, { backgroundColor: active ? colors.secondary : colors.muted, borderColor: active ? colors.secondary : colors.border }]} onPress={() => toggleLGA(l)}>
                       {active && <Feather name="check" size={11} color="#fff" style={{ marginRight: 3 }} />}
-                      <Text style={[sheetStyles.chipText, { color: active ? "#fff" : colors.text }]}>{l}</Text>
+                      <Text style={[styles.chipText, { color: active ? "#fff" : colors.text }]}>{l}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -256,10 +256,10 @@ function LocationFilterSheet({
           <View style={{ height: 24 }} />
         </ScrollView>
 
-        <View style={[sheetStyles.footer, { borderTopColor: colors.border }]}>
-          {totalSelected > 0 && <Text style={[sheetStyles.footerHint, { color: colors.mutedForeground }]}>{draftStates.length > 0 ? `${draftStates.length} state${draftStates.length > 1 ? "s" : ""}` : ""}{draftStates.length > 0 && draftLGAs.length > 0 ? " · " : ""}{draftLGAs.length > 0 ? `${draftLGAs.length} LGA${draftLGAs.length > 1 ? "s" : ""}` : ""} selected</Text>}
-          <TouchableOpacity style={[sheetStyles.applyBtn, { backgroundColor: colors.primary }]} onPress={apply}>
-            <Text style={sheetStyles.applyBtnText}>Apply</Text>
+        <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          {totalSelected > 0 && <Text style={[styles.footerHint, { color: colors.mutedForeground }]}>{draftStates.length > 0 ? `${draftStates.length} state${draftStates.length > 1 ? "s" : ""}` : ""}{draftStates.length > 0 && draftLGAs.length > 0 ? " · " : ""}{draftLGAs.length > 0 ? `${draftLGAs.length} LGA${draftLGAs.length > 1 ? "s" : ""}` : ""} selected</Text>}
+          <TouchableOpacity style={[styles.applyBtn, { backgroundColor: colors.primary }]} onPress={apply}>
+            <Text style={styles.applyBtnText}>Apply</Text>
           </TouchableOpacity>
         </View>
       </View>
