@@ -372,6 +372,26 @@ export default function CasesScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetRow}>
+        <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => { setMineOnly((v) => !v); }}>
+          <Text style={[styles.presetChipText, { color: colors.text }]}>{mineOnly ? "My cases ✓" : "My cases"}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.presetChip, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => { setTodayOnly((v) => !v); }}>
+          <Text style={[styles.presetChipText, { color: colors.text }]}>{todayOnly ? "Today ✓" : "Today"}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.presetChip, { backgroundColor: severityFilter === "fatal" ? colors.fatalLight : colors.card, borderColor: colors.border }]}
+          onPress={() => setSeverityFilter((v) => (v === "fatal" ? "all" : "fatal"))}
+        >
+          <Text style={[styles.presetChipText, { color: colors.text }]}>Fatal</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.presetChip, { backgroundColor: statusFilter === "open" ? colors.primary + "18" : colors.card, borderColor: colors.border }]}
+          onPress={() => setStatusFilter((v) => (v === "open" ? "all" : "open"))}
+        >
+          <Text style={[styles.presetChipText, { color: colors.text }]}>Open</Text>
+        </TouchableOpacity>
+      </ScrollView>
       <FlatList
         data={filtered}
         keyExtractor={(i) => i.id}
@@ -420,6 +440,29 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   headerBtnText: { color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  filterSummaryBtn: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  filterSummaryText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  filterSummaryCount: { fontSize: 12, fontFamily: "Inter_500Medium", marginLeft: "auto" },
+  presetRow: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4, gap: 8 },
+  presetChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    height: 36,
+    marginRight: 8,
+  },
+  presetChipText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   list: { padding: 16 },
   emptyList: { flexGrow: 1 },
   emptyState: { alignItems: "center", justifyContent: "center", paddingTop: 80 },
