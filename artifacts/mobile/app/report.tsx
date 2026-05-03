@@ -390,6 +390,64 @@ export default function ReportScreen() {
 
         {step === 3 && (
           <View style={{ gap: 16 }}>
+            <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>PEOPLE & VEHICLES</Text>
+
+            <View style={[s.block, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={s.sectionHeaderRow}>
+                <Text style={[s.blockTitle, { color: colors.text }]}>Vehicles</Text>
+                <TouchableOpacity onPress={addVehicle}>
+                  <Text style={[s.linkText, { color: colors.primary }]}>Add vehicle</Text>
+                </TouchableOpacity>
+              </View>
+              {form.vehicles.length === 0 ? (
+                <Text style={[s.emptyHint, { color: colors.mutedForeground }]}>No vehicles added yet.</Text>
+              ) : (
+                form.vehicles.map((vehicle) => (
+                  <View key={vehicle.id} style={[s.entryCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                    <View style={s.sectionHeaderRow}>
+                      <Text style={[s.entryTitle, { color: colors.text }]}>Vehicle</Text>
+                      <TouchableOpacity onPress={() => removeVehicle(vehicle.id)}>
+                        <Feather name="trash-2" size={14} color={colors.fatal} />
+                      </TouchableOpacity>
+                    </View>
+                    <FieldInput colors={colors} label="Plate" value={vehicle.plate} onChangeText={(plate: string) => updateVehicle(vehicle.id, { plate })} placeholder="ABC 123 XY" />
+                    <View style={s.twoCol}>
+                      <FieldInput colors={colors} label="Make" value={vehicle.make} onChangeText={(make: string) => updateVehicle(vehicle.id, { make })} placeholder="Toyota" />
+                      <FieldInput colors={colors} label="Model" value={vehicle.model} onChangeText={(model: string) => updateVehicle(vehicle.id, { model })} placeholder="Corolla" />
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+
+            <View style={[s.block, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={s.sectionHeaderRow}>
+                <Text style={[s.blockTitle, { color: colors.text }]}>Victims / persons</Text>
+                <TouchableOpacity onPress={addVictim}>
+                  <Text style={[s.linkText, { color: colors.primary }]}>Add person</Text>
+                </TouchableOpacity>
+              </View>
+              {form.victims.length === 0 ? (
+                <Text style={[s.emptyHint, { color: colors.mutedForeground }]}>No persons added yet.</Text>
+              ) : (
+                form.victims.map((victim) => (
+                  <View key={victim.id} style={[s.entryCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                    <View style={s.sectionHeaderRow}>
+                      <Text style={[s.entryTitle, { color: colors.text }]}>Person</Text>
+                      <TouchableOpacity onPress={() => removeVictim(victim.id)}>
+                        <Feather name="trash-2" size={14} color={colors.fatal} />
+                      </TouchableOpacity>
+                    </View>
+                    <FieldInput colors={colors} label="Name" value={victim.name} onChangeText={(name: string) => updateVictim(victim.id, { name })} placeholder="Full name" />
+                    <View style={s.twoCol}>
+                      <FieldInput colors={colors} label="Age" value={victim.age} onChangeText={(age: string) => updateVictim(victim.id, { age })} placeholder="34" keyboardType="number-pad" />
+                      <FieldInput colors={colors} label="Gender" value={victim.gender} onChangeText={(gender: string) => updateVictim(victim.id, { gender: gender as any })} placeholder="Male" />
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+
             <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>POTENTIAL CAUSES</Text>
             {probableCauseGroups.map(([category, items]) => (
               <View key={category} style={[s.block, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -476,6 +534,7 @@ const s = StyleSheet.create({
   title: { fontSize: 18, fontFamily: "Inter_700Bold" },
   subtitle: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
   sectionTitle: { fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
+  sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   helper: { fontSize: 12, fontFamily: "Inter_400Regular" },
   cardGrid: { gap: 10 },
   typeCard: { borderWidth: 1, borderRadius: 14, padding: 14, flexDirection: "row", alignItems: "center", gap: 10 },
@@ -494,6 +553,11 @@ const s = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular" },
   selected: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7, marginBottom: 8, alignSelf: "flex-start" },
   selectedText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  linkText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  emptyHint: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  entryCard: { borderWidth: 1, borderRadius: 14, padding: 12, gap: 10 },
+  entryTitle: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  twoCol: { flexDirection: "row", gap: 10 },
   gpsBtn: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "flex-start", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999 },
   gpsBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_700Bold" },
   addBtn: { flexDirection: "row", alignItems: "center", gap: 8, alignSelf: "flex-start", paddingHorizontal: 14, paddingVertical: 10, borderRadius: 999 },
