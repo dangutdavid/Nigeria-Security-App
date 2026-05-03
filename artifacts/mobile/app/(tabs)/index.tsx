@@ -25,7 +25,7 @@ export default function HomeScreen() {
                 <Text style={[styles.seeAll, { color: colors.primary }]}>All cases</Text>
               </TouchableOpacity>
             </View>
-            {myReports.map((inc, index) => <IncidentCard key={`${inc.id}-${index}`} incident={inc} />)}
+            {myReports.map((inc) => <IncidentCard key={inc.id} incident={inc} />)}
           </View>
         )}
 
@@ -36,7 +36,7 @@ export default function HomeScreen() {
               <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
             </TouchableOpacity>
           </View>
-          {recent.map((inc, index) => <IncidentCard key={`${inc.id}-${index}`} incident={inc} />)}
+          {recent.map((inc) => <IncidentCard key={inc.id} incident={inc} />)}
         </View>
       </View>
       <TouchableOpacity style={[styles.fab, { backgroundColor: colors.secondary }]} onPress={() => router.push("/report")}>
