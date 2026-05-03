@@ -13,6 +13,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  RefreshControl,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useIncidents, IncidentStatus, SeverityLevel, groupProbableCauses } from "@/context/IncidentContext";
@@ -294,6 +295,7 @@ export default function CasesScreen() {
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
   const [selectedLGAs, setSelectedLGAs] = useState<string[]>([]);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   React.useEffect(() => {
     const nextStatus = typeof params.status === "string" ? params.status : null;
@@ -329,6 +331,19 @@ export default function CasesScreen() {
 
   const locationActive = selectedStates.length > 0 || selectedLGAs.length > 0;
   const bottomPad = insets.bottom + 24;
+  const activeFiltersCount =
+    (statusFilter === "all" ? 0 : 1) +
+    (severityFilter === "all" ? 0 : 1) +
+    (mineOnly ? 1 : 0) +
+    (todayOnly ? 1 : 0) +
+    selectedStates.length +
+    selectedLGAs.length;
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    setRefreshing(false);
+  };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -343,6 +358,19 @@ export default function CasesScreen() {
           <Feather name="plus" size={18} color="#fff" />
           <Text style={styles.headerBtnText}>Add incident</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.filterSummaryBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+          onPress={() => setLocationModalVisible(true)}
+          activeOpacity={0.85}
+        >
+          <Feather name="sliders" size={16} color={colors.text} />
+          <Text style={[styles.filterSummaryText, { color: colors.text }]}>
+            {activeFiltersCount > 0 ? `${activeFiltersCount} filters` : "Filters"}
+          </Text>
+          <Text style={[styles.filterSummaryCount, { color: colors.mutedForeground }]}>
+            {filtered.length}/{incidents.length}
+          </Text>
+        </TouchableOpacity>
       </View>
       <FlatList
         data={filtered}
@@ -351,6 +379,7 @@ export default function CasesScreen() {
         renderItem={({ item }) => <IncidentCard incident={item} />}
         scrollEnabled={!!filtered.length}
         showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
         ListEmptyComponent={<View style={styles.emptyState}><Feather name="map-pin" size={40} color={colors.mutedForeground} /><Text style={[styles.emptyTitle, { color: colors.text }]}>No cases found</Text></View>}
       />
       <TouchableOpacity
