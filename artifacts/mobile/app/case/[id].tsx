@@ -54,15 +54,15 @@ export default function CaseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getIncident, updateIncident } = useIncidents();
   const { user, allUsers } = useAuth();
-  const assignableUsers = allUsers.filter(
-    (u) => u.status === "active" && u.id !== incident?.reportedBy
-  );
 
   const [noteText, setNoteText] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
 
   const incident = getIncident(id as string);
+  const assignableUsers = allUsers.filter(
+    (u) => u.status === "active" && u.id !== incident?.reportedBy
+  );
 
   async function shareCase() {
     if (!incident) return;
