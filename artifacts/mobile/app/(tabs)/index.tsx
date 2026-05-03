@@ -185,6 +185,25 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={[styles.analyticsCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => router.push("/analytics")}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.analyticsIcon, { backgroundColor: colors.primary + "14" }]}>
+              <Feather name="bar-chart-2" size={18} color={colors.primary} />
+            </View>
+            <View style={styles.analyticsCopy}>
+              <Text style={[styles.analyticsTitle, { color: colors.text }]}>Analytics & Hotspots</Text>
+              <Text style={[styles.analyticsSub, { color: colors.mutedForeground }]}>
+                View trends, crash patterns, and operational insights
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        </View>
+
         {myReports.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
@@ -250,6 +269,11 @@ const styles = StyleSheet.create({
   quickActionText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 14 },
   quickActionAlt: { flex: 1, height: 48, borderRadius: 14, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8, borderWidth: 1 },
   quickActionAltText: { fontFamily: "Inter_700Bold", fontSize: 14 },
+  analyticsCard: { borderWidth: 1, borderRadius: 18, padding: 14, flexDirection: "row", alignItems: "center", gap: 12 },
+  analyticsIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  analyticsCopy: { flex: 1 },
+  analyticsTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  analyticsSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2, lineHeight: 16 },
   section: { marginTop: 14 },
   sectionHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   sectionTitle: { fontSize: 12, fontFamily: "Inter_700Bold" },
