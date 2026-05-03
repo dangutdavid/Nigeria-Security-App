@@ -1,12 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Dimensions,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -45,6 +46,28 @@ export default function AnalyticsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { incidents } = useIncidents();
+  const [typeFilter, setTypeFilter] = useState<"all" | string>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | string>("all");
+  const [query, setQuery] = useState("");
+  const [rangeFilter, setRangeFilter] = useState<"all" | "7" | "30" | "90">("all");
+
+  const filteredIncidents = useMemo(() => {
+    const now = Date.now();
+    const rangeMs =
+      rangeFilter === "7" ? 7 * 86400000 : rangeFilter === "30" ? 30 * 86400000 : rangeFilter === "90" ? 90 * 86400000 : 0;
+    return incidents.filter((inc) => {
+      const matchesType = typeFilter === "all" || inc.type === typeFilter;
+      const matchesStatus = statusFilter === "all" || inc.status === statusFilter;
+      const matchesQuery =
+        !query.trim() ||
+        [inc.title, inc.location, inc.lga, inc.state, inc.description]
+          .join(" ")
+          .toLowerCase()
+          .includes(query.trim().toLowerCase());
+      const matchesRange = rangeMs === 0 || now - new Date(inc.dateTime).getTime() <= rangeMs;
+      return matchesType && matchesStatus && matchesQuery && matchesRange;
+    });
+  }, [incidents, query, rangeFilter, statusFilter, typeFilter]);
 
   const stats = useMemo(() => {
     const byType: Record<string, number> = {};
@@ -54,7 +77,7 @@ export default function AnalyticsScreen() {
     const byStatus: Record<string, number> = {};
     const byMonth: Record<string, number> = {};
 
-    incidents.forEach((inc) => {
+    filteredIncidents.forEach((inc) => {
       byType[inc.type] = (byType[inc.type] || 0) + 1;
       bySeverity[inc.severity] = (bySeverity[inc.severity] || 0) + 1;
       if (inc.state) byState[inc.state] = (byState[inc.state] || 0) + 1;
@@ -65,7 +88,7 @@ export default function AnalyticsScreen() {
     });
 
     return { byType, bySeverity, byState, byLGA, byStatus, byMonth };
-  }, [incidents]);
+  }, [filteredIncidents]);
 
   const maxType = Math.max(...Object.values(stats.byType), 1);
   const maxState = Math.max(...Object.values(stats.byState), 1);
@@ -84,7 +107,7 @@ export default function AnalyticsScreen() {
     property_only: "#6B7A8A",
   };
 
-  const totalCasualties = incidents.reduce((sum, i) => sum + i.victims.length, 0);
+  const totalCasualties = filteredIncidents.reduce((sum, i) => sum + i.victims.length, 0);
   const fatalVictims = incidents.reduce(
     (sum, i) => sum + i.victims.filter((v) => v.condition === "deceased").length,
     0
@@ -117,7 +140,7 @@ export default function AnalyticsScreen() {
           <View style={{ width: 22 }} />
         </View>
         <Text style={styles.headerSub}>
-          {incidents.length} total incidents · Sector overview
+          {filteredIncidents.length} filtered incidents · Sector overview
         </Text>
       </View>
 
@@ -125,9 +148,41 @@ export default function AnalyticsScreen() {
         contentContainerStyle={{ padding: 14, paddingBottom: bottomPad }}
         showsVerticalScrollIndicator={false}
       >
+        <Section title="FILTER INCIDENTS" colors={colors}>
+          <View style={[styles.filterBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search title, location, state..."
+              placeholderTextColor={colors.mutedForeground}
+              style={[styles.searchInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.muted }]}
+            />
+            <View style={styles.filterRow}>
+              <FilterPill label="All types" active={typeFilter === "all"} onPress={() => setTypeFilter("all")} />
+              <FilterPill label="Crash" active={typeFilter === "crash"} onPress={() => setTypeFilter("crash")} />
+              <FilterPill label="Breakdown" active={typeFilter === "breakdown"} onPress={() => setTypeFilter("breakdown")} />
+              <FilterPill label="Hazard" active={typeFilter === "hazard"} onPress={() => setTypeFilter("hazard")} />
+              <FilterPill label="Flooding" active={typeFilter === "flooding"} onPress={() => setTypeFilter("flooding")} />
+            </View>
+            <View style={styles.filterRow}>
+              <FilterPill label="Any status" active={statusFilter === "all"} onPress={() => setStatusFilter("all")} />
+              <FilterPill label="Open" active={statusFilter === "open"} onPress={() => setStatusFilter("open")} />
+              <FilterPill label="Submitted" active={statusFilter === "submitted"} onPress={() => setStatusFilter("submitted")} />
+              <FilterPill label="Review" active={statusFilter === "under_review"} onPress={() => setStatusFilter("under_review")} />
+              <FilterPill label="Closed" active={statusFilter === "closed"} onPress={() => setStatusFilter("closed")} />
+            </View>
+            <View style={styles.filterRow}>
+              <FilterPill label="All time" active={rangeFilter === "all"} onPress={() => setRangeFilter("all")} />
+              <FilterPill label="7d" active={rangeFilter === "7"} onPress={() => setRangeFilter("7")} />
+              <FilterPill label="30d" active={rangeFilter === "30"} onPress={() => setRangeFilter("30")} />
+              <FilterPill label="90d" active={rangeFilter === "90"} onPress={() => setRangeFilter("90")} />
+            </View>
+          </View>
+        </Section>
+
         {/* Casualty summary */}
         <View style={styles.row}>
-          <SummaryCard colors={colors} label="Total Incidents" value={incidents.length} icon="activity" color={colors.primary}
+          <SummaryCard colors={colors} label="Total Incidents" value={filteredIncidents.length} icon="activity" color={colors.primary}
             onPress={() => router.push("/(tabs)/cases" as any)} />
           <View style={{ width: 10 }} />
           <SummaryCard colors={colors} label="Fatal Crashes" value={stats.bySeverity["fatal"] || 0} icon="alert-triangle" color={colors.fatal}
@@ -179,7 +234,7 @@ export default function AnalyticsScreen() {
         {/* By status */}
         <Section title="CASE STATUS BREAKDOWN" colors={colors}>
           {Object.entries(stats.byStatus).map(([status, count]) => {
-            const total = incidents.length;
+            const total = filteredIncidents.length;
             const pct = total > 0 ? Math.round((count / total) * 100) : 0;
             return (
               <TouchableOpacity
@@ -212,7 +267,7 @@ export default function AnalyticsScreen() {
         </Section>
 
         {/* By LGA */}
-        {Object.keys(stats.byLGA).length > 0 && (
+          {Object.keys(stats.byLGA).length > 0 && (
           <Section title="TOP LGAs BY INCIDENT COUNT" colors={colors}>
             {Object.entries(stats.byLGA)
               .sort((a, b) => b[1] - a[1])
@@ -362,6 +417,35 @@ function InsightRow({ colors, icon, iconColor, text }: any) {
   );
 }
 
+function FilterPill({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const colors = useColors();
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      style={[
+        styles.filterPill,
+        {
+          backgroundColor: active ? colors.primary : colors.muted,
+          borderColor: active ? colors.primary : colors.border,
+        },
+      ]}
+    >
+      <Text style={[styles.filterPillText, { color: active ? "#fff" : colors.text }]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 function getAvgAge(incidents: any[]) {
   if (!incidents.length) return 0;
   const open = incidents.filter((i) => i.status !== "closed");
@@ -491,5 +575,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_400Regular",
     lineHeight: 18,
+  },
+  filterBox: {
+    gap: 10,
+  },
+  searchInput: {
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+  },
+  filterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  filterPill: {
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
   },
 });
