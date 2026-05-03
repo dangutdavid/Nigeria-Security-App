@@ -71,6 +71,7 @@ export default function PatrolLogScreen() {
   const [encounterPlate, setEncounterPlate] = useState("");
   const [tab, setTab] = useState<"active" | "history">("active");
   const [tick, setTick] = useState(0);
+  const [selectedSession, setSelectedSession] = useState<(typeof sessions)[number] | null>(null);
 
   useEffect(() => {
     if (!activeSession) return;
@@ -301,7 +302,11 @@ export default function PatrolLogScreen() {
             </View>
           }
           renderItem={({ item }) => (
-            <View style={[styles.historyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity
+              style={[styles.historyCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              activeOpacity={0.85}
+              onPress={() => setSelectedSession(item)}
+            >
               <View style={styles.historyTop}>
                 <Text style={[styles.historyRoute, { color: colors.text }]}>{item.route}</Text>
                 <Text style={[styles.historyDuration, { color: colors.primary }]}>
@@ -340,7 +345,7 @@ export default function PatrolLogScreen() {
                   {item.notes}
                 </Text>
               ) : null}
-            </View>
+            </TouchableOpacity>
           )}
         />
       )}
@@ -401,6 +406,44 @@ export default function PatrolLogScreen() {
                   <Text style={styles.modalConfirmText}>Start Duty</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      <Modal visible={!!selectedSession} animationType="slide" transparent onRequestClose={() => setSelectedSession(null)}>
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+            <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Patrol History</Text>
+              {selectedSession ? (
+                <>
+                  <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
+                    {selectedSession.route}
+                  </Text>
+                  <Text style={[styles.sessionDetailText, { color: colors.text }]}>
+                    {new Date(selectedSession.startTime).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} ·{" "}
+                    {formatTime(selectedSession.startTime)} – {selectedSession.endTime ? formatTime(selectedSession.endTime) : "ongoing"}
+                  </Text>
+                  <Text style={[styles.sessionDetailText, { color: colors.mutedForeground }]}>
+                    Officer: {selectedSession.officerName} ({selectedSession.officerBadge})
+                  </Text>
+                  <Text style={[styles.sessionDetailText, { color: colors.mutedForeground }]}>
+                    Entries: {selectedSession.encounters.length} · Distance: {selectedSession.totalKm ?? "—"} km
+                  </Text>
+                  {selectedSession.notes ? (
+                    <Text style={[styles.historyNotes, { color: colors.mutedForeground, borderTopColor: colors.border }]}>
+                      {selectedSession.notes}
+                    </Text>
+                  ) : null}
+                  <TouchableOpacity
+                    style={[styles.modalConfirmBtn, { backgroundColor: colors.primary, marginTop: 12 }]}
+                    onPress={() => setSelectedSession(null)}
+                  >
+                    <Text style={styles.modalConfirmText}>Close</Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
             </View>
           </KeyboardAvoidingView>
         </View>
@@ -802,6 +845,11 @@ const styles = StyleSheet.create({
   historyStatText: {
     fontSize: 11,
     fontFamily: "Inter_500Medium",
+  },
+  sessionDetailText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    marginTop: 6,
   },
   historyNotes: {
     fontSize: 12,
