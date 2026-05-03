@@ -415,6 +415,10 @@ export default function ReportScreen() {
                       <FieldInput colors={colors} label="Make" value={vehicle.make} onChangeText={(make: string) => updateVehicle(vehicle.id, { make })} placeholder="Toyota" />
                       <FieldInput colors={colors} label="Model" value={vehicle.model} onChangeText={(model: string) => updateVehicle(vehicle.id, { model })} placeholder="Corolla" />
                     </View>
+                    <View style={s.twoCol}>
+                      <FieldInput colors={colors} label="Colour" value={vehicle.colour} onChangeText={(colour: string) => updateVehicle(vehicle.id, { colour })} placeholder="White" />
+                      <FieldInput colors={colors} label="Type" value={vehicle.type} onChangeText={(type: string) => updateVehicle(vehicle.id, { type: type as Vehicle["type"] })} placeholder="car" />
+                    </View>
                   </View>
                 ))
               )}
@@ -443,6 +447,7 @@ export default function ReportScreen() {
                       <FieldInput colors={colors} label="Age" value={victim.age} onChangeText={(age: string) => updateVictim(victim.id, { age })} placeholder="34" keyboardType="number-pad" />
                       <FieldInput colors={colors} label="Gender" value={victim.gender} onChangeText={(gender: string) => updateVictim(victim.id, { gender: gender as any })} placeholder="Male" />
                     </View>
+                    <FieldInput colors={colors} label="Condition" value={victim.condition} onChangeText={(condition: string) => updateVictim(victim.id, { condition: condition as any })} placeholder="injured" />
                   </View>
                 ))
               )}
