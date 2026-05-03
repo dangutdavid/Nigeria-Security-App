@@ -321,6 +321,16 @@ export default function CasesScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
+        <View>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Cases</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>Browse and manage incidents</Text>
+        </View>
+        <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.secondary }]} onPress={() => router.push("/report")} activeOpacity={0.85}>
+          <Feather name="plus" size={18} color="#fff" />
+          <Text style={styles.headerBtnText}>Add</Text>
+        </TouchableOpacity>
+      </View>
       <FlatList
         data={filtered}
         keyExtractor={(i) => i.id}
@@ -343,6 +353,27 @@ export default function CasesScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  headerTitle: { fontSize: 22, fontFamily: "Inter_700Bold" },
+  headerSubtitle: { marginTop: 4, fontSize: 12, fontFamily: "Inter_400Regular" },
+  headerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    height: 40,
+    borderRadius: 20,
+  },
+  headerBtnText: { color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 13 },
   list: { padding: 16 },
   emptyList: { flexGrow: 1 },
   emptyState: { alignItems: "center", justifyContent: "center", paddingTop: 80 },
