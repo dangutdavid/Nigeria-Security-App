@@ -96,7 +96,6 @@ export default function ProfileScreen() {
     setOfflineMode(false);
     setAutoSync(true);
     setLocationSharing(true);
-    setLoggingOut(true);
     await logout();
     router.replace("/");
   }
