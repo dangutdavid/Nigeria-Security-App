@@ -67,18 +67,8 @@ export default function LoginScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: colors.primary }]}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 24) },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+    <KeyboardAvoidingView style={[styles.root, { backgroundColor: colors.primary }]} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 24) }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <View style={styles.logoArea}>
           <Image source={require("../assets/images/icon.png")} style={styles.logo} />
           <Text style={styles.appName}>FRSC Mobile</Text>
@@ -86,45 +76,23 @@ export default function LoginScreen() {
           <Text style={styles.appSub2}>Field Operations System</Text>
         </View>
 
-        <View style={[styles.card, { backgroundColor: colors.card }]}> 
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
           <Text style={[styles.cardTitle, { color: colors.text }]}>Officer Sign In</Text>
           <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>Use your FRSC badge number and assigned PIN</Text>
 
           <View style={styles.fieldWrap}>
             <Text style={[styles.label, { color: colors.mutedForeground }]}>Badge Number</Text>
-            <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.muted }]}> 
+            <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.muted }]}>
               <Feather name="shield" size={18} color={colors.mutedForeground} />
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder="e.g. FO-001"
-                placeholderTextColor={colors.mutedForeground}
-                value={badge}
-                onChangeText={(t) => {
-                  setBadge(t);
-                  setError("");
-                }}
-                autoCapitalize="characters"
-                autoCorrect={false}
-              />
+              <TextInput style={[styles.input, { color: colors.text }]} placeholder="e.g. FO-001" placeholderTextColor={colors.mutedForeground} value={badge} onChangeText={(t) => { setBadge(t); setError(""); }} autoCapitalize="characters" autoCorrect={false} />
             </View>
           </View>
 
           <View style={styles.fieldWrap}>
             <Text style={[styles.label, { color: colors.mutedForeground }]}>PIN</Text>
-            <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.muted }]}> 
+            <View style={[styles.inputRow, { borderColor: colors.border, backgroundColor: colors.muted }]}>
               <Feather name="lock" size={18} color={colors.mutedForeground} />
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                placeholder="Enter your PIN"
-                placeholderTextColor={colors.mutedForeground}
-                value={pin}
-                onChangeText={(t) => {
-                  setPin(t);
-                  setError("");
-                }}
-                secureTextEntry={!showPin}
-                keyboardType="number-pad"
-              />
+              <TextInput style={[styles.input, { color: colors.text }]} placeholder="Enter your PIN" placeholderTextColor={colors.mutedForeground} value={pin} onChangeText={(t) => { setPin(t); setError(""); }} secureTextEntry={!showPin} keyboardType="number-pad" />
               <TouchableOpacity onPress={() => setShowPin((s) => !s)}>
                 <Feather name={showPin ? "eye-off" : "eye"} size={18} color={colors.mutedForeground} />
               </TouchableOpacity>
@@ -138,43 +106,20 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
-          <TouchableOpacity
-            style={[styles.loginBtn, { backgroundColor: colors.primary }, loading && { opacity: 0.7 }]}
-            onPress={handleLogin}
-            disabled={loading}
-            activeOpacity={0.85}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Feather name="log-in" size={18} color="#fff" />
-                <Text style={styles.loginBtnText}>Sign In</Text>
-              </>
-            )}
+          <TouchableOpacity style={[styles.loginBtn, { backgroundColor: colors.primary }, loading && { opacity: 0.7 }]} onPress={handleLogin} disabled={loading} activeOpacity={0.85}>
+            {loading ? <ActivityIndicator color="#fff" /> : (<><Feather name="log-in" size={18} color="#fff" /><Text style={styles.loginBtnText}>Sign In</Text></>)}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => router.push("/forgot-pin")}
-            style={styles.forgotLink}
-            activeOpacity={0.7}
-          >
+          <TouchableOpacity onPress={() => router.push("/forgot-pin")} style={styles.forgotLink} activeOpacity={0.7}>
             <Feather name="help-circle" size={14} color={colors.mutedForeground} />
-            <Text style={[styles.forgotLinkText, { color: colors.mutedForeground }]}>
-              Forgot your PIN?
-            </Text>
+            <Text style={[styles.forgotLinkText, { color: colors.mutedForeground }]}>Forgot your PIN?</Text>
           </TouchableOpacity>
 
-          <View style={[styles.demoSection, { borderTopColor: colors.border }]}> 
+          <View style={[styles.demoSection, { borderTopColor: colors.border }]}>
             <Text style={[styles.demoTitle, { color: colors.mutedForeground }]}>Demo Accounts</Text>
             <View style={styles.demoList}>
               {DEMO_HINTS.map((d) => (
-                <TouchableOpacity
-                  key={d.badge}
-                  style={[styles.demoChip, { borderColor: colors.border, backgroundColor: colors.muted }]}
-                  onPress={() => fillDemo(d.badge, d.pin)}
-                  activeOpacity={0.7}
-                >
+                <TouchableOpacity key={d.badge} style={[styles.demoChip, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={() => fillDemo(d.badge, d.pin)} activeOpacity={0.7}>
                   <Text style={[styles.demoChipBadge, { color: colors.primary }]}>{d.badge}</Text>
                   <Text style={[styles.demoChipRole, { color: colors.mutedForeground }]}>{d.role}</Text>
                 </TouchableOpacity>
