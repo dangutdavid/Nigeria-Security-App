@@ -63,6 +63,11 @@ const TYPE_SEVERITY_HINT: Record<IncidentType, string> = {
   flooding: "Pick the impact level caused by the flooding.",
 };
 
+const VEHICLE_TYPES = ["car", "bus", "truck", "pickup", "van", "motorcycle", "tricycle", "suv", "other"];
+const VEHICLE_COLOURS = ["White", "Black", "Grey", "Silver", "Blue", "Red", "Green", "Yellow", "Other"];
+const GENDER_OPTIONS = ["male", "female", "unknown"];
+const CONDITION_OPTIONS = ["injured", "uninjured", "critical", "deceased", "unknown"];
+
 const NIGERIA_STATES = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
   "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT", "Gombe", "Imo",
@@ -118,6 +123,36 @@ function StepPill({ label, active, colors }: { label: string; active: boolean; c
   return (
     <View style={[s.stepPill, { backgroundColor: active ? colors.primary : colors.muted, borderColor: active ? colors.primary : colors.border }]}>
       <Text style={[s.stepPillText, { color: active ? "#fff" : colors.mutedForeground }]}>{label}</Text>
+    </View>
+  );
+}
+
+function ChoiceChips({
+  colors,
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  colors: any;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  label?: string;
+}) {
+  return (
+    <View style={{ gap: 8 }}>
+      {label ? <Text style={[s.fieldLabel, { color: colors.mutedForeground }]}>{label}</Text> : null}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+        {options.map((option) => {
+          const active = value.toLowerCase() === option.toLowerCase();
+          return (
+            <TouchableOpacity key={option} style={[s.choiceChip, { backgroundColor: active ? colors.primary : colors.muted, borderColor: active ? colors.primary : colors.border }]} onPress={() => onChange(option)}>
+              <Text style={[s.choiceChipText, { color: active ? "#fff" : colors.text }]}>{option}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
@@ -418,10 +453,8 @@ export default function ReportScreen() {
                       <FieldInput colors={colors} label="Make" value={vehicle.make} onChangeText={(make: string) => updateVehicle(vehicle.id, { make })} placeholder="Toyota" />
                       <FieldInput colors={colors} label="Model" value={vehicle.model} onChangeText={(model: string) => updateVehicle(vehicle.id, { model })} placeholder="Corolla" />
                     </View>
-                    <View style={s.twoCol}>
-                      <FieldInput colors={colors} label="Colour" value={vehicle.colour} onChangeText={(colour: string) => updateVehicle(vehicle.id, { colour })} placeholder="White" />
-                      <FieldInput colors={colors} label="Type" value={vehicle.type} onChangeText={(type: string) => updateVehicle(vehicle.id, { type: type as Vehicle["type"] })} placeholder="car" />
-                    </View>
+                    <ChoiceChips colors={colors} label="Colour" value={vehicle.colour} options={VEHICLE_COLOURS} onChange={(colour) => updateVehicle(vehicle.id, { colour })} />
+                    <ChoiceChips colors={colors} label="Type" value={vehicle.type} options={VEHICLE_TYPES} onChange={(type) => updateVehicle(vehicle.id, { type: type as Vehicle["type"] })} />
                   </View>
                 ))
               )}
@@ -451,9 +484,9 @@ export default function ReportScreen() {
                     <FieldInput colors={colors} label="Name" value={victim.name} onChangeText={(name: string) => updateVictim(victim.id, { name })} placeholder="Full name" />
                     <View style={s.twoCol}>
                       <FieldInput colors={colors} label="Age" value={victim.age} onChangeText={(age: string) => updateVictim(victim.id, { age })} placeholder="34" keyboardType="number-pad" />
-                      <FieldInput colors={colors} label="Gender" value={victim.gender} onChangeText={(gender: string) => updateVictim(victim.id, { gender: gender as any })} placeholder="Male" />
+                      <ChoiceChips colors={colors} label="Gender" value={victim.gender} options={GENDER_OPTIONS} onChange={(gender) => updateVictim(victim.id, { gender: gender as any })} />
                     </View>
-                    <FieldInput colors={colors} label="Condition" value={victim.condition} onChangeText={(condition: string) => updateVictim(victim.id, { condition: condition as any })} placeholder="injured" />
+                    <ChoiceChips colors={colors} label="Condition" value={victim.condition} options={CONDITION_OPTIONS} onChange={(condition) => updateVictim(victim.id, { condition: condition as any })} />
                   </View>
                 ))
               )}
@@ -544,6 +577,8 @@ const s = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 12, fontSize: 14, fontFamily: "Inter_400Regular" },
   stepPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7 },
   stepPillText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  choiceChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+  choiceChipText: { fontSize: 12, fontFamily: "Inter_500Medium", textTransform: "capitalize" },
   chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   chipText: { fontSize: 12, fontFamily: "Inter_500Medium" },
   searchBox: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, marginBottom: 10 },
