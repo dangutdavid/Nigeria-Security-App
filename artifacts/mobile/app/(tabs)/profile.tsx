@@ -97,7 +97,7 @@ export default function ProfileScreen() {
     setAutoSync(true);
     setLocationSharing(true);
     await logout();
-    router.replace("/");
+    router.replace("/logout");
   }
 
   function handleLogout() {
