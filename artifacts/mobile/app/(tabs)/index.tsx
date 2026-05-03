@@ -17,15 +17,15 @@ export default function HomeScreen() {
   const recent = incidents.slice(0, 5);
   const openCount = incidents.filter((incident) => incident.status !== "closed").length;
   const fatalCount = incidents.filter((incident) => incident.severity === "fatal" && incident.status !== "closed").length;
-  const bySeverity = [
+  const severityFilters = [
     { key: "fatal", label: "Fatal", value: incidents.filter((incident) => incident.severity === "fatal").length, color: "#8B0000" },
     { key: "serious", label: "Serious", value: incidents.filter((incident) => incident.severity === "serious").length, color: "#E67E22" },
     { key: "minor", label: "Minor", value: incidents.filter((incident) => incident.severity === "minor").length, color: "#27AE60" },
   ];
-  const byStatus = [
+  const statusFilters = [
     { key: "submitted", label: "Submitted", value: incidents.filter((incident) => incident.status === "submitted").length, color: colors.primary },
     { key: "assigned", label: "Assigned", value: incidents.filter((incident) => incident.status === "assigned").length, color: colors.secondary },
-    { key: "review", label: "Under review", value: incidents.filter((incident) => incident.status === "under_review").length, color: colors.warning },
+    { key: "under_review", label: "Review", value: incidents.filter((incident) => incident.status === "under_review").length, color: colors.warning },
   ];
 
   return (
@@ -64,41 +64,31 @@ export default function HomeScreen() {
 
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>REPORT CHARTS</Text>
-            <Text style={[styles.sectionLink, { color: colors.primary }]}>Tap a bar to filter</Text>
+            <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>QUICK FILTERS</Text>
+            <Text style={[styles.sectionLink, { color: colors.primary }]}>Tap to open cases</Text>
           </View>
-          <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.chartTitle, { color: colors.text }]}>Severity breakdown</Text>
-            <View style={styles.severityList}>
-              {bySeverity.map((item) => (
-                <TouchableOpacity
-                  key={item.key}
-                  style={styles.severityRow}
-                  onPress={() => router.push(`/(tabs)/cases?severity=${item.key}` as any)}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.severityLeft}>
-                    <View style={[styles.severityDot, { backgroundColor: item.color }]} />
-                    <Text style={[styles.statusLabel, { color: colors.text }]}>{item.label}</Text>
-                  </View>
-                  <View style={styles.severityBarTrack}>
-                    <View
-                      style={[
-                        styles.severityBarFill,
-                        { width: `${Math.max(18, item.value ? item.value * 20 : 18)}%`, backgroundColor: item.color },
-                      ]}
-                    />
-                  </View>
-                  <Text style={[styles.severityValue, { color: colors.text }]}>{item.value}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+          <View style={styles.filterChipRow}>
+            {severityFilters.map((item) => (
+              <TouchableOpacity
+                key={item.key}
+                style={[styles.filterChip, { borderColor: item.color, backgroundColor: colors.card }]}
+                onPress={() => router.push(`/(tabs)/cases?severity=${item.key}` as any)}
+                activeOpacity={0.85}
+              >
+                <View style={[styles.filterDot, { backgroundColor: item.color }]} />
+                <Text style={[styles.filterChipText, { color: colors.text }]}>{item.label}</Text>
+                <Text style={[styles.filterChipCount, { color: colors.mutedForeground }]}>{item.value}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-
-          <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 12 }]}>
-            <Text style={[styles.chartTitle, { color: colors.text }]}>Status snapshot</Text>
-            {byStatus.map((item) => (
-              <TouchableOpacity key={item.key} style={styles.statusRow} onPress={() => router.push(`/(tabs)/cases?status=${item.key}` as any)}>
+          <View style={[styles.statusPillsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {statusFilters.map((item) => (
+              <TouchableOpacity
+                key={item.key}
+                style={styles.statusPillRow}
+                onPress={() => router.push(`/(tabs)/cases?status=${item.key}` as any)}
+                activeOpacity={0.85}
+              >
                 <View style={styles.statusLeft}>
                   <View style={[styles.statusDot, { backgroundColor: item.color }]} />
                   <Text style={[styles.statusLabel, { color: colors.text }]}>{item.label}</Text>
@@ -190,15 +180,13 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 12, fontFamily: "Inter_700Bold" },
   seeAll: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   sectionLink: { fontSize: 11, fontFamily: "Inter_500Medium" },
-  chartCard: { borderRadius: 18, borderWidth: 1, padding: 14 },
-  chartTitle: { fontSize: 15, fontFamily: "Inter_700Bold", marginBottom: 12 },
-  severityList: { gap: 12 },
-  severityRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  severityLeft: { width: 78, flexDirection: "row", alignItems: "center", gap: 8 },
-  severityBarTrack: { flex: 1, height: 10, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.06)", overflow: "hidden" },
-  severityBarFill: { height: "100%", borderRadius: 999 },
-  severityValue: { width: 22, textAlign: "right", fontSize: 14, fontFamily: "Inter_700Bold" },
-  statusRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 12, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.06)" },
+  filterChipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
+  filterChip: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+  filterDot: { width: 8, height: 8, borderRadius: 4 },
+  filterChipText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  filterChipCount: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  statusPillsCard: { borderRadius: 18, borderWidth: 1, paddingHorizontal: 14 },
+  statusPillRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 12, borderTopWidth: 1, borderTopColor: "rgba(0,0,0,0.06)" },
   statusLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   statusLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
