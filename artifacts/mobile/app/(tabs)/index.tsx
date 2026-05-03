@@ -182,11 +182,11 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.quickRow}>
-          <TouchableOpacity style={[styles.quickAction, { backgroundColor: colors.secondary }]} onPress={() => router.push("/report") }>
+          <TouchableOpacity style={[styles.quickAction, { backgroundColor: colors.secondary }]} onPress={() => router.push("/report")}>
             <Feather name="plus" size={18} color="#fff" />
             <Text style={styles.quickActionText}>Add incident</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.quickActionAlt, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => router.push("/(tabs)/cases") }>
+          <TouchableOpacity style={[styles.quickActionAlt, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => router.push("/(tabs)/cases")}>
             <Feather name="list" size={18} color={colors.text} />
             <Text style={[styles.quickActionAltText, { color: colors.text }]}>View cases</Text>
           </TouchableOpacity>
