@@ -170,6 +170,14 @@ export default function AnalyticsScreen() {
                 </TouchableOpacity>
               ) : null}
             </View>
+            {hasFilters ? (
+              <View style={styles.activeFiltersRow}>
+                {typeFilter !== "all" ? <FilterPill label={typeFilter} active onPress={() => setTypeFilter("all")} /> : null}
+                {statusFilter !== "all" ? <FilterPill label={statusFilter.replace("_", " ")} active onPress={() => setStatusFilter("all")} /> : null}
+                {rangeFilter !== "all" ? <FilterPill label={`${rangeFilter}d`} active onPress={() => setRangeFilter("all")} /> : null}
+                {query.trim() ? <FilterPill label={`“${query.trim()}”`} active onPress={() => setQuery("")} /> : null}
+              </View>
+            ) : null}
             <TextInput
               value={query}
               onChangeText={setQuery}
@@ -621,6 +629,11 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
   },
   filterRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  activeFiltersRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
