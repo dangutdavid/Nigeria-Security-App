@@ -186,7 +186,7 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: colors.fatal }]} onPress={handleLogout} activeOpacity={0.85}>
           <Feather name="log-out" size={16} color="#fff" />
-          <Text style={styles.logoutText}>Sign Out</Text>
+          <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
