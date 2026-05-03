@@ -28,7 +28,6 @@ interface AuthContextType {
   isLoading: boolean;
   login: (badgeNumber: string, pin: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
-  // User management
   allUsers: User[];
   addUser: (user: Omit<User, "id" | "createdAt">, pin: string) => Promise<void>;
   updateUser: (id: string, updates: Partial<Omit<User, "id" | "createdAt">>) => Promise<void>;
@@ -144,7 +143,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (storedUser) setUser(JSON.parse(storedUser));
       if (storedUsers) setRecords(JSON.parse(storedUsers));
     } catch {
-      // ignore
     } finally {
       setIsLoading(false);
     }
@@ -156,9 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function login(badgeNumber: string, pin: string): Promise<LoginResult> {
-    const entry = records.find(
-      (r) => r.user.badgeNumber.toUpperCase() === badgeNumber.toUpperCase()
-    );
+    const entry = records.find((r) => r.user.badgeNumber.toUpperCase() === badgeNumber.toUpperCase());
     if (!entry || entry.pin !== pin) return "invalid";
     if (entry.user.status === "inactive") return "inactive";
     if (entry.user.status === "suspended") return "suspended";
@@ -168,14 +164,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function logout() {
-    await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+    await AsyncStorage.multiRemove([AUTH_STORAGE_KEY]);
     setUser(null);
   }
 
-  async function addUser(
-    newUser: Omit<User, "id" | "createdAt">,
-    pin: string
-  ): Promise<void> {
+  async function addUser(newUser: Omit<User, "id" | "createdAt">, pin: string): Promise<void> {
     const record: UserRecord = {
       pin,
       user: {
@@ -187,15 +180,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await persistRecords([...records, record]);
   }
 
-  async function updateUser(
-    id: string,
-    updates: Partial<Omit<User, "id" | "createdAt">>
-  ): Promise<void> {
-    const next = records.map((r) =>
-      r.user.id === id ? { ...r, user: { ...r.user, ...updates } } : r
-    );
+  async function updateUser(id: string, updates: Partial<Omit<User, "id" | "createdAt">>): Promise<void> {
+    const next = records.map((r) => (r.user.id === id ? { ...r, user: { ...r.user, ...updates } } : r));
     await persistRecords(next);
-    // Keep active session in sync
     if (user?.id === id) {
       const updated = next.find((r) => r.user.id === id)?.user ?? null;
       if (updated) {
@@ -211,9 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function resetPin(id: string, newPin: string): Promise<void> {
-    const next = records.map((r) =>
-      r.user.id === id ? { ...r, pin: newPin } : r
-    );
+    const next = records.map((r) => (r.user.id === id ? { ...r, pin: newPin } : r));
     await persistRecords(next);
   }
 

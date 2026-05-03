@@ -88,16 +88,22 @@ export default function ProfileScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
 
-  async function handleLogout() {
-    Alert.alert("Sign Out", "Are you sure you want to sign out? Any unsynced reports will remain saved locally.", [
+  async function doLogout() {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await logout();
+    router.replace("/");
+  }
+
+  function handleLogout() {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Sign Out",
         style: "destructive",
-        onPress: async () => {
-          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          await logout();
-          router.replace("/");
+        onPress: () => {
+          void doLogout().catch(() => {
+            Alert.alert("Sign Out Failed", "Please try again.");
+          });
         },
       },
     ]);
