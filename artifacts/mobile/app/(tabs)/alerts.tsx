@@ -37,6 +37,7 @@ function buildAlerts(incidents: ReturnType<typeof useIncidents>["incidents"], ro
         message: "Review and assign pending incident reports to field officers.",
         time: "Now",
         read: false,
+          incidentId: "unassigned",
       });
     }
   }
@@ -186,6 +187,10 @@ export default function AlertsScreen() {
               ]}
               activeOpacity={item.incidentId ? 0.7 : 1}
               onPress={() => {
+                if (item.incidentId === "unassigned") {
+                  router.push("/(tabs)/cases?status=submitted" as any);
+                  return;
+                }
                 if (item.incidentId) router.push(`/case/${item.incidentId}` as any);
               }}
             >
@@ -213,7 +218,7 @@ export default function AlertsScreen() {
                   </Text>
                   {item.incidentId && (
                     <Text style={[styles.viewLink, { color: colors.primary }]}>
-                      View case
+                      {item.incidentId === "unassigned" ? "Review cases" : "View case"}
                     </Text>
                   )}
                 </View>
