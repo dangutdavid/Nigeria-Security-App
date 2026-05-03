@@ -82,6 +82,9 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
   const { isOnDuty, activeSession } = usePatrol();
+  const canManageUsers = user?.role === "supervisor" || user?.role === "commander";
+  const canAssignCases = canManageUsers;
+  const canUseCommandTools = user?.role === "supervisor" || user?.role === "commander";
 
   const [offlineMode, setOfflineMode] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
@@ -197,21 +200,29 @@ export default function ProfileScreen() {
             subtitle="Check registration and owner records"
             onPress={() => router.push("/vehicle-lookup")}
           />
-          <SettingRow
-            icon="clipboard"
-            label="Case Assignment"
-            subtitle="Assign submitted incidents to officers"
-            onPress={() => router.push("/(tabs)/cases?status=submitted" as any)}
-          />
-          <SettingRow icon="users" label="Manage Users" subtitle="Create and assign officers" onPress={() => router.push("/users")} />
-          <SettingRow icon="key" label="Change PIN" subtitle="Update your login PIN" onPress={() => router.push("/change-pin")} />
+          {canAssignCases ? (
+            <SettingRow
+              icon="clipboard"
+              label="Case Assignment"
+              subtitle="Assign submitted incidents to officers"
+              onPress={() => router.push("/(tabs)/cases?status=submitted" as any)}
+            />
+          ) : null}
+          {canManageUsers ? (
+            <SettingRow icon="users" label="Manage Users" subtitle="Create and assign officers" onPress={() => router.push("/users")} />
+          ) : null}
+          {canUseCommandTools ? (
+            <SettingRow icon="key" label="Change PIN" subtitle="Update your login PIN" onPress={() => router.push("/change-pin")} />
+          ) : null}
           <SettingRow icon="help-circle" label="Forgot PIN" subtitle="Recover access with OTP" onPress={() => router.push("/forgot-pin")} />
-          <SettingRow
-            icon="settings"
-            label="Settings & Sync"
-            subtitle="Open profile settings and connectivity options"
-            onPress={() => router.push("/patrol-log")}
-          />
+          {canUseCommandTools ? (
+            <SettingRow
+              icon="settings"
+              label="Settings & Sync"
+              subtitle="Open profile settings and connectivity options"
+              onPress={() => router.push("/patrol-log")}
+            />
+          ) : null}
         </View>
       </View>
 
