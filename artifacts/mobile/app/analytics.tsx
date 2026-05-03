@@ -109,7 +109,7 @@ export default function AnalyticsScreen() {
 
   const totalCasualties = filteredIncidents.reduce((sum, i) => sum + i.victims.length, 0);
   const fatalVictims = incidents.reduce(
-    (sum, i) => sum + i.victims.filter((v) => v.condition === "deceased").length,
+    (sum, i) => sum + i.victims.filter((v) => v.condition === "fatal").length,
     0
   );
   const seriousVictims = incidents.reduce(
