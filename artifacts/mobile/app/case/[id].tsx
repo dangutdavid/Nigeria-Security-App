@@ -557,7 +557,9 @@ function isImageUri(u: string) {
   return lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".webp") || lower.endsWith(".gif");
 }
 
-function EvidencePickerButtons({
+// ─── Single-item picker buttons (used inside inline-edit cards) ───────────────
+
+function SingleEvidencePicker({
   onPickedUri,
   colors,
 }: {
@@ -586,10 +588,7 @@ function EvidencePickerButtons({
       Alert.alert("Permission needed", "Allow camera access to capture evidence photos.");
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ["images"],
-      quality: 0.85,
-    });
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.85 });
     if (!result.canceled && result.assets.length > 0) {
       onPickedUri(result.assets[0].uri);
     }
@@ -597,17 +596,11 @@ function EvidencePickerButtons({
 
   return (
     <View style={st.pickerRow}>
-      <Pressable
-        onPress={pickFromCamera}
-        style={[st.pickerBtn, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}
-      >
+      <Pressable onPress={pickFromCamera} style={[st.pickerBtn, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}>
         <Feather name="camera" size={18} color={colors.primary} />
         <Text style={[st.pickerBtnText, { color: colors.primary }]}>Take Photo</Text>
       </Pressable>
-      <Pressable
-        onPress={pickFromLibrary}
-        style={[st.pickerBtn, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}
-      >
+      <Pressable onPress={pickFromLibrary} style={[st.pickerBtn, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}>
         <Feather name="image" size={18} color={colors.primary} />
         <Text style={[st.pickerBtnText, { color: colors.primary }]}>From Library</Text>
       </Pressable>
@@ -615,15 +608,21 @@ function EvidencePickerButtons({
   );
 }
 
+// ─── Evidence tab ─────────────────────────────────────────────────────────────
+
 function EvidenceTab({
   evidence, setEvidence,
-  uri, setUri, label, setLabel,
   colors,
 }: any) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [eUri, setEUri] = useState("");
   const [eLabel, setELabel] = useState("");
+
+  // staging area for new items
+  const [staged, setStaged] = useState<string[]>([]);
+  const [batchLabel, setBatchLabel] = useState("");
   const [showUrlInput, setShowUrlInput] = useState(false);
+  const [urlDraft, setUrlDraft] = useState("");
 
   function startEdit(e: EvidenceItem) {
     setEditingId(e.id);
@@ -631,9 +630,7 @@ function EvidenceTab({
     setELabel(e.label ?? "");
   }
 
-  function cancelEdit() {
-    setEditingId(null);
-  }
+  function cancelEdit() { setEditingId(null); }
 
   function saveEdit() {
     if (!eUri.trim()) {
@@ -651,16 +648,60 @@ function EvidenceTab({
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
-  function doAdd() {
-    if (!uri.trim()) {
-      Alert.alert("No file selected", "Take a photo, choose from your library, or paste a URL.");
+  async function pickFromCamera() {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Permission needed", "Allow camera access to capture evidence photos.");
       return;
     }
-    setEvidence((prev: EvidenceItem[]) => [
-      ...prev,
-      { id: Date.now().toString(), uri: uri.trim(), label: label.trim() || undefined },
-    ]);
-    setUri(""); setLabel(""); setShowUrlInput(false);
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.85 });
+    if (!result.canceled && result.assets.length > 0) {
+      setStaged((prev) => [...prev, result.assets[0].uri]);
+    }
+  }
+
+  async function pickFromLibrary() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Permission needed", "Allow access to your photo library to attach evidence photos.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images", "videos"],
+      allowsMultipleSelection: true,
+      quality: 0.85,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      setStaged((prev) => [...prev, ...result.assets.map((a) => a.uri)]);
+    }
+  }
+
+  function addUrlToStaged() {
+    const u = urlDraft.trim();
+    if (!u) return;
+    setStaged((prev) => [...prev, u]);
+    setUrlDraft("");
+    setShowUrlInput(false);
+  }
+
+  function attachAll() {
+    if (staged.length === 0) {
+      Alert.alert("Nothing staged", "Take a photo, choose from your library, or paste a URL first.");
+      return;
+    }
+    const prefix = batchLabel.trim();
+    const newItems: EvidenceItem[] = staged.map((uri, idx) => ({
+      id: `${Date.now()}_${idx}`,
+      uri,
+      label: staged.length === 1
+        ? (prefix || undefined)
+        : (prefix ? `${prefix} ${idx + 1}` : `Item ${idx + 1}`),
+    }));
+    setEvidence((prev: EvidenceItem[]) => [...prev, ...newItems]);
+    setStaged([]);
+    setBatchLabel("");
+    setShowUrlInput(false);
+    setUrlDraft("");
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
@@ -674,30 +715,17 @@ function EvidenceTab({
       ) : (
         evidence.map((e: EvidenceItem) =>
           editingId === e.id ? (
-            <InlineEditCard
-              key={e.id}
-              title="Editing evidence"
-              colors={colors}
-              onSave={saveEdit}
-              onCancel={cancelEdit}
-            >
-              <EvidencePickerButtons onPickedUri={setEUri} colors={colors} />
+            <InlineEditCard key={e.id} title="Editing evidence" colors={colors} onSave={saveEdit} onCancel={cancelEdit}>
+              <SingleEvidencePicker onPickedUri={setEUri} colors={colors} />
               {eUri ? (
                 <View style={st.previewBox}>
-                  {isImageUri(eUri) ? (
-                    <Image source={{ uri: eUri }} style={st.previewImage} resizeMode="cover" />
-                  ) : null}
+                  {isImageUri(eUri) ? <Image source={{ uri: eUri }} style={st.previewImage} resizeMode="cover" /> : null}
                   <Text style={[st.previewUri, { color: colors.mutedForeground }]} numberOfLines={2}>{eUri}</Text>
                   <Pressable onPress={() => setEUri("")} style={st.clearPreview}>
                     <Feather name="x" size={14} color={colors.mutedForeground} />
                   </Pressable>
                 </View>
               ) : null}
-              <Pressable onPress={() => {}} style={st.urlToggle}>
-                <Feather name="link" size={13} color={colors.mutedForeground} />
-                <Text style={[st.urlToggleText, { color: colors.mutedForeground }]}>Paste a URL instead</Text>
-              </Pressable>
-              <LabeledInput label="Evidence URL / reference" value={eUri} onChange={setEUri} placeholder="https://… or file reference" colors={colors} />
               <LabeledInput label="Label / description" value={eLabel} onChange={setELabel} placeholder="e.g. Scene photo 1" colors={colors} />
             </InlineEditCard>
           ) : (
@@ -714,40 +742,96 @@ function EvidenceTab({
         )
       )}
 
+      {/* ── Add new evidence ── */}
       <View style={[st.addFormCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[st.addFormTitle, { color: colors.text }]}>Attach evidence</Text>
 
-        <EvidencePickerButtons onPickedUri={setUri} colors={colors} />
+        {/* Picker buttons */}
+        <View style={st.pickerRow}>
+          <Pressable onPress={pickFromCamera} style={[st.pickerBtn, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}>
+            <Feather name="camera" size={18} color={colors.primary} />
+            <Text style={[st.pickerBtnText, { color: colors.primary }]}>Take Photo</Text>
+          </Pressable>
+          <Pressable onPress={pickFromLibrary} style={[st.pickerBtn, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}>
+            <Feather name="image" size={18} color={colors.primary} />
+            <Text style={[st.pickerBtnText, { color: colors.primary }]}>From Library</Text>
+          </Pressable>
+        </View>
 
-        {uri ? (
-          <View style={st.previewBox}>
-            {isImageUri(uri) ? (
-              <Image source={{ uri }} style={st.previewImage} resizeMode="cover" />
-            ) : null}
-            <Text style={[st.previewUri, { color: colors.mutedForeground }]} numberOfLines={2}>{uri}</Text>
-            <Pressable onPress={() => setUri("")} style={st.clearPreview}>
-              <Feather name="x" size={14} color={colors.mutedForeground} />
-            </Pressable>
-          </View>
-        ) : null}
-
-        <Pressable
-          onPress={() => setShowUrlInput((v) => !v)}
-          style={st.urlToggle}
-        >
+        {/* Paste URL toggle */}
+        <Pressable onPress={() => setShowUrlInput((v) => !v)} style={st.urlToggle}>
           <Feather name="link" size={13} color={colors.mutedForeground} />
           <Text style={[st.urlToggleText, { color: colors.mutedForeground }]}>
             {showUrlInput ? "Hide URL field" : "Paste a URL instead"}
           </Text>
           <Feather name={showUrlInput ? "chevron-up" : "chevron-down"} size={13} color={colors.mutedForeground} />
         </Pressable>
-
         {showUrlInput ? (
-          <LabeledInput label="Evidence URL / reference" value={uri} onChange={setUri} placeholder="https://… or file reference" colors={colors} />
+          <View style={st.urlRow}>
+            <TextInput
+              value={urlDraft}
+              onChangeText={setUrlDraft}
+              placeholder="https://… or file reference"
+              placeholderTextColor={colors.mutedForeground}
+              style={[st.urlInput, { backgroundColor: colors.muted, borderColor: colors.border, color: colors.text }]}
+              autoCapitalize="none"
+              keyboardType="url"
+            />
+            <Pressable
+              onPress={addUrlToStaged}
+              style={[st.urlAddBtn, { backgroundColor: colors.primary }]}
+            >
+              <Feather name="plus" size={16} color="#fff" />
+            </Pressable>
+          </View>
         ) : null}
 
-        <LabeledInput label="Label / description" value={label} onChange={setLabel} placeholder="e.g. Scene photo 1 (optional)" colors={colors} />
-        <AddButton label="Attach to record" onPress={doAdd} colors={colors} />
+        {/* Staged thumbnail grid */}
+        {staged.length > 0 ? (
+          <View style={{ marginTop: 10 }}>
+            <Text style={[st.stagedCount, { color: colors.mutedForeground }]}>
+              {staged.length} file{staged.length !== 1 ? "s" : ""} selected
+            </Text>
+            <View style={st.stagedGrid}>
+              {staged.map((u, idx) => (
+                <View key={`${u}_${idx}`} style={st.stagedItem}>
+                  {isImageUri(u) ? (
+                    <Image source={{ uri: u }} style={st.stagedThumb} resizeMode="cover" />
+                  ) : (
+                    <View style={[st.stagedThumb, st.stagedFilePlaceholder, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                      <Feather name="file" size={20} color={colors.mutedForeground} />
+                    </View>
+                  )}
+                  <Pressable
+                    onPress={() => setStaged((prev) => prev.filter((_, i) => i !== idx))}
+                    style={[st.stagedRemoveBtn, { backgroundColor: colors.card }]}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  >
+                    <Feather name="x" size={11} color={colors.text} />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+
+            <LabeledInput
+              label={staged.length > 1 ? "Label prefix (e.g. 'Scene' → Scene 1, Scene 2…)" : "Label / description"}
+              value={batchLabel}
+              onChange={setBatchLabel}
+              placeholder={staged.length > 1 ? "e.g. Scene photo" : "e.g. Scene photo 1 (optional)"}
+              colors={colors}
+            />
+
+            <Pressable
+              onPress={attachAll}
+              style={[st.attachAllBtn, { backgroundColor: colors.primary }]}
+            >
+              <Feather name="paperclip" size={15} color="#fff" />
+              <Text style={st.attachAllText}>
+                Attach {staged.length} file{staged.length !== 1 ? "s" : ""} to record
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     </ScrollView>
   );
@@ -795,8 +879,6 @@ function EditIncidentModal({
   const [pHospital, setPHospital] = useState("");
 
   const [evidence, setEvidence] = useState<EvidenceItem[]>(incident.evidence ?? []);
-  const [eUri, setEUri] = useState("");
-  const [eLabel, setELabel] = useState("");
 
   function resetToIncident() {
     setTitle(incident.title); setType(incident.type); setSeverity(incident.severity);
@@ -893,8 +975,6 @@ function EditIncidentModal({
             {activeTab === "Evidence" && (
               <EvidenceTab
                 evidence={evidence} setEvidence={setEvidence}
-                uri={eUri} setUri={setEUri}
-                label={eLabel} setLabel={setELabel}
                 colors={colors}
               />
             )}
@@ -1501,6 +1581,56 @@ const st = StyleSheet.create({
     marginBottom: 4,
   },
   urlToggleText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
+
+  urlRow: { flexDirection: "row", gap: 8, marginBottom: 8, alignItems: "center" },
+  urlInput: {
+    flex: 1,
+    height: 42,
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+  },
+  urlAddBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  stagedCount: { fontSize: 12, fontFamily: "Inter_600SemiBold", marginBottom: 8 },
+  stagedGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
+  stagedItem: { position: "relative" },
+  stagedThumb: { width: 72, height: 72, borderRadius: 10 },
+  stagedFilePlaceholder: { alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  stagedRemoveBtn: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+
+  attachAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginTop: 2,
+  },
+  attachAllText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
   deleteCircle: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", borderWidth: 1 },
   iconCircle: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", borderWidth: 1, marginLeft: 6 },
 
