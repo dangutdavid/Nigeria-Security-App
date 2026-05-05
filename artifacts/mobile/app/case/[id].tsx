@@ -5,7 +5,10 @@ import React, { useState } from "react";
 import {
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   Share,
   StyleSheet,
@@ -15,19 +18,56 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuth } from "@/context/AuthContext";
-import { useIncidents, IncidentStatus, Victim, Vehicle, EvidenceItem } from "@/context/IncidentContext";
-import { Modal } from "react-native";
-import { useColors } from "@/hooks/useColors";
 import { StatusBadge } from "@/components/StatusBadge";
+import { useAuth } from "@/context/AuthContext";
+import {
+  EvidenceItem,
+  Incident,
+  IncidentStatus,
+  Vehicle,
+  Victim,
+  useIncidents,
+} from "@/context/IncidentContext";
+import { useColors } from "@/hooks/useColors";
 
-const STATUS_ACTIONS: Record<IncidentStatus, Array<{ label: string; next: IncidentStatus; color: string; icon: string }>> = {
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+const STATUS_ACTIONS: Record<
+  IncidentStatus,
+  Array<{ label: string; next: IncidentStatus; color: string; icon: string }>
+> = {
   draft: [{ label: "Submit Report", next: "submitted", color: "#2C7BE5", icon: "send" }],
   submitted: [{ label: "Assign for Review", next: "assigned", color: "#E67E22", icon: "user-check" }],
   assigned: [{ label: "Begin Review", next: "under_review", color: "#C8960C", icon: "eye" }],
   under_review: [{ label: "Close Case", next: "closed", color: "#27AE60", icon: "check-circle" }],
   closed: [],
 };
+
+const CONDITION_COLORS: Record<string, string> = {
+  fatal: "#8B0000",
+  critical: "#C0392B",
+  injured: "#E67E22",
+  unhurt: "#27AE60",
+};
+
+const SEV_LABELS: Record<string, string> = {
+  fatal: "Fatal",
+  serious: "Serious",
+  minor: "Minor",
+  property_only: "Property Only",
+};
+
+const TYPE_ICONS: Record<string, string> = {
+  crash: "alert-triangle",
+  breakdown: "tool",
+  hazard: "alert-circle",
+  flooding: "droplet",
+};
+
+const EDIT_TABS = ["Details", "Vehicles", "Persons", "Evidence"] as const;
+type EditTab = (typeof EDIT_TABS)[number];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr);
@@ -40,42 +80,42 @@ function formatDate(dateStr: string) {
   });
 }
 
-const CONDITION_COLORS: Record<string, string> = {
-  fatal: "#8B0000",
-  critical: "#C0392B",
-  injured: "#E67E22",
-  unhurt: "#27AE60",
-};
+// ─── Small reusable components ───────────────────────────────────────────────
 
-function Field({
+function LabeledInput({
   label,
   value,
-  onChangeText,
-  colors,
+  onChange,
+  placeholder,
   multiline,
+  keyboardType,
+  colors,
 }: {
   label: string;
   value: string;
-  onChangeText: (value: string) => void;
-  colors: any;
+  onChange: (v: string) => void;
+  placeholder?: string;
   multiline?: boolean;
+  keyboardType?: "default" | "numeric";
+  colors: any;
 }) {
   return (
-    <View style={{ gap: 8, marginBottom: 12 }}>
-      <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{label}</Text>
+    <View style={{ marginBottom: 14 }}>
+      <Text style={[st.inputLabel, { color: colors.mutedForeground }]}>{label}</Text>
       <TextInput
         value={value}
-        onChangeText={onChangeText}
+        onChangeText={onChange}
+        placeholder={placeholder ?? label}
+        placeholderTextColor={colors.mutedForeground + "88"}
         multiline={multiline}
-        placeholder={label}
-        placeholderTextColor={colors.mutedForeground}
+        keyboardType={keyboardType ?? "default"}
         style={[
-          styles.fieldInput,
+          st.input,
           {
-            backgroundColor: colors.muted,
+            backgroundColor: colors.background,
             borderColor: colors.border,
             color: colors.text,
-            minHeight: multiline ? 100 : 46,
+            minHeight: multiline ? 90 : 46,
             textAlignVertical: multiline ? "top" : "center",
           },
         ]}
@@ -84,32 +124,445 @@ function Field({
   );
 }
 
-function BadgeButton({
-  label,
-  selected,
-  onPress,
+function ChipGroup<T extends string>({
+  options,
+  value,
+  onChange,
   colors,
 }: {
-  label: string;
-  selected?: boolean;
-  onPress: () => void;
+  options: T[];
+  value: T;
+  onChange: (v: T) => void;
   colors: any;
 }) {
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      style={[
-        styles.badgeButton,
-        {
-          backgroundColor: selected ? colors.primary : colors.muted,
-          borderColor: selected ? colors.primary : colors.border,
-        },
-      ]}
-    >
-      <Text style={[styles.badgeButtonText, { color: selected ? "#fff" : colors.text }]}>{label}</Text>
-    </TouchableOpacity>
+    <View style={st.chipRow}>
+      {options.map((o) => {
+        const sel = value === o;
+        return (
+          <Pressable
+            key={o}
+            onPress={() => onChange(o)}
+            style={[
+              st.chip,
+              {
+                backgroundColor: sel ? colors.primary : colors.muted,
+                borderColor: sel ? colors.primary : colors.border,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                st.chipText,
+                { color: sel ? "#fff" : colors.text },
+              ]}
+            >
+              {o}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
+
+function RecordCard({
+  title,
+  meta,
+  onDelete,
+  colors,
+}: {
+  title: string;
+  meta: string;
+  onDelete: () => void;
+  colors: any;
+}) {
+  return (
+    <View style={[st.recordCard, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+      <View style={{ flex: 1 }}>
+        <Text style={[st.recordTitle, { color: colors.text }]} numberOfLines={1}>
+          {title}
+        </Text>
+        <Text style={[st.recordMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
+          {meta}
+        </Text>
+      </View>
+      <Pressable
+        onPress={onDelete}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        style={[st.deleteCircle, { backgroundColor: CONDITION_COLORS.fatal + "15", borderColor: CONDITION_COLORS.fatal + "30" }]}
+      >
+        <Feather name="trash-2" size={14} color={CONDITION_COLORS.fatal} />
+      </Pressable>
+    </View>
+  );
+}
+
+function AddButton({ label, onPress, colors }: { label: string; onPress: () => void; colors: any }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[st.addBtn, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}
+    >
+      <Feather name="plus-circle" size={16} color={colors.primary} />
+      <Text style={[st.addBtnText, { color: colors.primary }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+// ─── Edit modal tab panels ────────────────────────────────────────────────────
+
+function DetailsTab({
+  title, setTitle, type, setType, severity, setSeverity,
+  state, setState, lga, setLga, location, setLocation, description, setDescription,
+  colors,
+}: any) {
+  return (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={st.tabContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <LabeledInput label="Case title" value={title} onChange={setTitle} colors={colors} />
+      <Text style={[st.inputLabel, { color: colors.mutedForeground }]}>Incident type</Text>
+      <ChipGroup
+        options={["crash", "breakdown", "hazard", "flooding"] as const}
+        value={type}
+        onChange={setType}
+        colors={colors}
+      />
+      <Text style={[st.inputLabel, { color: colors.mutedForeground, marginTop: 4 }]}>Severity</Text>
+      <ChipGroup
+        options={["fatal", "serious", "minor", "property_only"] as const}
+        value={severity}
+        onChange={setSeverity}
+        colors={colors}
+      />
+      <View style={{ height: 14 }} />
+      <LabeledInput label="State" value={state} onChange={setState} colors={colors} />
+      <LabeledInput label="LGA" value={lga} onChange={setLga} colors={colors} />
+      <LabeledInput label="Location / Road" value={location} onChange={setLocation} colors={colors} />
+      <LabeledInput label="Description" value={description} onChange={setDescription} multiline colors={colors} />
+    </ScrollView>
+  );
+}
+
+function VehiclesTab({
+  vehicles, setVehicles,
+  plate, setPlate, make, setMake, model, setModel, colour, setColour, vtype, setVtype,
+  colors,
+}: any) {
+  function doAdd() {
+    if (!plate.trim() && !make.trim() && !model.trim()) {
+      Alert.alert("Enter at least one vehicle detail");
+      return;
+    }
+    setVehicles((prev: Vehicle[]) => [
+      ...prev,
+      { id: Date.now().toString(), plate: plate.trim(), make: make.trim(), model: model.trim(), colour: colour.trim(), type: vtype },
+    ]);
+    setPlate(""); setMake(""); setModel(""); setColour(""); setVtype("car");
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  return (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={st.tabContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      {vehicles.length === 0 ? (
+        <View style={[st.emptyBox, { borderColor: colors.border }]}>
+          <Feather name="truck" size={28} color={colors.mutedForeground} />
+          <Text style={[st.emptyText, { color: colors.mutedForeground }]}>No vehicles recorded</Text>
+        </View>
+      ) : (
+        vehicles.map((v: Vehicle) => (
+          <RecordCard
+            key={v.id}
+            title={[v.make, v.model].filter(Boolean).join(" ") || "Vehicle"}
+            meta={[v.plate, v.colour, v.type].filter(Boolean).join("  ·  ")}
+            onDelete={() => setVehicles((prev: Vehicle[]) => prev.filter((x) => x.id !== v.id))}
+            colors={colors}
+          />
+        ))
+      )}
+
+      <View style={[st.addFormCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[st.addFormTitle, { color: colors.text }]}>Add vehicle</Text>
+        <LabeledInput label="Plate number" value={plate} onChange={setPlate} colors={colors} />
+        <LabeledInput label="Make" value={make} onChange={setMake} colors={colors} />
+        <LabeledInput label="Model" value={model} onChange={setModel} colors={colors} />
+        <LabeledInput label="Colour" value={colour} onChange={setColour} colors={colors} />
+        <Text style={[st.inputLabel, { color: colors.mutedForeground }]}>Vehicle type</Text>
+        <ChipGroup
+          options={["car", "truck", "bus", "motorcycle", "other"] as const}
+          value={vtype}
+          onChange={setVtype}
+          colors={colors}
+        />
+        <View style={{ height: 8 }} />
+        <AddButton label="Add vehicle to record" onPress={doAdd} colors={colors} />
+      </View>
+    </ScrollView>
+  );
+}
+
+function PersonsTab({
+  victims, setVictims,
+  name, setName, age, setAge, gender, setGender, condition, setCondition, hospital, setHospital,
+  colors,
+}: any) {
+  function doAdd() {
+    if (!name.trim() && !age.trim()) {
+      Alert.alert("Enter at least a name or age");
+      return;
+    }
+    setVictims((prev: Victim[]) => [
+      ...prev,
+      { id: Date.now().toString(), name: name.trim(), age: age.trim(), gender, condition, hospital: hospital.trim() || undefined },
+    ]);
+    setName(""); setAge(""); setGender("unknown"); setCondition("injured"); setHospital("");
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  return (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={st.tabContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      {victims.length === 0 ? (
+        <View style={[st.emptyBox, { borderColor: colors.border }]}>
+          <Feather name="users" size={28} color={colors.mutedForeground} />
+          <Text style={[st.emptyText, { color: colors.mutedForeground }]}>No persons recorded</Text>
+        </View>
+      ) : (
+        victims.map((v: Victim) => (
+          <RecordCard
+            key={v.id}
+            title={v.name || "Unknown person"}
+            meta={[v.age ? `Age ${v.age}` : null, v.gender, v.condition, v.hospital ? `Hospital: ${v.hospital}` : null].filter(Boolean).join("  ·  ")}
+            onDelete={() => setVictims((prev: Victim[]) => prev.filter((x) => x.id !== v.id))}
+            colors={colors}
+          />
+        ))
+      )}
+
+      <View style={[st.addFormCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[st.addFormTitle, { color: colors.text }]}>Add person</Text>
+        <LabeledInput label="Name" value={name} onChange={setName} placeholder="Full name / Unknown" colors={colors} />
+        <LabeledInput label="Age" value={age} onChange={setAge} placeholder="e.g. 35 or ~30s" keyboardType="default" colors={colors} />
+        <Text style={[st.inputLabel, { color: colors.mutedForeground }]}>Gender</Text>
+        <ChipGroup
+          options={["male", "female", "unknown"] as const}
+          value={gender}
+          onChange={setGender}
+          colors={colors}
+        />
+        <Text style={[st.inputLabel, { color: colors.mutedForeground, marginTop: 4 }]}>Condition</Text>
+        <ChipGroup
+          options={["fatal", "critical", "injured", "unhurt"] as const}
+          value={condition}
+          onChange={setCondition}
+          colors={colors}
+        />
+        <View style={{ height: 8 }} />
+        <LabeledInput label="Hospital admitted" value={hospital} onChange={setHospital} placeholder="Hospital name (optional)" colors={colors} />
+        <AddButton label="Add person to record" onPress={doAdd} colors={colors} />
+      </View>
+    </ScrollView>
+  );
+}
+
+function EvidenceTab({
+  evidence, setEvidence,
+  uri, setUri, label, setLabel,
+  colors,
+}: any) {
+  function doAdd() {
+    if (!uri.trim()) {
+      Alert.alert("Enter an evidence URL or reference");
+      return;
+    }
+    setEvidence((prev: EvidenceItem[]) => [
+      ...prev,
+      { id: Date.now().toString(), uri: uri.trim(), label: label.trim() || undefined },
+    ]);
+    setUri(""); setLabel("");
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  return (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={st.tabContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      {evidence.length === 0 ? (
+        <View style={[st.emptyBox, { borderColor: colors.border }]}>
+          <Feather name="image" size={28} color={colors.mutedForeground} />
+          <Text style={[st.emptyText, { color: colors.mutedForeground }]}>No evidence attached</Text>
+        </View>
+      ) : (
+        evidence.map((e: EvidenceItem) => (
+          <RecordCard
+            key={e.id}
+            title={e.label || "Evidence item"}
+            meta={e.uri}
+            onDelete={() => setEvidence((prev: EvidenceItem[]) => prev.filter((x) => x.id !== e.id))}
+            colors={colors}
+          />
+        ))
+      )}
+
+      <View style={[st.addFormCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[st.addFormTitle, { color: colors.text }]}>Attach evidence</Text>
+        <LabeledInput label="Evidence URL / reference" value={uri} onChange={setUri} placeholder="https://… or file reference" colors={colors} />
+        <LabeledInput label="Label / description" value={label} onChange={setLabel} placeholder="e.g. Scene photo 1" colors={colors} />
+        <AddButton label="Attach to record" onPress={doAdd} colors={colors} />
+      </View>
+    </ScrollView>
+  );
+}
+
+// ─── Full-screen Edit Modal ───────────────────────────────────────────────────
+
+function EditIncidentModal({
+  visible,
+  incident,
+  onClose,
+  onSave,
+  colors,
+  insets,
+}: {
+  visible: boolean;
+  incident: Incident;
+  onClose: () => void;
+  onSave: (updates: Partial<Incident>) => Promise<void>;
+  colors: any;
+  insets: any;
+}) {
+  const [activeTab, setActiveTab] = useState<EditTab>("Details");
+
+  const [title, setTitle] = useState(incident.title);
+  const [type, setType] = useState(incident.type);
+  const [severity, setSeverity] = useState(incident.severity);
+  const [state, setState] = useState(incident.state);
+  const [lga, setLga] = useState(incident.lga);
+  const [location, setLocation] = useState(incident.location);
+  const [description, setDescription] = useState(incident.description);
+
+  const [vehicles, setVehicles] = useState<Vehicle[]>(incident.vehicles ?? []);
+  const [plate, setPlate] = useState("");
+  const [make, setMake] = useState("");
+  const [model, setModel] = useState("");
+  const [colour, setColour] = useState("");
+  const [vtype, setVtype] = useState<Vehicle["type"]>("car");
+
+  const [victims, setVictims] = useState<Victim[]>(incident.victims ?? []);
+  const [pName, setPName] = useState("");
+  const [pAge, setPAge] = useState("");
+  const [pGender, setPGender] = useState<Victim["gender"]>("unknown");
+  const [pCondition, setPCondition] = useState<Victim["condition"]>("injured");
+  const [pHospital, setPHospital] = useState("");
+
+  const [evidence, setEvidence] = useState<EvidenceItem[]>(incident.evidence ?? []);
+  const [eUri, setEUri] = useState("");
+  const [eLabel, setELabel] = useState("");
+
+  function resetToIncident() {
+    setTitle(incident.title); setType(incident.type); setSeverity(incident.severity);
+    setState(incident.state); setLga(incident.lga); setLocation(incident.location);
+    setDescription(incident.description);
+    setVehicles(incident.vehicles ?? []); setVictims(incident.victims ?? []); setEvidence(incident.evidence ?? []);
+    setActiveTab("Details");
+  }
+
+  async function handleSave() {
+    await onSave({ title: title.trim(), type, severity, state: state.trim(), lga: lga.trim(), location: location.trim(), description: description.trim(), vehicles, victims, evidence });
+  }
+
+  const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const bottomPad = insets.bottom + 16;
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <View style={[st.editRoot, { backgroundColor: colors.background, paddingTop: topPad }]}>
+          {/* Header */}
+          <View style={[st.editHeader, { borderBottomColor: colors.border, backgroundColor: colors.card }]}>
+            <Pressable onPress={() => { resetToIncident(); onClose(); }} style={st.editHeaderBtn}>
+              <Text style={[st.editCancelText, { color: colors.mutedForeground }]}>Cancel</Text>
+            </Pressable>
+            <Text style={[st.editHeaderTitle, { color: colors.text }]}>Edit Incident</Text>
+            <Pressable onPress={handleSave} style={[st.editSaveBtn, { backgroundColor: colors.primary }]}>
+              <Text style={st.editSaveText}>Save</Text>
+            </Pressable>
+          </View>
+
+          {/* Tab bar */}
+          <View style={[st.tabBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            {EDIT_TABS.map((tab) => {
+              const active = activeTab === tab;
+              let badge = 0;
+              if (tab === "Vehicles") badge = vehicles.length;
+              if (tab === "Persons") badge = victims.length;
+              if (tab === "Evidence") badge = evidence.length;
+              return (
+                <Pressable key={tab} onPress={() => setActiveTab(tab)} style={[st.tabItem, active && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}>
+                  <Text style={[st.tabText, { color: active ? colors.primary : colors.mutedForeground }]}>{tab}</Text>
+                  {badge > 0 && (
+                    <View style={[st.tabBadge, { backgroundColor: colors.primary }]}>
+                      <Text style={st.tabBadgeText}>{badge}</Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Tab content */}
+          <View style={{ flex: 1, paddingBottom: bottomPad }}>
+            {activeTab === "Details" && (
+              <DetailsTab
+                title={title} setTitle={setTitle}
+                type={type} setType={setType}
+                severity={severity} setSeverity={setSeverity}
+                state={state} setState={setState}
+                lga={lga} setLga={setLga}
+                location={location} setLocation={setLocation}
+                description={description} setDescription={setDescription}
+                colors={colors}
+              />
+            )}
+            {activeTab === "Vehicles" && (
+              <VehiclesTab
+                vehicles={vehicles} setVehicles={setVehicles}
+                plate={plate} setPlate={setPlate}
+                make={make} setMake={setMake}
+                model={model} setModel={setModel}
+                colour={colour} setColour={setColour}
+                vtype={vtype} setVtype={setVtype}
+                colors={colors}
+              />
+            )}
+            {activeTab === "Persons" && (
+              <PersonsTab
+                victims={victims} setVictims={setVictims}
+                name={pName} setName={setPName}
+                age={pAge} setAge={setPAge}
+                gender={pGender} setGender={setPGender}
+                condition={pCondition} setCondition={setPCondition}
+                hospital={pHospital} setHospital={setPHospital}
+                colors={colors}
+              />
+            )}
+            {activeTab === "Evidence" && (
+              <EvidenceTab
+                evidence={evidence} setEvidence={setEvidence}
+                uri={eUri} setUri={setEUri}
+                label={eLabel} setLabel={setELabel}
+                colors={colors}
+              />
+            )}
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+// ─── Main screen ─────────────────────────────────────────────────────────────
 
 export default function CaseDetailScreen() {
   const colors = useColors();
@@ -123,252 +576,75 @@ export default function CaseDetailScreen() {
   const [addingNote, setAddingNote] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editLocation, setEditLocation] = useState("");
-  const [editLga, setEditLga] = useState("");
-  const [editState, setEditState] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editTitle, setEditTitle] = useState("");
-  const [editSeverity, setEditSeverity] = useState<"fatal" | "serious" | "minor" | "property_only">("fatal");
-  const [editType, setEditType] = useState<"crash" | "breakdown" | "hazard" | "flooding">("crash");
-  const [editVehicles, setEditVehicles] = useState<Vehicle[]>([]);
-  const [editVictims, setEditVictims] = useState<Victim[]>([]);
-  const [editEvidence, setEditEvidence] = useState<EvidenceItem[]>([]);
-  const [vehiclePlate, setVehiclePlate] = useState("");
-  const [vehicleMake, setVehicleMake] = useState("");
-  const [vehicleModel, setVehicleModel] = useState("");
-  const [vehicleColour, setVehicleColour] = useState("");
-  const [vehicleType, setVehicleType] = useState<Vehicle["type"]>("car");
-  const [victimName, setVictimName] = useState("");
-  const [victimAge, setVictimAge] = useState("");
-  const [victimGender, setVictimGender] = useState<Victim["gender"]>("unknown");
-  const [victimCondition, setVictimCondition] = useState<Victim["condition"]>("injured");
-  const [victimHospital, setVictimHospital] = useState("");
-  const [evidenceUri, setEvidenceUri] = useState("");
-  const [evidenceLabel, setEvidenceLabel] = useState("");
 
   const incident = getIncident(id as string);
+
   const assignableUsers = allUsers.filter(
     (u) => u.status === "active" && u.id !== incident?.reportedBy
   );
 
-  async function shareCase() {
-    if (!incident) return;
-    const victims = incident.victims.length > 0
-      ? `\nVictims: ${incident.victims.length} (${incident.victims.map((v) => v.condition).join(", ")})`
-      : "";
-    const vehicles = incident.vehicles.length > 0
-      ? `\nVehicles: ${incident.vehicles.map((v) => v.plate || "N/A").join(", ")}`
-      : "";
-    const text = [
-      `FRSC INCIDENT REPORT`,
-      `━━━━━━━━━━━━━━━━━━━━━`,
-      `Case ID: ${incident.id}`,
-      `Type: ${incident.type.toUpperCase()}`,
-      `Severity: ${incident.severity.toUpperCase()}`,
-      `Status: ${incident.status.replace("_", " ").toUpperCase()}`,
-      ``,
-      `Title: ${incident.title}`,
-      `Location: ${incident.location}${incident.state ? ` · ${incident.state}` : ""}${incident.lga ? ` / ${incident.lga}` : ""}`,
-      `Date/Time: ${formatDate(incident.dateTime)}`,
-      `Reported by: ${incident.reportedByName}`,
-      `${incident.assignedToName ? `Assigned to: ${incident.assignedToName}` : "Unassigned"}`,
-      victims,
-      vehicles,
-      ``,
-      `━━━━━━━━━━━━━━━━━━━━━`,
-      `FRSC Field Operations App`,
-    ].filter((l) => l !== "").join("\n");
-
-    try {
-      await Share.share({ message: text, title: `FRSC Case ${incident.id}` });
-    } catch {
-      // dismissed
-    }
-  }
-
   if (!incident) {
     return (
-      <View style={[styles.notFound, { backgroundColor: colors.background }]}>
-        <Text style={{ color: colors.text, fontSize: 18 }}>Case not found</Text>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={{ color: colors.primary, marginTop: 10 }}>Go back</Text>
+      <View style={[st.notFound, { backgroundColor: colors.background }]}>
+        <Feather name="alert-circle" size={40} color={colors.mutedForeground} />
+        <Text style={[st.notFoundText, { color: colors.text }]}>Case not found</Text>
+        <TouchableOpacity onPress={() => router.back()} style={[st.notFoundBtn, { backgroundColor: colors.primary }]}>
+          <Text style={{ color: "#fff", fontFamily: "Inter_700Bold", fontSize: 14 }}>Go back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const canEditIncident = user?.id === incident.reportedBy || user?.role === "supervisor" || user?.role === "commander";
+  // After the early-return guard above, incident is definitely defined.
+  const inc = incident;
 
-  const actions = STATUS_ACTIONS[incident.status];
-  const canTakeAction =
-    user?.role === "supervisor" || user?.role === "commander" || incident.reportedBy === user?.id;
-
-  async function advanceStatus(next: IncidentStatus) {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const newTimeline = [
-      ...(incident?.timeline ?? []),
-      {
-        id: Date.now().toString(),
-        action: `Status changed to ${next.replace("_", " ")}`,
-        by: user?.name || "",
-        timestamp: new Date().toISOString(),
-      },
-    ];
-    await updateIncident(id as string, { status: next, timeline: newTimeline });
-    Alert.alert("Updated", `Case status updated to ${next.replace("_", " ")}`);
-  }
-
-  async function addNote() {
-    if (!noteText.trim()) return;
-    const newTimeline = [
-      ...(incident?.timeline ?? []),
-      {
-        id: Date.now().toString(),
-        action: `Note: ${noteText.trim()}`,
-        by: user?.name || "",
-        timestamp: new Date().toISOString(),
-      },
-    ];
-    await updateIncident(id as string, { timeline: newTimeline });
-    setNoteText("");
-    setAddingNote(false);
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }
-
-  async function assignToOfficer(officerId: string, officerName: string) {
-    const newTimeline = [
-      ...(incident?.timeline ?? []),
-      {
-        id: Date.now().toString(),
-        action: `Assigned to ${officerName}`,
-        by: user?.name || "",
-        timestamp: new Date().toISOString(),
-      },
-    ];
-    await updateIncident(id as string, {
-      assignedTo: officerId,
-      assignedToName: officerName,
-      timeline: newTimeline,
-    });
-    setShowAssignModal(false);
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert("Assigned", `Case assigned to ${officerName}.`);
-  }
-
-  const canAssign = (user?.role === "supervisor" || user?.role === "commander") && incident?.status !== "closed";
+  const canEdit = user?.id === inc.reportedBy || user?.role === "supervisor" || user?.role === "commander";
+  const canAssign = (user?.role === "supervisor" || user?.role === "commander") && inc.status !== "closed";
+  const canTakeAction = user?.role === "supervisor" || user?.role === "commander" || inc.reportedBy === user?.id;
+  const actions = STATUS_ACTIONS[inc.status];
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 20);
 
   const sevColors: Record<string, string> = {
-    fatal: colors.fatal,
-    serious: colors.serious,
-    minor: colors.minor,
-    property_only: colors.property,
+    fatal: colors.fatal, serious: colors.serious, minor: colors.minor, property_only: colors.property,
   };
-  const sevColor = sevColors[incident.severity] || colors.mutedForeground;
+  const sevColor = sevColors[inc.severity] || colors.mutedForeground;
 
-  function openEditModal() {
-    setEditTitle(incident.title || "");
-    setEditType(incident.type);
-    setEditSeverity(incident.severity);
-    setEditLocation(incident.location || "");
-    setEditLga(incident.lga || "");
-    setEditState(incident.state || "");
-    setEditDescription(incident.description || "");
-    setEditVehicles(incident.vehicles ?? []);
-    setEditVictims(incident.victims ?? []);
-    setEditEvidence(incident.evidence ?? []);
-    setShowEditModal(true);
+  async function advanceStatus(next: IncidentStatus) {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const entry = { id: Date.now().toString(), action: `Status changed to ${next.replace("_", " ")}`, by: user?.name || "", timestamp: new Date().toISOString() };
+    await updateIncident(id as string, { status: next, timeline: [...inc.timeline, entry] });
   }
 
-  function addVehicle() {
-    if (!vehiclePlate.trim() && !vehicleMake.trim() && !vehicleModel.trim()) return;
-    setEditVehicles((current) => [
-      ...current,
-      {
-        id: Date.now().toString(),
-        plate: vehiclePlate.trim(),
-        make: vehicleMake.trim(),
-        model: vehicleModel.trim(),
-        colour: vehicleColour.trim(),
-        type: vehicleType,
-      },
-    ]);
-    setVehiclePlate("");
-    setVehicleMake("");
-    setVehicleModel("");
-    setVehicleColour("");
-    setVehicleType("car");
+  async function addNote() {
+    if (!noteText.trim()) return;
+    const entry = { id: Date.now().toString(), action: `Note: ${noteText.trim()}`, by: user?.name || "", timestamp: new Date().toISOString() };
+    await updateIncident(id as string, { timeline: [...inc.timeline, entry] });
+    setNoteText(""); setAddingNote(false);
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
-  function addVictim() {
-    if (!victimName.trim() && !victimAge.trim()) return;
-    setEditVictims((current) => [
-      ...current,
-      {
-        id: Date.now().toString(),
-        name: victimName.trim(),
-        age: victimAge.trim(),
-        gender: victimGender,
-        condition: victimCondition,
-        hospital: victimHospital.trim() || undefined,
-      },
-    ]);
-    setVictimName("");
-    setVictimAge("");
-    setVictimGender("unknown");
-    setVictimCondition("injured");
-    setVictimHospital("");
+  async function assignToOfficer(officerId: string, officerName: string) {
+    const entry = { id: Date.now().toString(), action: `Assigned to ${officerName}`, by: user?.name || "", timestamp: new Date().toISOString() };
+    await updateIncident(id as string, { assignedTo: officerId, assignedToName: officerName, timeline: [...inc.timeline, entry] });
+    setShowAssignModal(false);
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
-  function addEvidence() {
-    if (!evidenceUri.trim()) return;
-    setEditEvidence((current) => [
-      ...current,
-      {
-        id: Date.now().toString(),
-        uri: evidenceUri.trim(),
-        label: evidenceLabel.trim() || undefined,
-      },
-    ]);
-    setEvidenceUri("");
-    setEvidenceLabel("");
-  }
-
-  async function saveEdit() {
-    const newTimeline = [
-      ...(incident?.timeline ?? []),
-      {
-        id: Date.now().toString(),
-        action: "Incident details updated",
-        by: user?.name || "",
-        timestamp: new Date().toISOString(),
-      },
-    ];
-    await updateIncident(id as string, {
-      title: editTitle.trim(),
-      type: editType,
-      severity: editSeverity,
-      location: editLocation.trim(),
-      lga: editLga.trim(),
-      state: editState.trim(),
-      description: editDescription.trim(),
-      timeline: newTimeline,
-      vehicles: editVehicles,
-      victims: editVictims,
-      evidence: editEvidence,
-    });
+  async function handleSaveEdit(updates: Partial<Incident>) {
+    const entry = { id: Date.now().toString(), action: "Incident record updated", by: user?.name || "", timestamp: new Date().toISOString() };
+    await updateIncident(id as string, { ...updates, timeline: [...inc.timeline, entry] });
     setShowEditModal(false);
-    Alert.alert("Updated", "Incident details saved.");
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert("Saved", "Incident record updated.");
   }
 
   function confirmDelete() {
-    Alert.alert("Delete incident?", "This will permanently remove the incident record.", [
+    Alert.alert("Delete incident?", "This will permanently remove this incident record and all related data.", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Delete",
-        style: "destructive",
+        text: "Delete", style: "destructive",
         onPress: async () => {
           await deleteIncident(id as string);
           router.back();
@@ -377,417 +653,275 @@ export default function CaseDetailScreen() {
     ]);
   }
 
+  async function shareCase() {
+    const text = [
+      "FRSC INCIDENT REPORT",
+      "━━━━━━━━━━━━━━━━━━━━━",
+      `Case ID: ${inc.id}`,
+      `Type: ${inc.type.toUpperCase()}  |  Severity: ${inc.severity.toUpperCase()}`,
+      `Status: ${inc.status.replace("_", " ").toUpperCase()}`,
+      "",
+      `Title: ${inc.title}`,
+      `Location: ${[inc.location, inc.lga, inc.state].filter(Boolean).join(", ")}`,
+      `Date/Time: ${formatDate(inc.dateTime)}`,
+      `Reported by: ${inc.reportedByName}`,
+      inc.assignedToName ? `Assigned to: ${inc.assignedToName}` : "Unassigned",
+      inc.victims.length > 0 ? `Persons: ${inc.victims.length} (${inc.victims.map((v) => v.condition).join(", ")})` : "",
+      inc.vehicles.length > 0 ? `Vehicles: ${inc.vehicles.map((v) => v.plate || "N/A").join(", ")}` : "",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━",
+      "FRSC Field Operations App",
+    ].filter(Boolean).join("\n");
+    try { await Share.share({ message: text, title: `FRSC Case ${inc.id}` }); } catch { }
+  }
+
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: colors.card,
-            paddingTop: topPad + 12,
-            borderBottomColor: colors.border,
-            borderLeftWidth: 4,
-            borderLeftColor: sevColor,
-          },
-        ]}
-      >
-        <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+    <View style={[st.root, { backgroundColor: colors.background }]}>
+      {/* ── Header ── */}
+      <View style={[st.header, { backgroundColor: colors.card, paddingTop: topPad + 12, borderBottomColor: colors.border, borderLeftColor: sevColor }]}>
+        <View style={st.headerRow}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Feather name="arrow-left" size={22} color={colors.text} />
           </TouchableOpacity>
-          <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={[styles.caseId, { color: colors.mutedForeground }]}>{incident.id}</Text>
-            <Text style={[styles.caseTitle, { color: colors.text }]} numberOfLines={2}>
-              {incident.title}
-            </Text>
+          <View style={{ flex: 1, marginHorizontal: 12 }}>
+            <Text style={[st.caseId, { color: colors.mutedForeground }]}>{inc.id}</Text>
+            <Text style={[st.caseTitle, { color: colors.text }]} numberOfLines={2}>{inc.title}</Text>
           </View>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-            {incident.pendingSync && (
-              <Feather name="cloud-off" size={18} color={colors.warning} />
+          <View style={{ flexDirection: "row", gap: 14, alignItems: "center" }}>
+            {inc.pendingSync && <Feather name="cloud-off" size={18} color={colors.warning} />}
+            {canEdit && (
+              <TouchableOpacity onPress={() => setShowEditModal(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Feather name="edit-2" size={19} color={colors.primary} />
+              </TouchableOpacity>
             )}
             <TouchableOpacity onPress={shareCase} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Feather name="share-2" size={20} color={colors.primary} />
+              <Feather name="share-2" size={19} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.badgesRow}>
-          <StatusBadge type="severity" value={incident.severity} />
-          <StatusBadge type="status" value={incident.status} />
+        <View style={st.badgesRow}>
+          <StatusBadge type="severity" value={inc.severity} />
+          <StatusBadge type="status" value={inc.status} />
         </View>
 
-        <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <Feather name="map-pin" size={12} color={colors.mutedForeground} />
-            <Text style={[styles.metaText, { color: colors.mutedForeground }]} numberOfLines={1}>
-              {incident.location}
-            </Text>
-          </View>
-          <View style={styles.metaItem}>
+        <View style={{ gap: 5 }}>
+          {inc.location ? (
+            <View style={st.metaItem}>
+              <Feather name="map-pin" size={12} color={colors.mutedForeground} />
+              <Text style={[st.metaText, { color: colors.mutedForeground }]} numberOfLines={1}>{inc.location}</Text>
+            </View>
+          ) : null}
+          <View style={st.metaItem}>
             <Feather name="clock" size={12} color={colors.mutedForeground} />
-            <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
-              {formatDate(incident.dateTime)}
-            </Text>
+            <Text style={[st.metaText, { color: colors.mutedForeground }]}>{formatDate(inc.dateTime)}</Text>
           </View>
         </View>
 
-        {/* State / LGA row */}
-        {(incident.state || incident.lga) && (
-          <View style={[styles.metaRow, { flexDirection: "row", flexWrap: "wrap" }]}>
-            {incident.state ? (
-              <View style={[styles.metaChip, { backgroundColor: colors.infoLight }]}>
-                <Feather name="flag" size={11} color={colors.info} />
-                <Text style={[styles.metaChipText, { color: colors.info }]}>{incident.state}</Text>
+        {(inc.state || inc.lga) && (
+          <View style={[st.metaItem, { marginTop: 8, flexWrap: "wrap", gap: 6 }]}>
+            {inc.state ? (
+              <View style={[st.chip, { backgroundColor: colors.infoLight, borderColor: colors.info + "40" }]}>
+                <Feather name="flag" size={10} color={colors.info} />
+                <Text style={[st.chipText, { color: colors.info, fontSize: 11 }]}>{inc.state}</Text>
               </View>
             ) : null}
-            {incident.lga ? (
-              <View style={[styles.metaChip, { backgroundColor: colors.muted }]}>
-                <Feather name="layers" size={11} color={colors.mutedForeground} />
-                <Text style={[styles.metaChipText, { color: colors.mutedForeground }]}>{incident.lga}</Text>
+            {inc.lga ? (
+              <View style={[st.chip, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Feather name="layers" size={10} color={colors.mutedForeground} />
+                <Text style={[st.chipText, { color: colors.mutedForeground, fontSize: 11 }]}>{inc.lga}</Text>
               </View>
             ) : null}
           </View>
         )}
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: bottomPad }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Actions */}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
+
+        {/* ── Status Actions ── */}
         {canTakeAction && actions.length > 0 && (
-          <View style={[styles.actionsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-              ACTIONS
-            </Text>
+          <View style={[st.card, { marginTop: 14, borderColor: colors.border, backgroundColor: colors.card }]}>
+            <Text style={[st.cardLabel, { color: colors.mutedForeground }]}>ACTIONS</Text>
             <View style={{ gap: 8 }}>
-              {actions.map((action) => (
+              {actions.map((a) => (
                 <TouchableOpacity
-                  key={action.next}
-                  style={[styles.actionBtn, { backgroundColor: action.color }]}
-                  onPress={() => advanceStatus(action.next)}
-                  activeOpacity={0.85}
+                  key={a.next}
+                  style={[st.actionBtn, { backgroundColor: a.color }]}
+                  onPress={() => advanceStatus(a.next)}
+                  activeOpacity={0.82}
                 >
-                  <Feather name={action.icon as any} size={18} color="#fff" />
-                  <Text style={styles.actionBtnText}>{action.label}</Text>
+                  <Feather name={a.icon as any} size={17} color="#fff" />
+                  <Text style={st.actionBtnText}>{a.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
         )}
 
-        {canEditIncident && (
-          <Section title="EDIT INCIDENT" colors={colors}>
-            <View style={styles.editActions}>
-              <TouchableOpacity
-                style={[styles.assignBtn, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "30" }]}
-                onPress={openEditModal}
-              >
-                <Feather name="edit-3" size={15} color={colors.primary} />
-                <Text style={[styles.assignBtnText, { color: colors.primary }]}>Edit incident details</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.deleteBtn, { backgroundColor: colors.destructive + "12", borderColor: colors.destructive + "30" }]}
-                onPress={confirmDelete}
-              >
-                <Feather name="trash-2" size={15} color={colors.destructive} />
-                <Text style={[styles.assignBtnText, { color: colors.destructive }]}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-          </Section>
-        )}
-
-        {/* Description */}
-        {incident.description ? (
-          <Section title="DESCRIPTION" colors={colors}>
-            <Text style={[styles.descText, { color: colors.text }]}>
-              {incident.description}
-            </Text>
+        {/* ── Description ── */}
+        {inc.description ? (
+          <Section label="DESCRIPTION" colors={colors}>
+            <Text style={[st.descText, { color: colors.text }]}>{inc.description}</Text>
           </Section>
         ) : null}
 
-        {/* Vehicles */}
-        {incident.vehicles.length > 0 && (
-          <Section title={`VEHICLES (${incident.vehicles.length})`} colors={colors}>
-            {incident.vehicles.map((v: Vehicle) => (
-              <View key={v.id} style={[styles.subItem, { borderColor: colors.border }]}>
-                <View style={styles.plateRow}>
-                  <View style={[styles.plateBadge, { backgroundColor: "#F5F5DC", borderColor: "#C8960C" }]}>
-                    <Text style={styles.plateText}>{v.plate || "No plate"}</Text>
+        {/* ── Vehicles ── */}
+        <Section label={`VEHICLES${inc.vehicles.length > 0 ? ` (${inc.vehicles.length})` : ""}`} colors={colors}>
+          {inc.vehicles.length === 0 ? (
+            <Text style={[st.emptyInline, { color: colors.mutedForeground }]}>No vehicles recorded</Text>
+          ) : (
+            inc.vehicles.map((v) => (
+              <View key={v.id} style={[st.subRow, { borderBottomColor: colors.border }]}>
+                <View style={st.plateRow}>
+                  <View style={[st.plateBadge, { backgroundColor: "#FFF8DC", borderColor: "#C8960C" }]}>
+                    <Text style={st.plateText}>{v.plate || "No plate"}</Text>
                   </View>
-                  <Text style={[styles.vehicleType, { color: colors.mutedForeground }]}>
-                    {v.type}
-                  </Text>
+                  <Text style={[st.vehicleTypeTxt, { color: colors.mutedForeground }]}>{v.type}</Text>
                 </View>
-                <Text style={[styles.vehicleInfo, { color: colors.text }]}>
-                  {[v.make, v.model, v.colour].filter(Boolean).join(" · ") || "Details pending"}
+                <Text style={[st.vehicleInfo, { color: colors.text }]}>
+                  {[v.make, v.model, v.colour].filter(Boolean).join("  ·  ") || "Details pending"}
                 </Text>
               </View>
-            ))}
-          </Section>
-        )}
+            ))
+          )}
+          {canEdit && (
+            <TouchableOpacity
+              style={[st.inlineAddBtn, { borderColor: colors.primary + "30", backgroundColor: colors.primary + "10" }]}
+              onPress={() => { setShowEditModal(true); }}
+            >
+              <Feather name="edit-3" size={13} color={colors.primary} />
+              <Text style={[st.inlineAddText, { color: colors.primary }]}>Manage vehicles</Text>
+            </TouchableOpacity>
+          )}
+        </Section>
 
-        {/* Victims */}
-        {incident.victims.length > 0 && (
-          <Section title={`VICTIMS / CASUALTIES (${incident.victims.length})`} colors={colors}>
-            {incident.victims.map((v: Victim) => (
-              <View key={v.id} style={[styles.subItem, { borderColor: colors.border }]}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-                  <Text style={[styles.victimName, { color: colors.text }]}>
-                    {v.name || "Unknown"}
-                  </Text>
-                  <View style={[styles.conditionBadge, { backgroundColor: CONDITION_COLORS[v.condition] + "20" }]}>
-                    <Text style={[styles.conditionText, { color: CONDITION_COLORS[v.condition] }]}>
+        {/* ── Persons / Casualties ── */}
+        <Section label={`PERSONS / CASUALTIES${inc.victims.length > 0 ? ` (${inc.victims.length})` : ""}`} colors={colors}>
+          {inc.victims.length === 0 ? (
+            <Text style={[st.emptyInline, { color: colors.mutedForeground }]}>No persons recorded</Text>
+          ) : (
+            inc.victims.map((v) => (
+              <View key={v.id} style={[st.subRow, { borderBottomColor: colors.border }]}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <Text style={[st.victimName, { color: colors.text }]}>{v.name || "Unknown"}</Text>
+                  <View style={[st.conditionPill, { backgroundColor: (CONDITION_COLORS[v.condition] ?? "#888") + "20" }]}>
+                    <Text style={[st.conditionPillText, { color: CONDITION_COLORS[v.condition] ?? "#888" }]}>
                       {v.condition}
                     </Text>
                   </View>
                 </View>
-                <Text style={[styles.victimDetails, { color: colors.mutedForeground }]}>
-                  {[v.age ? `Age ${v.age}` : null, v.gender, v.hospital ? `Admitted: ${v.hospital}` : null].filter(Boolean).join(" · ")}
+                <Text style={[st.victimMeta, { color: colors.mutedForeground }]}>
+                  {[v.age ? `Age ${v.age}` : null, v.gender, v.hospital ? `Admitted: ${v.hospital}` : null].filter(Boolean).join("  ·  ")}
                 </Text>
               </View>
-            ))}
-          </Section>
-        )}
+            ))
+          )}
+          {canEdit && (
+            <TouchableOpacity
+              style={[st.inlineAddBtn, { borderColor: colors.primary + "30", backgroundColor: colors.primary + "10" }]}
+              onPress={() => setShowEditModal(true)}
+            >
+              <Feather name="edit-3" size={13} color={colors.primary} />
+              <Text style={[st.inlineAddText, { color: colors.primary }]}>Manage persons</Text>
+            </TouchableOpacity>
+          )}
+        </Section>
 
-        {/* Evidence */}
-        {incident.evidence.length > 0 && (
-          <Section title={`EVIDENCE (${incident.evidence.length})`} colors={colors}>
+        {/* ── Evidence ── */}
+        <Section label={`EVIDENCE${inc.evidence.length > 0 ? ` (${inc.evidence.length})` : ""}`} colors={colors}>
+          {inc.evidence.length === 0 ? (
+            <Text style={[st.emptyInline, { color: colors.mutedForeground }]}>No evidence attached</Text>
+          ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-              {incident.evidence.map((uri, idx) => (
-                <View key={uri} style={styles.evidenceItem}>
-                  <Image source={{ uri }} style={styles.evidenceImg} resizeMode="cover" />
-                  <Text style={[styles.evidenceIdx, { color: colors.mutedForeground }]}>#{idx + 1}</Text>
+              {inc.evidence.map((e, idx) => (
+                <View key={e.id} style={st.evidenceThumb}>
+                  <Image source={{ uri: e.uri }} style={st.evidenceImg} resizeMode="cover" />
+                  <Text style={[st.evidenceLabel, { color: colors.mutedForeground }]}>{e.label || `#${idx + 1}`}</Text>
                 </View>
               ))}
             </ScrollView>
-          </Section>
-        )}
+          )}
+          {canEdit && (
+            <TouchableOpacity
+              style={[st.inlineAddBtn, { borderColor: colors.primary + "30", backgroundColor: colors.primary + "10", marginTop: 10 }]}
+              onPress={() => setShowEditModal(true)}
+            >
+              <Feather name="edit-3" size={13} color={colors.primary} />
+              <Text style={[st.inlineAddText, { color: colors.primary }]}>Manage evidence</Text>
+            </TouchableOpacity>
+          )}
+        </Section>
 
-        {/* Assignment */}
-        <Section title="ASSIGNMENT" colors={colors}>
-          <View style={styles.assignRow}>
-            <View style={styles.assignItem}>
-              <Text style={[styles.assignLabel, { color: colors.mutedForeground }]}>Reported by</Text>
-              <Text style={[styles.assignValue, { color: colors.text }]}>{incident.reportedByName}</Text>
+        {/* ── Assignment ── */}
+        <Section label="ASSIGNMENT" colors={colors}>
+          <View style={st.assignRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[st.assignLabel, { color: colors.mutedForeground }]}>Reported by</Text>
+              <Text style={[st.assignValue, { color: colors.text }]}>{inc.reportedByName}</Text>
             </View>
-            <View style={styles.assignItem}>
-              <Text style={[styles.assignLabel, { color: colors.mutedForeground }]}>Assigned to</Text>
-              {incident.assignedToName ? (
-                <Text style={[styles.assignValue, { color: colors.text }]}>{incident.assignedToName}</Text>
-              ) : (
-                <Text style={[styles.assignValue, { color: colors.mutedForeground }]}>Unassigned</Text>
-              )}
+            <View style={{ flex: 1 }}>
+              <Text style={[st.assignLabel, { color: colors.mutedForeground }]}>Assigned to</Text>
+              <Text style={[st.assignValue, { color: inc.assignedToName ? colors.text : colors.mutedForeground }]}>
+                {inc.assignedToName || "Unassigned"}
+              </Text>
             </View>
           </View>
           {canAssign && (
             <TouchableOpacity
+              style={[st.inlineAddBtn, { borderColor: colors.primary + "30", backgroundColor: colors.primary + "10", marginTop: 12 }]}
               onPress={() => setShowAssignModal(true)}
-              style={[styles.assignBtn, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "30" }]}
             >
-              <Feather name="user-check" size={15} color={colors.primary} />
-              <Text style={[styles.assignBtnText, { color: colors.primary }]}>
-                {incident.assignedToName ? "Reassign Case" : "Assign to Officer"}
+              <Feather name="user-check" size={13} color={colors.primary} />
+              <Text style={[st.inlineAddText, { color: colors.primary }]}>
+                {inc.assignedToName ? "Reassign case" : "Assign to officer"}
               </Text>
             </TouchableOpacity>
           )}
         </Section>
 
-        {/* Assign modal */}
-        <Modal visible={showAssignModal} animationType="slide" transparent>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Assign Case</Text>
-                <TouchableOpacity onPress={() => setShowAssignModal(false)}>
-                  <Feather name="x" size={20} color={colors.mutedForeground} />
-                </TouchableOpacity>
-              </View>
-              <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
-                Select an active officer to assign this case
-              </Text>
-              <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
-                {assignableUsers.map((u) => (
-                  <TouchableOpacity
-                    key={u.id}
-                    onPress={() => assignToOfficer(u.id, u.name)}
-                    style={[
-                      styles.assigneeRow,
-                      {
-                        backgroundColor: incident.assignedTo === u.id ? colors.primary + "12" : "transparent",
-                        borderColor: incident.assignedTo === u.id ? colors.primary + "40" : colors.border,
-                      },
-                    ]}
-                  >
-                    <View style={[styles.assigneeAvatar, { backgroundColor: colors.primary + "18" }]}>
-                      <Text style={[styles.assigneeInitials, { color: colors.primary }]}>
-                        {u.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.assigneeName, { color: colors.text }]}>{u.name}</Text>
-                      <Text style={[styles.assigneeBadge, { color: colors.mutedForeground }]}>
-                        {u.badgeNumber} · {u.station}
-                      </Text>
-                    </View>
-                    {incident.assignedTo === u.id && (
-                      <Feather name="check" size={18} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
-                ))}
-                {assignableUsers.length === 0 && (
-                  <Text style={[styles.modalSub, { color: colors.mutedForeground, textAlign: "center", padding: 20 }]}>
-                    No active officers available
-                  </Text>
-                )}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
+        {/* ── Danger zone ── */}
+        {canEdit && (
+          <Section label="RECORD MANAGEMENT" colors={colors}>
+            <TouchableOpacity
+              style={[st.dangerBtn, { borderColor: CONDITION_COLORS.fatal + "30", backgroundColor: CONDITION_COLORS.fatal + "0a" }]}
+              onPress={confirmDelete}
+              activeOpacity={0.8}
+            >
+              <Feather name="trash-2" size={15} color={CONDITION_COLORS.fatal} />
+              <Text style={[st.dangerBtnText, { color: CONDITION_COLORS.fatal }]}>Delete this incident record</Text>
+            </TouchableOpacity>
+          </Section>
+        )}
 
-        <Modal visible={showEditModal} animationType="slide" transparent>
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalSheet, { backgroundColor: colors.card }]}>
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Incident</Text>
-                <TouchableOpacity onPress={() => setShowEditModal(false)}>
-                  <Feather name="x" size={20} color={colors.mutedForeground} />
-                </TouchableOpacity>
-              </View>
-              <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>
-                Update any section of the submitted record.
-              </Text>
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <Field label="Case title" value={editTitle} onChangeText={setEditTitle} colors={colors} />
-                <Field label="Incident type" value={editType} onChangeText={setEditType as any} colors={colors} />
-                <Field label="Severity" value={editSeverity} onChangeText={setEditSeverity as any} colors={colors} />
-                <Field label="State" value={editState} onChangeText={setEditState} colors={colors} />
-                <Field label="LGA" value={editLga} onChangeText={setEditLga} colors={colors} />
-                <Field label="Location" value={editLocation} onChangeText={setEditLocation} colors={colors} />
-                <Field label="Description" value={editDescription} onChangeText={setEditDescription} colors={colors} multiline />
-                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Related Vehicles</Text>
-                {editVehicles.map((v) => (
-                  <View key={v.id} style={[styles.childRow, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.childTitle, { color: colors.text }]}>{[v.make, v.model].filter(Boolean).join(" · ") || "Vehicle"}</Text>
-                      <Text style={[styles.childMeta, { color: colors.mutedForeground }]}>{[v.plate, v.colour, v.type].filter(Boolean).join(" · ")}</Text>
-                    </View>
-                    <TouchableOpacity onPress={() => setEditVehicles((current) => current.filter((x) => x.id !== v.id))}>
-                      <Feather name="trash-2" size={18} color={colors.destructive} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                <Field label="Plate" value={vehiclePlate} onChangeText={setVehiclePlate} colors={colors} />
-                <Field label="Make" value={vehicleMake} onChangeText={setVehicleMake} colors={colors} />
-                <Field label="Model" value={vehicleModel} onChangeText={setVehicleModel} colors={colors} />
-                <Field label="Colour" value={vehicleColour} onChangeText={setVehicleColour} colors={colors} />
-                <View style={styles.badgeWrap}>
-                  {(["car", "truck", "bus", "motorcycle", "other"] as Vehicle["type"][]).map((t) => (
-                    <BadgeButton key={t} label={t} selected={vehicleType === t} onPress={() => setVehicleType(t)} colors={colors} />
-                  ))}
-                </View>
-                <TouchableOpacity style={[styles.smallAction, { borderColor: colors.primary + "30", backgroundColor: colors.primary + "12" }]} onPress={addVehicle}>
-                  <Feather name="plus" size={14} color={colors.primary} />
-                  <Text style={[styles.smallActionText, { color: colors.primary }]}>Add vehicle</Text>
-                </TouchableOpacity>
-
-                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Related Persons</Text>
-                {editVictims.map((v) => (
-                  <View key={v.id} style={[styles.childRow, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.childTitle, { color: colors.text }]}>{v.name || "Unknown"}</Text>
-                      <Text style={[styles.childMeta, { color: colors.mutedForeground }]}>{[v.age, v.gender, v.condition].filter(Boolean).join(" · ")}</Text>
-                    </View>
-                    <TouchableOpacity onPress={() => setEditVictims((current) => current.filter((x) => x.id !== v.id))}>
-                      <Feather name="trash-2" size={18} color={colors.destructive} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                <Field label="Name" value={victimName} onChangeText={setVictimName} colors={colors} />
-                <Field label="Age" value={victimAge} onChangeText={setVictimAge} colors={colors} />
-                <Text style={[styles.smallLabel, { color: colors.mutedForeground }]}>Gender</Text>
-                <View style={styles.badgeWrap}>
-                  {(["male", "female", "unknown"] as Victim["gender"][]).map((g) => (
-                    <BadgeButton key={g} label={g} selected={victimGender === g} onPress={() => setVictimGender(g)} colors={colors} />
-                  ))}
-                </View>
-                <Text style={[styles.smallLabel, { color: colors.mutedForeground }]}>Condition</Text>
-                <View style={styles.badgeWrap}>
-                  {(["fatal", "critical", "injured", "unhurt"] as Victim["condition"][]).map((c) => (
-                    <BadgeButton key={c} label={c} selected={victimCondition === c} onPress={() => setVictimCondition(c)} colors={colors} />
-                  ))}
-                </View>
-                <Field label="Hospital" value={victimHospital} onChangeText={setVictimHospital} colors={colors} />
-                <TouchableOpacity style={[styles.smallAction, { borderColor: colors.primary + "30", backgroundColor: colors.primary + "12" }]} onPress={addVictim}>
-                  <Feather name="plus" size={14} color={colors.primary} />
-                  <Text style={[styles.smallActionText, { color: colors.primary }]}>Add person</Text>
-                </TouchableOpacity>
-
-                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>Related Evidence</Text>
-                {editEvidence.map((e) => (
-                  <View key={e.id} style={[styles.childRow, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.childTitle, { color: colors.text }]} numberOfLines={1}>{e.label || "Evidence item"}</Text>
-                      <Text style={[styles.childMeta, { color: colors.mutedForeground }]} numberOfLines={1}>{e.uri}</Text>
-                    </View>
-                    <TouchableOpacity onPress={() => setEditEvidence((current) => current.filter((x) => x.id !== e.id))}>
-                      <Feather name="trash-2" size={18} color={colors.destructive} />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-                <Field label="Evidence URL" value={evidenceUri} onChangeText={setEvidenceUri} colors={colors} />
-                <Field label="Label" value={evidenceLabel} onChangeText={setEvidenceLabel} colors={colors} />
-                <TouchableOpacity style={[styles.smallAction, { borderColor: colors.primary + "30", backgroundColor: colors.primary + "12" }]} onPress={addEvidence}>
-                  <Feather name="plus" size={14} color={colors.primary} />
-                  <Text style={[styles.smallActionText, { color: colors.primary }]}>Add evidence</Text>
-                </TouchableOpacity>
-              </ScrollView>
-              <View style={styles.modalActions}>
-                <TouchableOpacity style={[styles.secondaryBtn, { borderColor: colors.border }]} onPress={() => setShowEditModal(false)}>
-                  <Text style={[styles.secondaryBtnText, { color: colors.text }]}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.modalPrimaryBtn, { backgroundColor: colors.primary }]} onPress={saveEdit}>
-                  <Text style={styles.modalPrimaryBtnText}>Save Changes</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Timeline */}
-        <Section title="TIMELINE" colors={colors}>
-          {incident.timeline.map((entry, idx) => (
-            <View key={entry.id} style={styles.timelineItem}>
-              <View style={styles.timelineLeft}>
-                <View style={[styles.timelineDot, { backgroundColor: colors.primary }]} />
-                {idx < incident.timeline.length - 1 && (
-                  <View style={[styles.timelineLine, { backgroundColor: colors.border }]} />
+        {/* ── Timeline ── */}
+        <Section label="TIMELINE" colors={colors}>
+          {inc.timeline.map((entry, idx) => (
+            <View key={entry.id} style={st.timelineRow}>
+              <View style={st.timelineLeft}>
+                <View style={[st.timelineDot, { backgroundColor: colors.primary }]} />
+                {idx < inc.timeline.length - 1 && (
+                  <View style={[st.timelineLine, { backgroundColor: colors.border }]} />
                 )}
               </View>
-              <View style={styles.timelineRight}>
-                <Text style={[styles.timelineAction, { color: colors.text }]}>{entry.action}</Text>
-                <Text style={[styles.timelineMeta, { color: colors.mutedForeground }]}>
-                  {entry.by} · {formatDate(entry.timestamp)}
-                </Text>
+              <View style={st.timelineRight}>
+                <Text style={[st.timelineAction, { color: colors.text }]}>{entry.action}</Text>
+                <Text style={[st.timelineMeta, { color: colors.mutedForeground }]}>{entry.by} · {formatDate(entry.timestamp)}</Text>
               </View>
             </View>
           ))}
 
-          {/* Add note */}
           {!addingNote ? (
             <TouchableOpacity
-              style={[styles.addNoteBtn, { borderColor: colors.border }]}
+              style={[st.addNoteBtn, { borderColor: colors.border }]}
               onPress={() => setAddingNote(true)}
             >
-              <Feather name="plus" size={16} color={colors.primary} />
-              <Text style={[styles.addNoteText, { color: colors.primary }]}>Add note</Text>
+              <Feather name="plus" size={15} color={colors.primary} />
+              <Text style={[st.addNoteText, { color: colors.primary }]}>Add note</Text>
             </TouchableOpacity>
           ) : (
-            <View style={[styles.noteInput, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+            <View style={[st.noteBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
               <TextInput
-                style={[styles.noteTextInput, { color: colors.text }]}
+                style={[st.noteInput, { color: colors.text }]}
                 placeholder="Write a note…"
                 placeholderTextColor={colors.mutedForeground}
                 value={noteText}
@@ -795,483 +929,204 @@ export default function CaseDetailScreen() {
                 multiline
                 autoFocus
               />
-              <View style={styles.noteActions}>
-                <TouchableOpacity onPress={() => setAddingNote(false)}>
-                  <Text style={[{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 13 }]}>
-                    Cancel
-                  </Text>
+              <View style={st.noteActions}>
+                <TouchableOpacity onPress={() => { setAddingNote(false); setNoteText(""); }}>
+                  <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 13 }}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.noteSubmit, { backgroundColor: colors.primary }]}
-                  onPress={addNote}
-                >
-                  <Text style={styles.noteSubmitText}>Add Note</Text>
+                <TouchableOpacity style={[st.noteSubmit, { backgroundColor: colors.primary }]} onPress={addNote}>
+                  <Text style={st.noteSubmitText}>Add note</Text>
                 </TouchableOpacity>
               </View>
             </View>
           )}
         </Section>
       </ScrollView>
+
+      {/* ── Assign modal ── */}
+      <Modal visible={showAssignModal} animationType="slide" transparent onRequestClose={() => setShowAssignModal(false)}>
+        <View style={st.sheetOverlay}>
+          <View style={[st.sheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + 20 }]}>
+            <View style={st.sheetHandle} />
+            <View style={st.sheetHeader}>
+              <Text style={[st.sheetTitle, { color: colors.text }]}>Assign Case</Text>
+              <TouchableOpacity onPress={() => setShowAssignModal(false)}>
+                <Feather name="x" size={20} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[st.sheetSub, { color: colors.mutedForeground }]}>Select an active officer</Text>
+            <ScrollView style={{ maxHeight: 340 }} showsVerticalScrollIndicator={false}>
+              {assignableUsers.length === 0 ? (
+                <Text style={[st.sheetSub, { color: colors.mutedForeground, textAlign: "center", paddingVertical: 20 }]}>No active officers available</Text>
+              ) : assignableUsers.map((u) => (
+                <TouchableOpacity
+                  key={u.id}
+                  onPress={() => assignToOfficer(u.id, u.name)}
+                  style={[st.officerRow, {
+                    backgroundColor: inc.assignedTo === u.id ? colors.primary + "12" : "transparent",
+                    borderColor: inc.assignedTo === u.id ? colors.primary + "40" : colors.border,
+                  }]}
+                >
+                  <View style={[st.officerAvatar, { backgroundColor: colors.primary + "18" }]}>
+                    <Text style={[st.officerInitials, { color: colors.primary }]}>
+                      {u.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[st.officerName, { color: colors.text }]}>{u.name}</Text>
+                    <Text style={[st.officerMeta, { color: colors.mutedForeground }]}>{u.badgeNumber} · {u.station}</Text>
+                  </View>
+                  {inc.assignedTo === u.id && <Feather name="check" size={18} color={colors.primary} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Full-screen edit modal ── */}
+      {showEditModal && (
+        <EditIncidentModal
+          visible={showEditModal}
+          incident={incident}
+          onClose={() => setShowEditModal(false)}
+          onSave={handleSaveEdit}
+          colors={colors}
+          insets={insets}
+        />
+      )}
     </View>
   );
 }
 
-function Section({ title, colors, children }: { title: string; colors: any; children: React.ReactNode }) {
+// ─── Section wrapper ──────────────────────────────────────────────────────────
+
+function Section({ label, colors, children }: { label: string; colors: any; children: React.ReactNode }) {
   return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>{title}</Text>
-      <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View style={st.section}>
+      <Text style={[st.cardLabel, { color: colors.mutedForeground }]}>{label}</Text>
+      <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {children}
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const st = StyleSheet.create({
   root: { flex: 1 },
-  notFound: { flex: 1, alignItems: "center", justifyContent: "center" },
-  header: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  headerTop: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 10,
-  },
-  backBtn: { paddingTop: 2 },
-  caseId: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-  },
-  caseTitle: {
-    fontSize: 17,
-    fontFamily: "Inter_700Bold",
-    lineHeight: 22,
-  },
-  badgesRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginBottom: 10,
-  },
-  metaRow: {
-    gap: 6,
-  },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-  metaText: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    flex: 1,
-  },
-  metaChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 20,
-  },
-  metaChipText: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-  },
-  scroll: { flex: 1 },
-  section: {
-    marginTop: 18,
-    paddingHorizontal: 14,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.8,
-    marginBottom: 8,
-  },
-  sectionCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    overflow: "hidden",
-    padding: 14,
-  },
-  actionsCard: {
-    margin: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-  },
-  actionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    padding: 14,
-    borderRadius: 12,
-  },
-  actionBtnText: {
-    color: "#fff",
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-  },
-  descText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    lineHeight: 22,
-  },
-  subItem: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-  },
-  plateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 4,
-  },
-  plateBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  plateText: {
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
-    color: "#333",
-    letterSpacing: 0.5,
-  },
-  vehicleType: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    textTransform: "capitalize",
-  },
-  vehicleInfo: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-  },
-  victimName: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
-  conditionBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  conditionText: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-    textTransform: "capitalize",
-  },
-  victimDetails: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    marginTop: 2,
-  },
-  evidenceItem: {
-    width: 110,
-    alignItems: "center",
-  },
-  evidenceImg: {
-    width: 110,
-    height: 90,
-    borderRadius: 10,
-  },
-  evidenceIdx: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    marginTop: 4,
-    textAlign: "center",
-  },
-  assignRow: {
-    flexDirection: "row",
-    gap: 20,
-  },
-  assignItem: {
-    flex: 1,
-  },
-  assignLabel: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-    marginBottom: 3,
-  },
-  assignValue: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
-  timelineItem: {
-    flexDirection: "row",
-    gap: 12,
-    minHeight: 50,
-  },
-  timelineLeft: {
-    alignItems: "center",
-    width: 14,
-  },
-  timelineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginTop: 4,
-  },
-  timelineLine: {
-    flex: 1,
-    width: 2,
-    marginTop: 4,
-    marginBottom: -4,
-  },
-  timelineRight: {
-    flex: 1,
-    paddingBottom: 16,
-  },
-  timelineAction: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    lineHeight: 18,
-  },
-  timelineMeta: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    marginTop: 2,
-  },
-  addNoteBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    marginTop: 8,
-  },
-  addNoteText: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
-  noteInput: {
-    borderRadius: 10,
-    borderWidth: 1,
-    padding: 12,
-    marginTop: 8,
-  },
-  noteTextInput: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    minHeight: 70,
-    textAlignVertical: "top",
-  },
-  noteActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    gap: 12,
-    marginTop: 8,
-  },
-  noteSubmit: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 20,
-  },
-  noteSubmitText: {
-    color: "#fff",
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
-  },
-  assignBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  assignBtnText: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
-  deleteBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  editActions: {
-    flexDirection: "row",
-    gap: 12,
-    flexWrap: "wrap",
-  },
-  fieldLabel: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    textTransform: "uppercase",
-    letterSpacing: 0.4,
-  },
-  fieldInput: {
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-  },
-  helperText: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  badgeWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 12,
-  },
-  badgeButton: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  badgeButtonText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    textTransform: "capitalize",
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontFamily: "Inter_700Bold",
-    textTransform: "uppercase",
-    letterSpacing: 0.7,
-    marginBottom: 8,
-    marginTop: 4,
-  },
-  smallLabel: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    marginBottom: 8,
-  },
-  childRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  childTitle: {
-    fontSize: 14,
-    fontFamily: "Inter_700Bold",
-  },
-  childMeta: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    marginTop: 2,
-  },
-  smallAction: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 11,
-    marginTop: 8,
-  },
-  smallActionText: {
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  modalSheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 36,
-    maxHeight: "88%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontFamily: "Inter_700Bold",
-  },
-  modalSub: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    marginBottom: 14,
-  },
-  modalActions: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 8,
-  },
-  secondaryBtn: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 14,
-  },
-  secondaryBtnText: {
-    fontSize: 14,
-    fontFamily: "Inter_700Bold",
-  },
-  modalPrimaryBtn: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 14,
-    paddingVertical: 14,
-  },
-  modalPrimaryBtnText: {
-    color: "#fff",
-    fontSize: 14,
-    fontFamily: "Inter_700Bold",
-  },
-  assigneeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 8,
-  },
-  assigneeAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  assigneeInitials: {
-    fontSize: 14,
-    fontFamily: "Inter_700Bold",
-  },
-  assigneeName: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-  },
-  assigneeBadge: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    marginTop: 2,
-  },
+  notFound: { flex: 1, alignItems: "center", justifyContent: "center", gap: 14 },
+  notFoundText: { fontSize: 18, fontFamily: "Inter_600SemiBold" },
+  notFoundBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+
+  header: { paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1, borderLeftWidth: 4 },
+  headerRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
+  caseId: { fontSize: 11, fontFamily: "Inter_500Medium", marginBottom: 2 },
+  caseTitle: { fontSize: 17, fontFamily: "Inter_700Bold", lineHeight: 22 },
+  badgesRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
+  metaItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  metaText: { fontSize: 12, fontFamily: "Inter_400Regular", flex: 1 },
+
+  section: { marginTop: 18, paddingHorizontal: 14 },
+  cardLabel: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1.0, marginBottom: 8, textTransform: "uppercase" },
+  card: { borderRadius: 16, borderWidth: 1, padding: 14 },
+
+  actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 15, borderRadius: 13 },
+  actionBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
+
+  descText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
+
+  subRow: { paddingVertical: 11, borderBottomWidth: 1 },
+  plateRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 },
+  plateBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
+  plateText: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#5A3E00", letterSpacing: 0.5 },
+  vehicleTypeTxt: { fontSize: 12, fontFamily: "Inter_400Regular", textTransform: "capitalize" },
+  vehicleInfo: { fontSize: 13, fontFamily: "Inter_400Regular" },
+
+  victimName: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  victimMeta: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  conditionPill: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: 10 },
+  conditionPillText: { fontSize: 11, fontFamily: "Inter_700Bold", textTransform: "capitalize" },
+
+  evidenceThumb: { width: 110, alignItems: "center" },
+  evidenceImg: { width: 110, height: 86, borderRadius: 10 },
+  evidenceLabel: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 4, textAlign: "center" },
+
+  emptyInline: { fontSize: 13, fontFamily: "Inter_400Regular", paddingVertical: 4 },
+
+  inlineAddBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1 },
+  inlineAddText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+
+  assignRow: { flexDirection: "row", gap: 16 },
+  assignLabel: { fontSize: 11, fontFamily: "Inter_500Medium", marginBottom: 3 },
+  assignValue: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+
+  dangerBtn: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, borderRadius: 13, borderWidth: 1 },
+  dangerBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+
+  timelineRow: { flexDirection: "row", gap: 12, minHeight: 48 },
+  timelineLeft: { alignItems: "center", width: 14 },
+  timelineDot: { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  timelineLine: { flex: 1, width: 2, marginTop: 4, marginBottom: -4 },
+  timelineRight: { flex: 1, paddingBottom: 16 },
+  timelineAction: { fontSize: 13, fontFamily: "Inter_600SemiBold", lineHeight: 18 },
+  timelineMeta: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+
+  addNoteBtn: { flexDirection: "row", alignItems: "center", gap: 6, padding: 12, borderRadius: 10, borderWidth: 1, borderStyle: "dashed", marginTop: 8 },
+  addNoteText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  noteBox: { borderRadius: 10, borderWidth: 1, padding: 12, marginTop: 8 },
+  noteInput: { fontSize: 14, fontFamily: "Inter_400Regular", minHeight: 70, textAlignVertical: "top" },
+  noteActions: { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 12, marginTop: 8 },
+  noteSubmit: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20 },
+  noteSubmitText: { color: "#fff", fontSize: 13, fontFamily: "Inter_700Bold" },
+
+  sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  sheet: { borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 20 },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: "#ccc", alignSelf: "center", marginBottom: 16 },
+  sheetHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
+  sheetTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
+  sheetSub: { fontSize: 13, fontFamily: "Inter_400Regular", marginBottom: 14 },
+  officerRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: 12, borderWidth: 1, marginBottom: 8 },
+  officerAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  officerInitials: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  officerName: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  officerMeta: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+
+  // Edit modal
+  editRoot: { flex: 1 },
+  editHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
+  editHeaderBtn: { minWidth: 60 },
+  editCancelText: { fontSize: 15, fontFamily: "Inter_500Medium" },
+  editHeaderTitle: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  editSaveBtn: { paddingHorizontal: 18, paddingVertical: 8, borderRadius: 20, minWidth: 60, alignItems: "center" },
+  editSaveText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
+
+  tabBar: { flexDirection: "row", borderBottomWidth: 1 },
+  tabItem: { flex: 1, alignItems: "center", paddingVertical: 13, flexDirection: "row", justifyContent: "center", gap: 5 },
+  tabText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  tabBadge: { minWidth: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
+  tabBadgeText: { color: "#fff", fontSize: 10, fontFamily: "Inter_700Bold" },
+
+  tabContent: { padding: 16, paddingBottom: 40 },
+
+  inputLabel: { fontSize: 11, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 7 },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: "Inter_400Regular" },
+
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 14 },
+  chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 8, flexDirection: "row", alignItems: "center", gap: 4 },
+  chipText: { fontSize: 12, fontFamily: "Inter_600SemiBold", textTransform: "capitalize" },
+
+  emptyBox: { alignItems: "center", justifyContent: "center", paddingVertical: 28, borderRadius: 14, borderWidth: 1, borderStyle: "dashed", marginBottom: 16, gap: 8 },
+  emptyText: { fontSize: 13, fontFamily: "Inter_400Regular" },
+
+  recordCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 13, borderRadius: 14, borderWidth: 1, marginBottom: 10 },
+  recordTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  recordMeta: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  deleteCircle: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+
+  addFormCard: { borderRadius: 16, borderWidth: 1, padding: 16, marginTop: 4 },
+  addFormTitle: { fontSize: 14, fontFamily: "Inter_700Bold", marginBottom: 14 },
+
+  addBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 13, borderRadius: 13, borderWidth: 1 },
+  addBtnText: { fontSize: 14, fontFamily: "Inter_700Bold" },
 });
