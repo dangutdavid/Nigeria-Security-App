@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useIncidents } from "@/context/IncidentContext";
 import { usePatrol } from "@/context/PatrolContext";
+import { useAuth } from "@/context/AuthContext";
 import { IncidentCard } from "@/components/IncidentCard";
 
 export default function HomeScreen() {
@@ -14,8 +15,9 @@ export default function HomeScreen() {
   const router = useRouter();
   const { incidents } = useIncidents();
   const { isOnDuty, activeSession } = usePatrol();
+  const { user } = useAuth();
 
-  const myReports = incidents.filter((incident) => incident.reportedBy === "u1");
+  const myReports = incidents.filter((incident) => incident.reportedBy === user?.id);
   const recent = incidents.slice(0, 5);
   const openCount = incidents.filter((incident) => incident.status !== "closed").length;
   const fatalCount = incidents.filter((incident) => incident.severity === "fatal" && incident.status !== "closed").length;

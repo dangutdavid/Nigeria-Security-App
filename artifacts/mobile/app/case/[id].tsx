@@ -167,6 +167,84 @@ function ChipGroup<T extends string>({
   );
 }
 
+// ─── Full-screen photo lightbox ───────────────────────────────────────────────
+
+function PhotoLightbox({
+  item,
+  allItems,
+  onClose,
+}: {
+  item: EvidenceItem | null;
+  allItems: EvidenceItem[];
+  onClose: () => void;
+}) {
+  const [idx, setIdx] = useState(0);
+
+  React.useEffect(() => {
+    if (item) {
+      const found = allItems.findIndex((e) => e.id === item.id);
+      setIdx(found >= 0 ? found : 0);
+    }
+  }, [item]);
+
+  if (!item) return null;
+
+  const current = allItems[idx] ?? item;
+  const hasPrev = idx > 0;
+  const hasNext = idx < allItems.length - 1;
+
+  return (
+    <Modal visible animationType="fade" transparent onRequestClose={onClose}>
+      <View style={lb.root}>
+        {/* Tap backdrop to close */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+
+        {/* Image */}
+        <Image source={{ uri: current.uri }} style={lb.img} resizeMode="contain" />
+
+        {/* Label + count */}
+        <View style={lb.labelRow}>
+          {current.label ? (
+            <Text style={lb.label}>{current.label}</Text>
+          ) : null}
+          {allItems.length > 1 ? (
+            <Text style={lb.counter}>{idx + 1} / {allItems.length}</Text>
+          ) : null}
+        </View>
+
+        {/* Prev / Next */}
+        {hasPrev && (
+          <Pressable style={[lb.navBtn, lb.navLeft]} onPress={() => setIdx((i) => i - 1)} hitSlop={16}>
+            <Feather name="chevron-left" size={26} color="#fff" />
+          </Pressable>
+        )}
+        {hasNext && (
+          <Pressable style={[lb.navBtn, lb.navRight]} onPress={() => setIdx((i) => i + 1)} hitSlop={16}>
+            <Feather name="chevron-right" size={26} color="#fff" />
+          </Pressable>
+        )}
+
+        {/* Close */}
+        <Pressable style={lb.closeBtn} onPress={onClose} hitSlop={12}>
+          <Feather name="x" size={20} color="#fff" />
+        </Pressable>
+      </View>
+    </Modal>
+  );
+}
+
+const lb = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "rgba(0,0,0,0.96)", justifyContent: "center", alignItems: "center" },
+  img: { width: "100%", height: "72%" },
+  labelRow: { position: "absolute", bottom: 80, left: 0, right: 0, alignItems: "center", gap: 4 },
+  label: { color: "rgba(255,255,255,0.9)", fontSize: 14, fontFamily: "Inter_500Medium", textAlign: "center", paddingHorizontal: 24 },
+  counter: { color: "rgba(255,255,255,0.5)", fontSize: 12, fontFamily: "Inter_400Regular" },
+  navBtn: { position: "absolute", top: "50%", backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 24, width: 48, height: 48, alignItems: "center", justifyContent: "center", marginTop: -24 },
+  navLeft: { left: 16 },
+  navRight: { right: 16 },
+  closeBtn: { position: "absolute", top: 52, right: 20, backgroundColor: "rgba(255,255,255,0.15)", borderRadius: 20, width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+});
+
 function RecordCard({
   title,
   meta,
@@ -997,6 +1075,7 @@ export default function CaseDetailScreen() {
 
   const [noteText, setNoteText] = useState("");
   const [addingNote, setAddingNote] = useState(false);
+  const [lightboxItem, setLightboxItem] = useState<EvidenceItem | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
 
@@ -1077,25 +1156,64 @@ export default function CaseDetailScreen() {
   }
 
   async function shareCase() {
+    const divider = "─────────────────────────────";
+    const vehicleLines = inc.vehicles.length === 0
+      ? ["  None recorded"]
+      : inc.vehicles.map((v, i) => {
+          const detail = [v.make, v.model, v.colour].filter(Boolean).join(" ");
+          return `  ${i + 1}. Plate: ${v.plate || "Unknown"}  |  ${v.type.toUpperCase()}${detail ? `  |  ${detail}` : ""}`;
+        });
+    const personLines = inc.victims.length === 0
+      ? ["  None recorded"]
+      : inc.victims.map((v, i) => {
+          const meta = [v.age ? `Age ${v.age}` : null, v.gender, v.hospital ? `Admitted: ${v.hospital}` : null].filter(Boolean).join(", ");
+          return `  ${i + 1}. ${v.name || "Unknown"}  —  ${v.condition.toUpperCase()}${meta ? `  (${meta})` : ""}`;
+        });
+    const noteLines = inc.timeline
+      .filter((t) => t.action.startsWith("Note:"))
+      .map((t) => `  • ${t.action.replace(/^Note:\s*/, "")}  [${t.by}]`);
+    const causeLines = inc.probableCauses && inc.probableCauses.length > 0
+      ? [inc.probableCauses.map((c: any) => c.label || c.code).join(", ")]
+      : ["  Not specified"];
+
     const text = [
-      "FRSC INCIDENT REPORT",
-      "━━━━━━━━━━━━━━━━━━━━━",
-      `Case ID: ${inc.id}`,
-      `Type: ${inc.type.toUpperCase()}  |  Severity: ${inc.severity.toUpperCase()}`,
-      `Status: ${inc.status.replace("_", " ").toUpperCase()}`,
-      "",
-      `Title: ${inc.title}`,
-      `Location: ${[inc.location, inc.lga, inc.state].filter(Boolean).join(", ")}`,
-      `Date/Time: ${formatDate(inc.dateTime)}`,
+      "FEDERAL ROAD SAFETY CORPS",
+      "FIELD INCIDENT REPORT",
+      divider,
+      `Case Ref   : ${inc.id}`,
+      `Reported   : ${formatDate(inc.dateTime)}`,
+      `Type       : ${inc.type.replace("_", " ").toUpperCase()}`,
+      `Severity   : ${inc.severity.replace("_", " ").toUpperCase()}`,
+      `Status     : ${inc.status.replace(/_/g, " ").toUpperCase()}`,
+      divider,
+      "INCIDENT DETAILS",
+      `Title      : ${inc.title}`,
+      `Location   : ${[inc.location, inc.lga, inc.state].filter(Boolean).join(", ")}`,
+      inc.description ? `Description: ${inc.description}` : null,
+      divider,
+      "ASSIGNMENT",
       `Reported by: ${inc.reportedByName}`,
-      inc.assignedToName ? `Assigned to: ${inc.assignedToName}` : "Unassigned",
-      inc.victims.length > 0 ? `Persons: ${inc.victims.length} (${inc.victims.map((v) => v.condition).join(", ")})` : "",
-      inc.vehicles.length > 0 ? `Vehicles: ${inc.vehicles.map((v) => v.plate || "N/A").join(", ")}` : "",
-      "",
-      "━━━━━━━━━━━━━━━━━━━━━",
-      "FRSC Field Operations App",
-    ].filter(Boolean).join("\n");
-    try { await Share.share({ message: text, title: `FRSC Case ${inc.id}` }); } catch { }
+      `Assigned to: ${inc.assignedToName || "Unassigned"}`,
+      divider,
+      `VEHICLES INVOLVED (${inc.vehicles.length})`,
+      ...vehicleLines,
+      divider,
+      `PERSONS / CASUALTIES (${inc.victims.length})`,
+      ...personLines,
+      divider,
+      `EVIDENCE (${inc.evidence.length} item${inc.evidence.length !== 1 ? "s" : ""})`,
+      inc.evidence.length > 0
+        ? inc.evidence.map((e, i) => `  ${i + 1}. ${e.label || `Item ${i + 1}`}`).join("\n")
+        : "  None attached",
+      divider,
+      "PROBABLE CAUSES",
+      ...causeLines,
+      ...(noteLines.length > 0 ? [divider, "NOTES", ...noteLines] : []),
+      divider,
+      `Generated by FRSC Field Operations App`,
+      `${new Date().toLocaleDateString("en-NG", { day: "2-digit", month: "long", year: "numeric" })}`,
+    ].filter((l) => l !== null).join("\n");
+    try { await Share.share({ message: text, title: `FRSC Case Report — ${inc.id}` }); } catch { }
   }
 
   return (
@@ -1257,10 +1375,10 @@ export default function CaseDetailScreen() {
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
               {inc.evidence.map((e, idx) => (
-                <View key={e.id} style={st.evidenceThumb}>
+                <Pressable key={e.id} style={st.evidenceThumb} onPress={() => setLightboxItem(e)}>
                   <Image source={{ uri: e.uri }} style={st.evidenceImg} resizeMode="cover" />
                   <Text style={[st.evidenceLabel, { color: colors.mutedForeground }]}>{e.label || `#${idx + 1}`}</Text>
-                </View>
+                </Pressable>
               ))}
             </ScrollView>
           )}
@@ -1417,6 +1535,12 @@ export default function CaseDetailScreen() {
           insets={insets}
         />
       )}
+
+      <PhotoLightbox
+        item={lightboxItem}
+        allItems={inc.evidence.filter((e) => isImageUri(e.uri))}
+        onClose={() => setLightboxItem(null)}
+      />
     </View>
   );
 }

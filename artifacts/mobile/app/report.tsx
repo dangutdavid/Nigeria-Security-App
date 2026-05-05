@@ -232,15 +232,30 @@ export default function ReportScreen() {
       Alert.alert("Not available", useCamera ? "Camera is not supported on web." : "Photo library is not supported on web.");
       return;
     }
-    const permission = useCamera ? await ImagePicker.requestCameraPermissionsAsync() : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const permission = useCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permission.status !== "granted") {
       Alert.alert("Permission denied", "Please allow access to attach evidence photos.");
       return;
     }
-    const result = useCamera ? await ImagePicker.launchCameraAsync({ quality: 0.75 }) : await ImagePicker.launchImageLibraryAsync({ quality: 0.75 });
-    if (!result.canceled && result.assets[0]) {
-      update({ evidence: [...new Set([...form.evidence, result.assets[0].uri])] });
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (useCamera) {
+      const result = await ImagePicker.launchCameraAsync({ quality: 0.75 });
+      if (!result.canceled && result.assets[0]) {
+        update({ evidence: [...new Set([...form.evidence, result.assets[0].uri])] });
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } else {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        quality: 0.75,
+        allowsMultipleSelection: true,
+        mediaTypes: ["images", "videos"],
+      });
+      if (!result.canceled && result.assets.length > 0) {
+        const newUris = result.assets.map((a) => a.uri);
+        update({ evidence: [...new Set([...form.evidence, ...newUris])] });
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
     }
   }
 
