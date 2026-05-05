@@ -170,11 +170,13 @@ function RecordCard({
   title,
   meta,
   onDelete,
+  onEdit,
   colors,
 }: {
   title: string;
   meta: string;
   onDelete: () => void;
+  onEdit: () => void;
   colors: any;
 }) {
   return (
@@ -188,11 +190,18 @@ function RecordCard({
         </Text>
       </View>
       <Pressable
+        onPress={onEdit}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        style={[st.iconCircle, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "30" }]}
+      >
+        <Feather name="edit-2" size={13} color={colors.primary} />
+      </Pressable>
+      <Pressable
         onPress={onDelete}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        style={[st.deleteCircle, { backgroundColor: CONDITION_COLORS.fatal + "15", borderColor: CONDITION_COLORS.fatal + "30" }]}
+        style={[st.iconCircle, { backgroundColor: CONDITION_COLORS.fatal + "15", borderColor: CONDITION_COLORS.fatal + "30" }]}
       >
-        <Feather name="trash-2" size={14} color={CONDITION_COLORS.fatal} />
+        <Feather name="trash-2" size={13} color={CONDITION_COLORS.fatal} />
       </Pressable>
     </View>
   );
@@ -243,11 +252,90 @@ function DetailsTab({
   );
 }
 
+// ─── Inline edit form wrapper ─────────────────────────────────────────────────
+
+function InlineEditCard({
+  title,
+  colors,
+  onSave,
+  onCancel,
+  children,
+}: {
+  title: string;
+  colors: any;
+  onSave: () => void;
+  onCancel: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={[st.inlineEditCard, { backgroundColor: colors.card, borderColor: colors.primary + "50" }]}>
+      <View style={st.inlineEditHeader}>
+        <View style={[st.inlineEditDot, { backgroundColor: colors.primary }]} />
+        <Text style={[st.inlineEditTitle, { color: colors.primary }]}>{title}</Text>
+      </View>
+      {children}
+      <View style={st.inlineEditActions}>
+        <Pressable
+          onPress={onCancel}
+          style={[st.inlineEditCancelBtn, { borderColor: colors.border }]}
+        >
+          <Text style={[st.inlineEditCancelText, { color: colors.mutedForeground }]}>Cancel</Text>
+        </Pressable>
+        <Pressable
+          onPress={onSave}
+          style={[st.inlineEditSaveBtn, { backgroundColor: colors.primary }]}
+        >
+          <Feather name="check" size={14} color="#fff" />
+          <Text style={st.inlineEditSaveText}>Save changes</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+// ─── Vehicles tab ─────────────────────────────────────────────────────────────
+
 function VehiclesTab({
   vehicles, setVehicles,
   plate, setPlate, make, setMake, model, setModel, colour, setColour, vtype, setVtype,
   colors,
 }: any) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [ePlate, setEPlate] = useState("");
+  const [eMake, setEMake] = useState("");
+  const [eModel, setEModel] = useState("");
+  const [eColour, setEColour] = useState("");
+  const [eVtype, setEVtype] = useState<Vehicle["type"]>("car");
+
+  function startEdit(v: Vehicle) {
+    setEditingId(v.id);
+    setEPlate(v.plate ?? "");
+    setEMake(v.make ?? "");
+    setEModel(v.model ?? "");
+    setEColour(v.colour ?? "");
+    setEVtype(v.type ?? "car");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+  }
+
+  function saveEdit() {
+    if (!ePlate.trim() && !eMake.trim() && !eModel.trim()) {
+      Alert.alert("Enter at least one vehicle detail");
+      return;
+    }
+    setVehicles((prev: Vehicle[]) =>
+      prev.map((v) =>
+        v.id === editingId
+          ? { ...v, plate: ePlate.trim(), make: eMake.trim(), model: eModel.trim(), colour: eColour.trim(), type: eVtype }
+          : v
+      )
+    );
+    setEditingId(null);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
   function doAdd() {
     if (!plate.trim() && !make.trim() && !model.trim()) {
       Alert.alert("Enter at least one vehicle detail");
@@ -269,15 +357,38 @@ function VehiclesTab({
           <Text style={[st.emptyText, { color: colors.mutedForeground }]}>No vehicles recorded</Text>
         </View>
       ) : (
-        vehicles.map((v: Vehicle) => (
-          <RecordCard
-            key={v.id}
-            title={[v.make, v.model].filter(Boolean).join(" ") || "Vehicle"}
-            meta={[v.plate, v.colour, v.type].filter(Boolean).join("  ·  ")}
-            onDelete={() => setVehicles((prev: Vehicle[]) => prev.filter((x) => x.id !== v.id))}
-            colors={colors}
-          />
-        ))
+        vehicles.map((v: Vehicle) =>
+          editingId === v.id ? (
+            <InlineEditCard
+              key={v.id}
+              title="Editing vehicle"
+              colors={colors}
+              onSave={saveEdit}
+              onCancel={cancelEdit}
+            >
+              <LabeledInput label="Plate number" value={ePlate} onChange={setEPlate} colors={colors} />
+              <LabeledInput label="Make" value={eMake} onChange={setEMake} colors={colors} />
+              <LabeledInput label="Model" value={eModel} onChange={setEModel} colors={colors} />
+              <LabeledInput label="Colour" value={eColour} onChange={setEColour} colors={colors} />
+              <Text style={[st.inputLabel, { color: colors.mutedForeground }]}>Vehicle type</Text>
+              <ChipGroup
+                options={["car", "truck", "bus", "motorcycle", "other"] as const}
+                value={eVtype}
+                onChange={setEVtype}
+                colors={colors}
+              />
+            </InlineEditCard>
+          ) : (
+            <RecordCard
+              key={v.id}
+              title={[v.make, v.model].filter(Boolean).join(" ") || "Vehicle"}
+              meta={[v.plate, v.colour, v.type].filter(Boolean).join("  ·  ")}
+              onEdit={() => startEdit(v)}
+              onDelete={() => setVehicles((prev: Vehicle[]) => prev.filter((x) => x.id !== v.id))}
+              colors={colors}
+            />
+          )
+        )
       )}
 
       <View style={[st.addFormCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -300,11 +411,49 @@ function VehiclesTab({
   );
 }
 
+// ─── Persons tab ──────────────────────────────────────────────────────────────
+
 function PersonsTab({
   victims, setVictims,
   name, setName, age, setAge, gender, setGender, condition, setCondition, hospital, setHospital,
   colors,
 }: any) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [eName, setEName] = useState("");
+  const [eAge, setEAge] = useState("");
+  const [eGender, setEGender] = useState<Victim["gender"]>("unknown");
+  const [eCondition, setECondition] = useState<Victim["condition"]>("injured");
+  const [eHospital, setEHospital] = useState("");
+
+  function startEdit(v: Victim) {
+    setEditingId(v.id);
+    setEName(v.name ?? "");
+    setEAge(v.age ?? "");
+    setEGender(v.gender ?? "unknown");
+    setECondition(v.condition ?? "injured");
+    setEHospital(v.hospital ?? "");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+  }
+
+  function saveEdit() {
+    if (!eName.trim() && !eAge.trim()) {
+      Alert.alert("Enter at least a name or age");
+      return;
+    }
+    setVictims((prev: Victim[]) =>
+      prev.map((v) =>
+        v.id === editingId
+          ? { ...v, name: eName.trim(), age: eAge.trim(), gender: eGender, condition: eCondition, hospital: eHospital.trim() || undefined }
+          : v
+      )
+    );
+    setEditingId(null);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
   function doAdd() {
     if (!name.trim() && !age.trim()) {
       Alert.alert("Enter at least a name or age");
@@ -326,15 +475,45 @@ function PersonsTab({
           <Text style={[st.emptyText, { color: colors.mutedForeground }]}>No persons recorded</Text>
         </View>
       ) : (
-        victims.map((v: Victim) => (
-          <RecordCard
-            key={v.id}
-            title={v.name || "Unknown person"}
-            meta={[v.age ? `Age ${v.age}` : null, v.gender, v.condition, v.hospital ? `Hospital: ${v.hospital}` : null].filter(Boolean).join("  ·  ")}
-            onDelete={() => setVictims((prev: Victim[]) => prev.filter((x) => x.id !== v.id))}
-            colors={colors}
-          />
-        ))
+        victims.map((v: Victim) =>
+          editingId === v.id ? (
+            <InlineEditCard
+              key={v.id}
+              title="Editing person"
+              colors={colors}
+              onSave={saveEdit}
+              onCancel={cancelEdit}
+            >
+              <LabeledInput label="Name" value={eName} onChange={setEName} placeholder="Full name / Unknown" colors={colors} />
+              <LabeledInput label="Age" value={eAge} onChange={setEAge} placeholder="e.g. 35 or ~30s" colors={colors} />
+              <Text style={[st.inputLabel, { color: colors.mutedForeground }]}>Gender</Text>
+              <ChipGroup
+                options={["male", "female", "unknown"] as const}
+                value={eGender}
+                onChange={setEGender}
+                colors={colors}
+              />
+              <Text style={[st.inputLabel, { color: colors.mutedForeground, marginTop: 4 }]}>Condition</Text>
+              <ChipGroup
+                options={["fatal", "critical", "injured", "unhurt"] as const}
+                value={eCondition}
+                onChange={setECondition}
+                colors={colors}
+              />
+              <View style={{ height: 4 }} />
+              <LabeledInput label="Hospital admitted" value={eHospital} onChange={setEHospital} placeholder="Hospital name (optional)" colors={colors} />
+            </InlineEditCard>
+          ) : (
+            <RecordCard
+              key={v.id}
+              title={v.name || "Unknown person"}
+              meta={[v.age ? `Age ${v.age}` : null, v.gender, v.condition, v.hospital ? `Hospital: ${v.hospital}` : null].filter(Boolean).join("  ·  ")}
+              onEdit={() => startEdit(v)}
+              onDelete={() => setVictims((prev: Victim[]) => prev.filter((x) => x.id !== v.id))}
+              colors={colors}
+            />
+          )
+        )
       )}
 
       <View style={[st.addFormCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -363,11 +542,43 @@ function PersonsTab({
   );
 }
 
+// ─── Evidence tab ─────────────────────────────────────────────────────────────
+
 function EvidenceTab({
   evidence, setEvidence,
   uri, setUri, label, setLabel,
   colors,
 }: any) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [eUri, setEUri] = useState("");
+  const [eLabel, setELabel] = useState("");
+
+  function startEdit(e: EvidenceItem) {
+    setEditingId(e.id);
+    setEUri(e.uri ?? "");
+    setELabel(e.label ?? "");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+  }
+
+  function saveEdit() {
+    if (!eUri.trim()) {
+      Alert.alert("Enter an evidence URL or reference");
+      return;
+    }
+    setEvidence((prev: EvidenceItem[]) =>
+      prev.map((e) =>
+        e.id === editingId
+          ? { ...e, uri: eUri.trim(), label: eLabel.trim() || undefined }
+          : e
+      )
+    );
+    setEditingId(null);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
   function doAdd() {
     if (!uri.trim()) {
       Alert.alert("Enter an evidence URL or reference");
@@ -389,15 +600,29 @@ function EvidenceTab({
           <Text style={[st.emptyText, { color: colors.mutedForeground }]}>No evidence attached</Text>
         </View>
       ) : (
-        evidence.map((e: EvidenceItem) => (
-          <RecordCard
-            key={e.id}
-            title={e.label || "Evidence item"}
-            meta={e.uri}
-            onDelete={() => setEvidence((prev: EvidenceItem[]) => prev.filter((x) => x.id !== e.id))}
-            colors={colors}
-          />
-        ))
+        evidence.map((e: EvidenceItem) =>
+          editingId === e.id ? (
+            <InlineEditCard
+              key={e.id}
+              title="Editing evidence"
+              colors={colors}
+              onSave={saveEdit}
+              onCancel={cancelEdit}
+            >
+              <LabeledInput label="Evidence URL / reference" value={eUri} onChange={setEUri} placeholder="https://… or file reference" colors={colors} />
+              <LabeledInput label="Label / description" value={eLabel} onChange={setELabel} placeholder="e.g. Scene photo 1" colors={colors} />
+            </InlineEditCard>
+          ) : (
+            <RecordCard
+              key={e.id}
+              title={e.label || "Evidence item"}
+              meta={e.uri}
+              onEdit={() => startEdit(e)}
+              onDelete={() => setEvidence((prev: EvidenceItem[]) => prev.filter((x) => x.id !== e.id))}
+              colors={colors}
+            />
+          )
+        )
       )}
 
       <View style={[st.addFormCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -1123,6 +1348,62 @@ const st = StyleSheet.create({
   recordTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
   recordMeta: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
   deleteCircle: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+  iconCircle: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", borderWidth: 1, marginLeft: 6 },
+
+  inlineEditCard: {
+    borderRadius: 16,
+    borderWidth: 2,
+    padding: 16,
+    marginBottom: 10,
+  },
+  inlineEditHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 14,
+  },
+  inlineEditDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  inlineEditTitle: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  inlineEditActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 6,
+  },
+  inlineEditCancelBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  inlineEditCancelText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  inlineEditSaveBtn: {
+    flex: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: 12,
+  },
+  inlineEditSaveText: {
+    color: "#fff",
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+  },
 
   addFormCard: { borderRadius: 16, borderWidth: 1, padding: 16, marginTop: 4 },
   addFormTitle: { fontSize: 14, fontFamily: "Inter_700Bold", marginBottom: 14 },
