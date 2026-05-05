@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -169,18 +170,23 @@ function ChipGroup<T extends string>({
 function RecordCard({
   title,
   meta,
+  imageUri,
   onDelete,
   onEdit,
   colors,
 }: {
   title: string;
   meta: string;
+  imageUri?: string;
   onDelete: () => void;
   onEdit: () => void;
   colors: any;
 }) {
   return (
     <View style={[st.recordCard, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+      {imageUri ? (
+        <Image source={{ uri: imageUri }} style={st.recordThumb} resizeMode="cover" />
+      ) : null}
       <View style={{ flex: 1 }}>
         <Text style={[st.recordTitle, { color: colors.text }]} numberOfLines={1}>
           {title}
@@ -544,6 +550,71 @@ function PersonsTab({
 
 // ─── Evidence tab ─────────────────────────────────────────────────────────────
 
+function isImageUri(u: string) {
+  if (!u) return false;
+  if (u.startsWith("file://") || u.startsWith("ph://") || u.startsWith("content://")) return true;
+  const lower = u.toLowerCase();
+  return lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png") || lower.endsWith(".webp") || lower.endsWith(".gif");
+}
+
+function EvidencePickerButtons({
+  onPickedUri,
+  colors,
+}: {
+  onPickedUri: (uri: string) => void;
+  colors: any;
+}) {
+  async function pickFromLibrary() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Permission needed", "Allow access to your photo library to attach evidence photos.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images", "videos"],
+      allowsMultipleSelection: false,
+      quality: 0.85,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      onPickedUri(result.assets[0].uri);
+    }
+  }
+
+  async function pickFromCamera() {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Permission needed", "Allow camera access to capture evidence photos.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      quality: 0.85,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      onPickedUri(result.assets[0].uri);
+    }
+  }
+
+  return (
+    <View style={st.pickerRow}>
+      <Pressable
+        onPress={pickFromCamera}
+        style={[st.pickerBtn, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}
+      >
+        <Feather name="camera" size={18} color={colors.primary} />
+        <Text style={[st.pickerBtnText, { color: colors.primary }]}>Take Photo</Text>
+      </Pressable>
+      <Pressable
+        onPress={pickFromLibrary}
+        style={[st.pickerBtn, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}
+      >
+        <Feather name="image" size={18} color={colors.primary} />
+        <Text style={[st.pickerBtnText, { color: colors.primary }]}>From Library</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function EvidenceTab({
   evidence, setEvidence,
   uri, setUri, label, setLabel,
@@ -552,6 +623,7 @@ function EvidenceTab({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [eUri, setEUri] = useState("");
   const [eLabel, setELabel] = useState("");
+  const [showUrlInput, setShowUrlInput] = useState(false);
 
   function startEdit(e: EvidenceItem) {
     setEditingId(e.id);
@@ -565,7 +637,7 @@ function EvidenceTab({
 
   function saveEdit() {
     if (!eUri.trim()) {
-      Alert.alert("Enter an evidence URL or reference");
+      Alert.alert("No file or URL selected", "Pick a photo or paste a URL first.");
       return;
     }
     setEvidence((prev: EvidenceItem[]) =>
@@ -581,14 +653,14 @@ function EvidenceTab({
 
   function doAdd() {
     if (!uri.trim()) {
-      Alert.alert("Enter an evidence URL or reference");
+      Alert.alert("No file selected", "Take a photo, choose from your library, or paste a URL.");
       return;
     }
     setEvidence((prev: EvidenceItem[]) => [
       ...prev,
       { id: Date.now().toString(), uri: uri.trim(), label: label.trim() || undefined },
     ]);
-    setUri(""); setLabel("");
+    setUri(""); setLabel(""); setShowUrlInput(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
@@ -596,7 +668,7 @@ function EvidenceTab({
     <ScrollView style={{ flex: 1 }} contentContainerStyle={st.tabContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       {evidence.length === 0 ? (
         <View style={[st.emptyBox, { borderColor: colors.border }]}>
-          <Feather name="image" size={28} color={colors.mutedForeground} />
+          <Feather name="camera" size={28} color={colors.mutedForeground} />
           <Text style={[st.emptyText, { color: colors.mutedForeground }]}>No evidence attached</Text>
         </View>
       ) : (
@@ -609,6 +681,22 @@ function EvidenceTab({
               onSave={saveEdit}
               onCancel={cancelEdit}
             >
+              <EvidencePickerButtons onPickedUri={setEUri} colors={colors} />
+              {eUri ? (
+                <View style={st.previewBox}>
+                  {isImageUri(eUri) ? (
+                    <Image source={{ uri: eUri }} style={st.previewImage} resizeMode="cover" />
+                  ) : null}
+                  <Text style={[st.previewUri, { color: colors.mutedForeground }]} numberOfLines={2}>{eUri}</Text>
+                  <Pressable onPress={() => setEUri("")} style={st.clearPreview}>
+                    <Feather name="x" size={14} color={colors.mutedForeground} />
+                  </Pressable>
+                </View>
+              ) : null}
+              <Pressable onPress={() => {}} style={st.urlToggle}>
+                <Feather name="link" size={13} color={colors.mutedForeground} />
+                <Text style={[st.urlToggleText, { color: colors.mutedForeground }]}>Paste a URL instead</Text>
+              </Pressable>
               <LabeledInput label="Evidence URL / reference" value={eUri} onChange={setEUri} placeholder="https://… or file reference" colors={colors} />
               <LabeledInput label="Label / description" value={eLabel} onChange={setELabel} placeholder="e.g. Scene photo 1" colors={colors} />
             </InlineEditCard>
@@ -616,7 +704,8 @@ function EvidenceTab({
             <RecordCard
               key={e.id}
               title={e.label || "Evidence item"}
-              meta={e.uri}
+              meta={isImageUri(e.uri) ? "Photo / video" : e.uri}
+              imageUri={isImageUri(e.uri) ? e.uri : undefined}
               onEdit={() => startEdit(e)}
               onDelete={() => setEvidence((prev: EvidenceItem[]) => prev.filter((x) => x.id !== e.id))}
               colors={colors}
@@ -627,8 +716,37 @@ function EvidenceTab({
 
       <View style={[st.addFormCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[st.addFormTitle, { color: colors.text }]}>Attach evidence</Text>
-        <LabeledInput label="Evidence URL / reference" value={uri} onChange={setUri} placeholder="https://… or file reference" colors={colors} />
-        <LabeledInput label="Label / description" value={label} onChange={setLabel} placeholder="e.g. Scene photo 1" colors={colors} />
+
+        <EvidencePickerButtons onPickedUri={setUri} colors={colors} />
+
+        {uri ? (
+          <View style={st.previewBox}>
+            {isImageUri(uri) ? (
+              <Image source={{ uri }} style={st.previewImage} resizeMode="cover" />
+            ) : null}
+            <Text style={[st.previewUri, { color: colors.mutedForeground }]} numberOfLines={2}>{uri}</Text>
+            <Pressable onPress={() => setUri("")} style={st.clearPreview}>
+              <Feather name="x" size={14} color={colors.mutedForeground} />
+            </Pressable>
+          </View>
+        ) : null}
+
+        <Pressable
+          onPress={() => setShowUrlInput((v) => !v)}
+          style={st.urlToggle}
+        >
+          <Feather name="link" size={13} color={colors.mutedForeground} />
+          <Text style={[st.urlToggleText, { color: colors.mutedForeground }]}>
+            {showUrlInput ? "Hide URL field" : "Paste a URL instead"}
+          </Text>
+          <Feather name={showUrlInput ? "chevron-up" : "chevron-down"} size={13} color={colors.mutedForeground} />
+        </Pressable>
+
+        {showUrlInput ? (
+          <LabeledInput label="Evidence URL / reference" value={uri} onChange={setUri} placeholder="https://… or file reference" colors={colors} />
+        ) : null}
+
+        <LabeledInput label="Label / description" value={label} onChange={setLabel} placeholder="e.g. Scene photo 1 (optional)" colors={colors} />
         <AddButton label="Attach to record" onPress={doAdd} colors={colors} />
       </View>
     </ScrollView>
@@ -1345,8 +1463,44 @@ const st = StyleSheet.create({
   emptyText: { fontSize: 13, fontFamily: "Inter_400Regular" },
 
   recordCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 13, borderRadius: 14, borderWidth: 1, marginBottom: 10 },
+  recordThumb: { width: 44, height: 44, borderRadius: 8 },
   recordTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
   recordMeta: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+
+  pickerRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
+  pickerBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+  pickerBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+
+  previewBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
+    backgroundColor: "rgba(0,0,0,0.04)",
+  },
+  previewImage: { width: 52, height: 52, borderRadius: 8 },
+  previewUri: { flex: 1, fontSize: 11, fontFamily: "Inter_400Regular" },
+  clearPreview: { padding: 4 },
+
+  urlToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
+  urlToggleText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
   deleteCircle: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", borderWidth: 1 },
   iconCircle: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", borderWidth: 1, marginLeft: 6 },
 
