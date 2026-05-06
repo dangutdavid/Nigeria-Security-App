@@ -334,5 +334,5 @@ const styles = StyleSheet.create({
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   statusLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   statusValue: { fontSize: 13, fontFamily: "Inter_700Bold" },
-  fab: { position: "absolute", right: 20, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", elevation: 6, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 } },
+  fab: { position: "absolute", right: 20, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", boxShadow: "0 3px 8px rgba(0,0,0,0.18)" },
 });

@@ -303,7 +303,13 @@ export default function CasesScreen() {
       const now = new Date();
       if (d.toDateString() !== now.toDateString()) return false;
     }
-    if (query && !`${incident.id} ${incident.title} ${incident.location} ${incident.lga} ${incident.state}`.toLowerCase().includes(query.toLowerCase())) return false;
+    if (query) {
+      const q = query.toLowerCase();
+      const plates = incident.vehicles?.map((v) => v.plate).join(" ") ?? "";
+      const victimNames = incident.victims?.map((v) => v.name).join(" ") ?? "";
+      const haystack = `${incident.id} ${incident.title} ${incident.location} ${incident.lga} ${incident.state} ${incident.reportedByName} ${plates} ${victimNames}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
     if (statusFilter !== "all") {
       if (statusFilter === "open") {
         if (["closed"].includes(incident.status)) return false;
@@ -336,21 +342,52 @@ export default function CasesScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
-        <View style={styles.headerText}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Cases</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>Browse and manage incidents</Text>
+        <View style={styles.headerTitleRow}>
+          <View style={styles.headerText}>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Cases</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>Browse and manage incidents</Text>
+          </View>
+          <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.secondary }]} onPress={() => router.push("/report")} activeOpacity={0.85}>
+            <Feather name="plus" size={16} color="#fff" />
+            <Text style={styles.headerBtnText}>Add</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={[styles.searchBar, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+          <Feather name="search" size={16} color={colors.mutedForeground} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search by ID, location, plate, victim…"
+            placeholderTextColor={colors.mutedForeground}
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => setQuery("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Feather name="x-circle" size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
       <View style={[styles.headerActionRow, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
         <View style={styles.headerActionsTop}>
-          <TouchableOpacity style={[styles.headerBtn, { backgroundColor: colors.secondary }]} onPress={() => router.push("/report")} activeOpacity={0.85}>
-            <Feather name="plus" size={18} color="#fff" />
-            <Text style={styles.headerBtnText}>Add incident</Text>
+          <TouchableOpacity style={[styles.filterSummaryBtn, { borderColor: activeFiltersCount > 0 ? colors.primary : colors.border, backgroundColor: activeFiltersCount > 0 ? colors.primary + "12" : colors.card }]} onPress={() => setLocationModalVisible(true)} activeOpacity={0.85}>
+            <Feather name="sliders" size={16} color={activeFiltersCount > 0 ? colors.primary : colors.text} />
+            <Text style={[styles.filterSummaryText, { color: activeFiltersCount > 0 ? colors.primary : colors.text }]}>{activeFiltersCount > 0 ? `${activeFiltersCount} filter${activeFiltersCount > 1 ? "s" : ""}` : "Filters"}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.filterSummaryBtn, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => setLocationModalVisible(true)} activeOpacity={0.85}>
-            <Feather name="sliders" size={16} color={colors.text} />
-            <Text style={[styles.filterSummaryText, { color: colors.text }]}>{activeFiltersCount > 0 ? `${activeFiltersCount} filters` : "Filters"}</Text>
-          </TouchableOpacity>
+          {(activeFiltersCount > 0 || query.length > 0) && (
+            <TouchableOpacity
+              style={[styles.clearAllBtn, { borderColor: colors.border }]}
+              onPress={() => { setQuery(""); setStatusFilter("all"); setSeverityFilter("all"); setMineOnly(false); setTodayOnly(false); setSelectedStates([]); setSelectedLGAs([]); }}
+              activeOpacity={0.75}
+            >
+              <Feather name="x" size={14} color={colors.mutedForeground} />
+              <Text style={[styles.clearAllBtnText, { color: colors.mutedForeground }]}>Clear all</Text>
+            </TouchableOpacity>
+          )}
         </View>
         {locationActive && (
           <View style={styles.locationSummaryRow}>
@@ -401,13 +438,6 @@ export default function CasesScreen() {
         }}
         onClose={() => setLocationModalVisible(false)}
       />
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: colors.secondary, bottom: insets.bottom + 92 }]}
-        onPress={() => router.push("/report")}
-        activeOpacity={0.85}
-      >
-        <Feather name="plus" size={24} color="#fff" />
-      </TouchableOpacity>
     </View>
   );
 }
@@ -420,9 +450,25 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: 1,
   },
-  headerText: { marginBottom: 8, paddingRight: 12 },
+  headerTitleRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 },
+  headerText: { flex: 1, marginRight: 12 },
   headerTitle: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  headerSubtitle: { marginTop: 6, fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 16 },
+  headerSubtitle: { marginTop: 4, fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 16 },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    height: 42,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    paddingVertical: 0,
+  },
   headerActionRow: {
     paddingHorizontal: 16,
     paddingTop: 8,
@@ -433,18 +479,29 @@ const styles = StyleSheet.create({
   headerActionsTop: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     flexWrap: "wrap",
   },
   headerBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 5,
     paddingHorizontal: 14,
-    height: 40,
+    height: 38,
     borderRadius: 20,
   },
   headerBtnText: { color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  clearAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    height: 38,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  clearAllBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  fab: {}, // kept for reference — removed from render
   filterSummaryBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -488,11 +545,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
+    boxShadow: "0 3px 8px rgba(0,0,0,0.18)",
   },
   // LocationFilterSheet styles
   clearBtn: { fontSize: 14, fontFamily: "Inter_600SemiBold" },

@@ -1375,7 +1375,7 @@ export default function CaseDetailScreen() {
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
               {inc.evidence.map((e, idx) => (
-                <Pressable key={e.id} style={st.evidenceThumb} onPress={() => setLightboxItem(e)}>
+                <Pressable key={e.id ?? `ev-${idx}`} style={st.evidenceThumb} onPress={() => setLightboxItem(e)}>
                   <Image source={{ uri: e.uri }} style={st.evidenceImg} resizeMode="cover" />
                   <Text style={[st.evidenceLabel, { color: colors.mutedForeground }]}>{e.label || `#${idx + 1}`}</Text>
                 </Pressable>
@@ -1738,11 +1738,7 @@ const st = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
+    boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
   },
 
   attachAllBtn: {

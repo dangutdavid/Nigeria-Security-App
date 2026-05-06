@@ -322,7 +322,10 @@ export default function ReportScreen() {
       gpsAccuracy: form.gpsAccuracy,
       vehicles: form.vehicles,
       victims: form.victims,
-      evidence: form.evidence,
+      evidence: form.evidence.map((uri, idx) => ({
+        id: `ev-${Date.now()}-${idx}`,
+        uri,
+      })),
       notes: form.notes,
       dateTime: new Date().toISOString(),
       timeline: [{ id: `TL-${Date.now()}`, action: "Incident reported", by: user.name, timestamp: new Date().toISOString() }],

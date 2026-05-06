@@ -60,7 +60,7 @@ export default function MapScreen() {
       <View
         style={[
           styles.floatingHeader,
-          { top: topPad + 8, backgroundColor: colors.card, shadowColor: "#000" },
+          { top: topPad + 8, backgroundColor: colors.card },
         ]}
       >
         <View style={styles.headerRow}>
@@ -202,10 +202,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 12,
     paddingBottom: 8,
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 5,
+    boxShadow: "0 2px 10px rgba(0,0,0,0.12)",
   },
   headerRow: {
     flexDirection: "row",
@@ -284,11 +281,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
   },
   closeBtn: {
     position: "absolute",
