@@ -1,6 +1,7 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Platform,
@@ -14,6 +15,9 @@ import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import { useIncidents } from "@/context/IncidentContext";
 
+const DISMISSED_KEY = "@frsc_dismissed_alerts";
+const READ_KEY = "@frsc_read_alerts";
+
 interface Alert {
   id: string;
   type: "assignment" | "escalation" | "update" | "sync" | "critical";
@@ -24,7 +28,11 @@ interface Alert {
   incidentId?: string;
 }
 
-function buildAlerts(incidents: ReturnType<typeof useIncidents>["incidents"], role: string): Alert[] {
+function buildAlerts(
+  incidents: ReturnType<typeof useIncidents>["incidents"],
+  role: string,
+  userId?: string,
+): Alert[] {
   const alerts: Alert[] = [];
 
   if (role === "supervisor" || role === "commander") {
@@ -37,7 +45,39 @@ function buildAlerts(incidents: ReturnType<typeof useIncidents>["incidents"], ro
         message: "Review and assign pending incident reports to field officers.",
         time: "Now",
         read: false,
-          incidentId: "unassigned",
+        incidentId: "unassigned",
+      });
+    }
+  }
+
+  if (role === "field_officer" && userId) {
+    const assignedToMe = incidents.filter(
+      (i) => i.assignedTo === userId && i.status !== "closed",
+    );
+    if (assignedToMe.length > 0) {
+      alerts.push({
+        id: "a-assigned-me",
+        type: "assignment",
+        title: `${assignedToMe.length} case${assignedToMe.length > 1 ? "s" : ""} assigned to you`,
+        message: assignedToMe
+          .slice(0, 2)
+          .map((i) => i.title)
+          .join(" · "),
+        time: "Active",
+        read: false,
+        incidentId: assignedToMe[0].id,
+      });
+    }
+    const myDrafts = incidents.filter((i) => i.reportedBy === userId && i.status === "draft");
+    if (myDrafts.length > 0) {
+      alerts.push({
+        id: "a-drafts",
+        type: "update",
+        title: `${myDrafts.length} unsent draft${myDrafts.length > 1 ? "s" : ""}`,
+        message: "You have saved drafts that haven't been submitted yet.",
+        time: "Pending",
+        read: true,
+        incidentId: myDrafts[0].id,
       });
     }
   }
@@ -60,7 +100,7 @@ function buildAlerts(incidents: ReturnType<typeof useIncidents>["incidents"], ro
   const recent = incidents.filter(
     (i) =>
       Date.now() - new Date(i.dateTime).getTime() < 3600000 * 6 &&
-      i.status === "submitted"
+      i.status === "submitted",
   );
   recent.slice(0, 3).forEach((inc) => {
     alerts.push({
@@ -118,12 +158,53 @@ export default function AlertsScreen() {
   const { incidents } = useIncidents();
   const router = useRouter();
   const [dismissed, setDismissed] = useState<string[]>([]);
+  const [readIds, setReadIds] = useState<string[]>([]);
 
-  const alerts = useMemo(() => {
-    return buildAlerts(incidents, user?.role || "field_officer").filter(
-      (a) => !dismissed.includes(a.id)
-    );
-  }, [incidents, user?.role, dismissed]);
+  useEffect(() => {
+    AsyncStorage.multiGet([DISMISSED_KEY, READ_KEY]).then((results) => {
+      const d = results[0][1];
+      const r = results[1][1];
+      if (d) setDismissed(JSON.parse(d));
+      if (r) setReadIds(JSON.parse(r));
+    });
+  }, []);
+
+  const dismiss = useCallback((id: string) => {
+    setDismissed((prev) => {
+      const next = [...prev, id];
+      void AsyncStorage.setItem(DISMISSED_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const dismissAll = useCallback((ids: string[]) => {
+    setDismissed((prev) => {
+      const next = [...new Set([...prev, ...ids])];
+      void AsyncStorage.setItem(DISMISSED_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const markAllRead = useCallback((ids: string[]) => {
+    setReadIds((prev) => {
+      const next = [...new Set([...prev, ...ids])];
+      void AsyncStorage.setItem(READ_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const allAlerts = useMemo(
+    () => buildAlerts(incidents, user?.role || "field_officer", user?.id),
+    [incidents, user?.role, user?.id],
+  );
+
+  const alerts = useMemo(
+    () => allAlerts.filter((a) => !dismissed.includes(a.id)).map((a) => ({
+      ...a,
+      read: a.read || readIds.includes(a.id),
+    })),
+    [allAlerts, dismissed, readIds]
+  );
 
   const unreadCount = alerts.filter((a) => !a.read).length;
 
@@ -149,12 +230,35 @@ export default function AlertsScreen() {
               <Text style={styles.badgeText}>{unreadCount}</Text>
             </View>
           )}
+          <View style={{ flex: 1 }} />
+          {unreadCount > 0 && (
+            <TouchableOpacity
+              onPress={() => markAllRead(alerts.filter((a) => !a.read).map((a) => a.id))}
+              activeOpacity={0.75}
+              style={[styles.headerAction, { borderColor: colors.border }]}
+            >
+              <Feather name="check-circle" size={13} color={colors.primary} />
+              <Text style={[styles.headerActionText, { color: colors.primary }]}>Read all</Text>
+            </TouchableOpacity>
+          )}
+          {alerts.length > 0 && (
+            <TouchableOpacity
+              onPress={() => dismissAll(alerts.map((a) => a.id))}
+              activeOpacity={0.75}
+              style={[styles.headerAction, { borderColor: colors.border }]}
+            >
+              <Feather name="trash-2" size={13} color={colors.mutedForeground} />
+              <Text style={[styles.headerActionText, { color: colors.mutedForeground }]}>Clear</Text>
+            </TouchableOpacity>
+          )}
         </View>
-        {unreadCount > 0 && (
-          <Text style={[styles.sub, { color: colors.mutedForeground }]}>
-            {unreadCount} unread notification{unreadCount > 1 ? "s" : ""}
-          </Text>
-        )}
+        <Text style={[styles.sub, { color: colors.mutedForeground }]}>
+          {unreadCount > 0
+            ? `${unreadCount} unread · ${alerts.length} total`
+            : alerts.length > 0
+              ? `${alerts.length} notification${alerts.length > 1 ? "s" : ""} · all read`
+              : "No active notifications"}
+        </Text>
       </View>
 
       <FlatList
@@ -225,7 +329,7 @@ export default function AlertsScreen() {
               </View>
               <TouchableOpacity
                 style={styles.dismissBtn}
-                onPress={() => setDismissed((prev) => [...prev, item.id])}
+                onPress={() => dismiss(item.id)}
               >
                 <Feather name="x" size={16} color={colors.mutedForeground} />
               </TouchableOpacity>
@@ -333,6 +437,20 @@ const styles = StyleSheet.create({
   },
   dismissBtn: {
     padding: 4,
+  },
+  headerAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginLeft: 6,
+  },
+  headerActionText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
   },
   empty: {
     alignItems: "center",

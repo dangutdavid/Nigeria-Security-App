@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -7,6 +8,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -1225,7 +1227,18 @@ export default function CaseDetailScreen() {
             <Feather name="arrow-left" size={22} color={colors.text} />
           </TouchableOpacity>
           <View style={{ flex: 1, marginHorizontal: 12 }}>
-            <Text style={[st.caseId, { color: colors.mutedForeground }]}>{inc.id}</Text>
+            <TouchableOpacity
+              style={{ flexDirection: "row", alignItems: "center", gap: 5 }}
+              onPress={async () => {
+                await Clipboard.setStringAsync(inc.id);
+                await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                Alert.alert("Copied", `Case ID ${inc.id} copied to clipboard.`);
+              }}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Text style={[st.caseId, { color: colors.mutedForeground }]}>{inc.id}</Text>
+              <Feather name="copy" size={11} color={colors.mutedForeground} />
+            </TouchableOpacity>
             <Text style={[st.caseTitle, { color: colors.text }]} numberOfLines={2}>{inc.title}</Text>
           </View>
           <View style={{ flexDirection: "row", gap: 14, alignItems: "center" }}>

@@ -325,6 +325,17 @@ export default function CasesScreen() {
 
   const locationActive = selectedStates.length > 0 || selectedLGAs.length > 0;
   const bottomPad = insets.bottom + 24;
+
+  const quickStats = useMemo(() => {
+    const todayStr = new Date().toDateString();
+    return {
+      total: incidents.length,
+      open: incidents.filter((i) => i.status !== "closed").length,
+      fatal: incidents.filter((i) => i.severity === "fatal").length,
+      today: incidents.filter((i) => new Date(i.dateTime).toDateString() === todayStr).length,
+    };
+  }, [incidents]);
+
   const activeFiltersCount =
     (statusFilter === "all" ? 0 : 1) +
     (severityFilter === "all" ? 0 : 1) +
@@ -372,6 +383,58 @@ export default function CasesScreen() {
           )}
         </View>
       </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[styles.statsStrip, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.statsStripContent}
+      >
+        <TouchableOpacity
+          style={[styles.statChip, { backgroundColor: statusFilter === "all" && severityFilter === "all" && !mineOnly && !todayOnly ? colors.primary : colors.card, borderColor: statusFilter === "all" && severityFilter === "all" && !mineOnly && !todayOnly ? colors.primary : colors.border }]}
+          onPress={() => { setStatusFilter("all"); setSeverityFilter("all"); setMineOnly(false); setTodayOnly(false); }}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.statChipNum, { color: statusFilter === "all" && severityFilter === "all" && !mineOnly && !todayOnly ? "#fff" : colors.text }]}>{quickStats.total}</Text>
+          <Text style={[styles.statChipLabel, { color: statusFilter === "all" && severityFilter === "all" && !mineOnly && !todayOnly ? "rgba(255,255,255,0.85)" : colors.mutedForeground }]}>Total</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.statChip, { backgroundColor: statusFilter === "open" ? "#E67E22" : colors.card, borderColor: statusFilter === "open" ? "#E67E22" : colors.border }]}
+          onPress={() => setStatusFilter(statusFilter === "open" ? "all" : "open")}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.statChipNum, { color: statusFilter === "open" ? "#fff" : colors.text }]}>{quickStats.open}</Text>
+          <Text style={[styles.statChipLabel, { color: statusFilter === "open" ? "rgba(255,255,255,0.85)" : colors.mutedForeground }]}>Open</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.statChip, { backgroundColor: severityFilter === "fatal" ? colors.fatal : colors.card, borderColor: severityFilter === "fatal" ? colors.fatal : colors.border }]}
+          onPress={() => setSeverityFilter(severityFilter === "fatal" ? "all" : "fatal")}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.statChipNum, { color: severityFilter === "fatal" ? "#fff" : colors.fatal }]}>{quickStats.fatal}</Text>
+          <Text style={[styles.statChipLabel, { color: severityFilter === "fatal" ? "rgba(255,255,255,0.85)" : colors.mutedForeground }]}>Fatal</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.statChip, { backgroundColor: todayOnly ? colors.primary : colors.card, borderColor: todayOnly ? colors.primary : colors.border }]}
+          onPress={() => setTodayOnly(!todayOnly)}
+          activeOpacity={0.75}
+        >
+          <Text style={[styles.statChipNum, { color: todayOnly ? "#fff" : colors.text }]}>{quickStats.today}</Text>
+          <Text style={[styles.statChipLabel, { color: todayOnly ? "rgba(255,255,255,0.85)" : colors.mutedForeground }]}>Today</Text>
+        </TouchableOpacity>
+        {user?.role !== "field_officer" && (
+          <TouchableOpacity
+            style={[styles.statChip, { backgroundColor: mineOnly ? colors.secondary : colors.card, borderColor: mineOnly ? colors.secondary : colors.border }]}
+            onPress={() => setMineOnly(!mineOnly)}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.statChipNum, { color: mineOnly ? "#fff" : colors.text }]}>
+              {incidents.filter((i) => i.reportedBy === user?.id).length}
+            </Text>
+            <Text style={[styles.statChipLabel, { color: mineOnly ? "rgba(255,255,255,0.85)" : colors.mutedForeground }]}>Mine</Text>
+          </TouchableOpacity>
+        )}
+      </ScrollView>
+
       <View style={[styles.headerActionRow, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
         <View style={styles.headerActionsTop}>
           <TouchableOpacity style={[styles.filterSummaryBtn, { borderColor: activeFiltersCount > 0 ? colors.primary : colors.border, backgroundColor: activeFiltersCount > 0 ? colors.primary + "12" : colors.card }]} onPress={() => setLocationModalVisible(true)} activeOpacity={0.85}>
@@ -501,7 +564,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   clearAllBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  fab: {}, // kept for reference — removed from render
   filterSummaryBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -537,16 +599,6 @@ const styles = StyleSheet.create({
   emptyList: { flexGrow: 1 },
   emptyState: { alignItems: "center", justifyContent: "center", paddingTop: 80 },
   emptyTitle: { marginTop: 10, fontSize: 16, fontFamily: "Inter_700Bold" },
-  fab: {
-    position: "absolute",
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    boxShadow: "0 3px 8px rgba(0,0,0,0.18)",
-  },
   // LocationFilterSheet styles
   clearBtn: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   gpsRow: {
@@ -625,4 +677,9 @@ const styles = StyleSheet.create({
   footerHint: { flex: 1, fontSize: 12, fontFamily: "Inter_500Medium" },
   applyBtn: { paddingHorizontal: 28, paddingVertical: 13, borderRadius: 14 },
   applyBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
+  statsStrip: { flexShrink: 0 },
+  statsStripContent: { paddingHorizontal: 14, paddingVertical: 10, gap: 8, flexDirection: "row" },
+  statChip: { alignItems: "center", justifyContent: "center", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 14, borderWidth: 1, minWidth: 64 },
+  statChipNum: { fontSize: 18, fontFamily: "Inter_700Bold", lineHeight: 20 },
+  statChipLabel: { fontSize: 10, fontFamily: "Inter_500Medium", marginTop: 2 },
 });

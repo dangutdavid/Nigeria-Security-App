@@ -41,6 +41,142 @@ const barStyles = StyleSheet.create({
   value: { width: 28, fontSize: 12, fontFamily: "Inter_600SemiBold", textAlign: "right" },
 });
 
+const TREND_HEIGHT = 80;
+
+function WeeklyTrend({
+  incidents,
+  colors,
+}: {
+  incidents: ReturnType<typeof useIncidents>["incidents"];
+  colors: ReturnType<typeof useColors>;
+}) {
+  const days = useMemo(() => {
+    const result: Array<{ label: string; shortDate: string; count: number; fatal: number; isToday: boolean }> = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - i);
+      const dayStr = d.toDateString();
+      const dayIncs = incidents.filter((inc) => new Date(inc.dateTime).toDateString() === dayStr);
+      result.push({
+        label: d.toLocaleDateString("en-US", { weekday: "narrow" }),
+        shortDate: d.toLocaleDateString("en-GB", { day: "numeric", month: "numeric" }),
+        count: dayIncs.length,
+        fatal: dayIncs.filter((inc) => inc.severity === "fatal").length,
+        isToday: i === 0,
+      });
+    }
+    return result;
+  }, [incidents]);
+
+  const maxCount = Math.max(...days.map((d) => d.count), 1);
+  const totalWeek = days.reduce((s, d) => s + d.count, 0);
+  const fatalWeek = days.reduce((s, d) => s + d.fatal, 0);
+  const peakDay = days.reduce((a, b) => (b.count > a.count ? b : a), days[0]);
+
+  return (
+    <View>
+      <View style={trendStyles.metaRow}>
+        <View style={trendStyles.metaItem}>
+          <Text style={[trendStyles.metaValue, { color: colors.text }]}>{totalWeek}</Text>
+          <Text style={[trendStyles.metaLabel, { color: colors.mutedForeground }]}>this week</Text>
+        </View>
+        {fatalWeek > 0 && (
+          <View style={trendStyles.metaItem}>
+            <Text style={[trendStyles.metaValue, { color: colors.fatal }]}>{fatalWeek}</Text>
+            <Text style={[trendStyles.metaLabel, { color: colors.mutedForeground }]}>fatal</Text>
+          </View>
+        )}
+        {peakDay.count > 0 && (
+          <View style={trendStyles.metaItem}>
+            <Text style={[trendStyles.metaValue, { color: colors.text }]}>{peakDay.count}</Text>
+            <Text style={[trendStyles.metaLabel, { color: colors.mutedForeground }]}>peak day</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={trendStyles.chart}>
+        {days.map((day, idx) => {
+          const barH = Math.round((day.count / maxCount) * TREND_HEIGHT);
+          return (
+            <View key={idx} style={trendStyles.col}>
+              {day.count > 0 ? (
+                <Text style={[trendStyles.countLabel, { color: day.isToday ? colors.primary : colors.mutedForeground }]}>
+                  {day.count}
+                </Text>
+              ) : (
+                <Text style={trendStyles.countLabel}>{" "}</Text>
+              )}
+              <View style={[trendStyles.barTrack, { height: TREND_HEIGHT }]}>
+                {day.fatal > 0 && (
+                  <View
+                    style={[
+                      trendStyles.barSegment,
+                      {
+                        height: Math.round((day.fatal / maxCount) * TREND_HEIGHT),
+                        backgroundColor: colors.fatal,
+                        opacity: 0.9,
+                      },
+                    ]}
+                  />
+                )}
+                {day.count - day.fatal > 0 && (
+                  <View
+                    style={[
+                      trendStyles.barSegment,
+                      {
+                        height: Math.round(((day.count - day.fatal) / maxCount) * TREND_HEIGHT),
+                        backgroundColor: day.isToday ? colors.primary : colors.secondary,
+                        opacity: day.isToday ? 1 : 0.6,
+                      },
+                    ]}
+                  />
+                )}
+              </View>
+              <Text
+                style={[
+                  trendStyles.dayLabel,
+                  {
+                    color: day.isToday ? colors.primary : colors.mutedForeground,
+                    fontFamily: day.isToday ? "Inter_700Bold" : "Inter_400Regular",
+                  },
+                ]}
+              >
+                {day.label}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+
+      {fatalWeek > 0 && (
+        <View style={trendStyles.legend}>
+          <View style={[trendStyles.legendDot, { backgroundColor: colors.fatal }]} />
+          <Text style={[trendStyles.legendText, { color: colors.mutedForeground }]}>Fatal</Text>
+          <View style={[trendStyles.legendDot, { backgroundColor: colors.secondary, marginLeft: 10 }]} />
+          <Text style={[trendStyles.legendText, { color: colors.mutedForeground }]}>Other</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const trendStyles = StyleSheet.create({
+  metaRow: { flexDirection: "row", gap: 24, marginBottom: 14 },
+  metaItem: { alignItems: "center" },
+  metaValue: { fontSize: 20, fontFamily: "Inter_700Bold" },
+  metaLabel: { fontSize: 11, fontFamily: "Inter_500Medium", marginTop: 1 },
+  chart: { flexDirection: "row", alignItems: "flex-end", gap: 6 },
+  col: { flex: 1, alignItems: "center", gap: 4 },
+  countLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", height: 14, lineHeight: 14 },
+  barTrack: { width: "100%", justifyContent: "flex-end", borderRadius: 6, overflow: "hidden", backgroundColor: "rgba(0,0,0,0.04)" },
+  barSegment: { width: "100%", borderRadius: 0 },
+  dayLabel: { fontSize: 11, marginTop: 2 },
+  legend: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 10 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { fontSize: 11, fontFamily: "Inter_500Medium" },
+});
+
 export default function AnalyticsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -224,6 +360,47 @@ export default function AnalyticsScreen() {
             onPress={() => router.push({ pathname: "/(tabs)/cases", params: { status: "closed" } } as any)} />
         </View>
 
+        {/* Closure rate + casualty strip */}
+        {filteredIncidents.length > 0 && (() => {
+          const closed = stats.byStatus["closed"] || 0;
+          const closureRate = Math.round((closed / filteredIncidents.length) * 100);
+          const totalVehicles = filteredIncidents.reduce((s, i) => s + i.vehicles.length, 0);
+          return (
+            <View style={[styles.closureCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.closureLeft}>
+                <View style={[styles.closureArcWrap, { borderColor: closureRate >= 60 ? colors.success : closureRate >= 30 ? colors.warning : colors.fatal }]}>
+                  <Text style={[styles.closureRatePct, { color: closureRate >= 60 ? colors.success : closureRate >= 30 ? colors.warning : colors.fatal }]}>
+                    {closureRate}%
+                  </Text>
+                  <Text style={[styles.closureRateLabel, { color: colors.mutedForeground }]}>closed</Text>
+                </View>
+              </View>
+              <View style={[styles.closureDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.closureRight}>
+                <View style={styles.closureMetric}>
+                  <Text style={[styles.closureMetricVal, { color: colors.text }]}>{totalCasualties}</Text>
+                  <Text style={[styles.closureMetricLabel, { color: colors.mutedForeground }]}>casualties</Text>
+                </View>
+                <View style={[styles.closureMetricDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.closureMetric}>
+                  <Text style={[styles.closureMetricVal, { color: colors.text }]}>{fatalVictims}</Text>
+                  <Text style={[styles.closureMetricLabel, { color: colors.fatal }]}>fatal</Text>
+                </View>
+                <View style={[styles.closureMetricDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.closureMetric}>
+                  <Text style={[styles.closureMetricVal, { color: colors.text }]}>{totalVehicles}</Text>
+                  <Text style={[styles.closureMetricLabel, { color: colors.mutedForeground }]}>vehicles</Text>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
+
+        {/* 7-day trend */}
+        <Section title="7-DAY TREND" colors={colors}>
+          <WeeklyTrend incidents={filteredIncidents} colors={colors} />
+        </Section>
+
         {/* By type */}
         <Section title="BY INCIDENT TYPE" colors={colors}>
           {Object.entries(stats.byType).map(([type, count]) => (
@@ -391,10 +568,92 @@ export default function AnalyticsScreen() {
             text={`${stats.byStatus["submitted"] || 0} reports awaiting assignment`}
           />
         </Section>
+
+        {/* Officer activity */}
+        <OfficerActivity incidents={filteredIncidents} colors={colors} onPress={(name) => setQuery(name)} />
+
       </ScrollView>
     </View>
   );
 }
+
+function OfficerActivity({
+  incidents,
+  colors,
+  onPress,
+}: {
+  incidents: ReturnType<typeof useIncidents>["incidents"];
+  colors: ReturnType<typeof useColors>;
+  onPress: (name: string) => void;
+}) {
+  const officers = useMemo(() => {
+    const map: Record<string, { name: string; reported: number; assigned: number; closed: number }> = {};
+    incidents.forEach((inc) => {
+      if (inc.reportedByName) {
+        if (!map[inc.reportedBy]) map[inc.reportedBy] = { name: inc.reportedByName, reported: 0, assigned: 0, closed: 0 };
+        map[inc.reportedBy].reported += 1;
+        if (inc.status === "closed") map[inc.reportedBy].closed += 1;
+      }
+      if (inc.assignedTo && inc.assignedToName) {
+        if (!map[inc.assignedTo]) map[inc.assignedTo] = { name: inc.assignedToName, reported: 0, assigned: 0, closed: 0 };
+        map[inc.assignedTo].assigned += 1;
+      }
+    });
+    return Object.entries(map)
+      .map(([id, v]) => ({ id, ...v, total: v.reported + v.assigned }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6);
+  }, [incidents]);
+
+  if (officers.length === 0) return null;
+
+  return (
+    <Section title="OFFICER ACTIVITY" colors={colors}>
+      {officers.map((officer, idx) => {
+        const closureRate = officer.reported > 0 ? Math.round((officer.closed / officer.reported) * 100) : null;
+        return (
+          <TouchableOpacity
+            key={officer.id}
+            style={[officerStyles.row, { borderBottomColor: colors.border }]}
+            onPress={() => onPress(officer.name)}
+            activeOpacity={0.75}
+          >
+            <View style={[officerStyles.rank, { backgroundColor: idx === 0 ? colors.primary + "18" : colors.muted }]}>
+              <Text style={[officerStyles.rankText, { color: idx === 0 ? colors.primary : colors.mutedForeground }]}>
+                {idx + 1}
+              </Text>
+            </View>
+            <View style={officerStyles.body}>
+              <Text style={[officerStyles.name, { color: colors.text }]} numberOfLines={1}>
+                {officer.name}
+              </Text>
+              <Text style={[officerStyles.meta, { color: colors.mutedForeground }]}>
+                {officer.reported} filed · {officer.assigned} assigned
+                {closureRate !== null ? ` · ${closureRate}% closed` : ""}
+              </Text>
+            </View>
+            <View style={officerStyles.badge}>
+              <Text style={[officerStyles.badgeNum, { color: colors.primary }]}>{officer.total}</Text>
+              <Text style={[officerStyles.badgeLabel, { color: colors.mutedForeground }]}>cases</Text>
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </Section>
+  );
+}
+
+const officerStyles = StyleSheet.create({
+  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1 },
+  rank: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  rankText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  body: { flex: 1 },
+  name: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  meta: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  badge: { alignItems: "center" },
+  badgeNum: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  badgeLabel: { fontSize: 10, fontFamily: "Inter_500Medium" },
+});
 
 function SummaryCard({ colors, label, value, icon, color, onPress }: any) {
   return (
@@ -647,5 +906,62 @@ const styles = StyleSheet.create({
   filterPillText: {
     fontSize: 12,
     fontFamily: "Inter_700Bold",
+  },
+  closureCard: {
+    flexDirection: "row",
+    borderRadius: 18,
+    borderWidth: 1,
+    marginBottom: 14,
+    overflow: "hidden",
+  },
+  closureLeft: {
+    width: 100,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 18,
+  },
+  closureArcWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closureRatePct: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+    lineHeight: 22,
+  },
+  closureRateLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+  },
+  closureDivider: {
+    width: 1,
+    marginVertical: 16,
+  },
+  closureRight: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingHorizontal: 8,
+  },
+  closureMetric: {
+    alignItems: "center",
+    gap: 4,
+  },
+  closureMetricVal: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+  },
+  closureMetricLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+  },
+  closureMetricDivider: {
+    width: 1,
+    height: 30,
   },
 });

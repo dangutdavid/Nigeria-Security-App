@@ -3,9 +3,10 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
   Image,
   Platform,
   ScrollView,
@@ -166,6 +167,7 @@ export default function ReportScreen() {
 
   const [step, setStep] = useState<Step>(1);
   const [lgaSearch, setLgaSearch] = useState("");
+  const progressAnim = useRef(new Animated.Value(1 / TOTAL_STEPS)).current;
   const [form, setForm] = useState<FormState>({
     type: null,
     severity: null,
@@ -187,6 +189,14 @@ export default function ReportScreen() {
   const filteredLgas = useMemo(() => selectedLgas.filter((l) => !lgaSearch || l.toLowerCase().includes(lgaSearch.toLowerCase())), [selectedLgas, lgaSearch]);
   const allowedSeverities = form.type ? TYPE_SEVERITY_MAP[form.type] : [];
   const probableCauseGroups = groupProbableCauses(form.type);
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: step / TOTAL_STEPS,
+      duration: 280,
+      useNativeDriver: false,
+    }).start();
+  }, [step]);
 
   function update(fields: Partial<FormState>) {
     setForm((f) => ({ ...f, ...fields }));
@@ -302,6 +312,37 @@ export default function ReportScreen() {
     return true;
   }
 
+  function saveDraft() {
+    if (!user || !form.type) return;
+    const incident = {
+      id: `DRAFT-${Date.now()}`,
+      title: `[DRAFT] ${form.type.toUpperCase()} - ${form.location || form.lga || form.state || "Untitled"}`,
+      type: form.type,
+      severity: form.severity ?? "minor",
+      status: "draft" as IncidentStatus,
+      reportedBy: user.id,
+      reportedByName: user.name,
+      location: form.location || form.lga || form.state,
+      state: form.state,
+      lga: form.lga,
+      description: form.description,
+      probableCauses: form.probableCauses,
+      latitude: form.latitude ?? 0,
+      longitude: form.longitude ?? 0,
+      gpsAccuracy: form.gpsAccuracy,
+      vehicles: form.vehicles,
+      victims: form.victims,
+      evidence: form.evidence.map((uri, idx) => ({ id: `ev-${Date.now()}-${idx}`, uri })),
+      notes: form.notes,
+      dateTime: new Date().toISOString(),
+      timeline: [{ id: `TL-${Date.now()}`, action: "Draft saved", by: user.name, timestamp: new Date().toISOString() }],
+      pendingSync: false,
+    } as any;
+    void addIncident(incident);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    router.replace("/(tabs)/cases");
+  }
+
   function submit() {
     if (!user || !form.type || !form.severity) return;
     const incident = {
@@ -349,7 +390,26 @@ export default function ReportScreen() {
           <Text style={[s.title, { color: colors.text }]}>Report Incident</Text>
           <Text style={[s.subtitle, { color: colors.mutedForeground }]}>Step {step} of {TOTAL_STEPS}</Text>
         </View>
-        <View style={{ width: 22 }} />
+        {form.type ? (
+          <TouchableOpacity onPress={saveDraft} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={[s.draftLink, { color: colors.warning }]}>Save Draft</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 22 }} />
+        )}
+      </View>
+
+      {/* Animated progress bar */}
+      <View style={[s.progressTrack, { backgroundColor: colors.muted }]}>
+        <Animated.View
+          style={[
+            s.progressFill,
+            {
+              backgroundColor: colors.primary,
+              width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ["0%", "100%"] }),
+            },
+          ]}
+        />
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
@@ -558,17 +618,26 @@ export default function ReportScreen() {
         )}
       </ScrollView>
 
-      <View style={[s.footer, { borderTopColor: colors.border, backgroundColor: colors.card, paddingBottom: insets.bottom + 12 }]}> 
+      <View style={[s.footer, { borderTopColor: colors.border, backgroundColor: colors.card, paddingBottom: insets.bottom + 12 }]}>
         <TouchableOpacity style={[s.navBtn, { borderColor: colors.border }]} onPress={prevStep}>
           <Text style={[s.navBtnText, { color: colors.text }]}>Back</Text>
         </TouchableOpacity>
         {step < TOTAL_STEPS ? (
-          <TouchableOpacity style={[s.navBtn, { backgroundColor: canContinue() ? colors.primary : colors.muted, borderColor: colors.border }]} onPress={nextStep} disabled={!canContinue()}>
-            <Text style={[s.navBtnText, { color: canContinue() ? "#fff" : colors.mutedForeground }]}>Next</Text>
+          <TouchableOpacity
+            style={[s.navBtn, s.navBtnPrimary, { backgroundColor: canContinue() ? colors.primary : colors.muted, borderColor: canContinue() ? colors.primary : colors.border }]}
+            onPress={nextStep}
+            disabled={!canContinue()}
+          >
+            <Text style={[s.navBtnText, { color: canContinue() ? "#fff" : colors.mutedForeground }]}>Continue</Text>
+            <Feather name="arrow-right" size={14} color={canContinue() ? "#fff" : colors.mutedForeground} />
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={[s.navBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={submit}>
-            <Text style={[s.navBtnText, { color: "#fff" }]}>Submit</Text>
+          <TouchableOpacity
+            style={[s.navBtn, s.navBtnPrimary, { backgroundColor: colors.success, borderColor: colors.success }]}
+            onPress={submit}
+          >
+            <Feather name="send" size={14} color="#fff" />
+            <Text style={[s.navBtnText, { color: "#fff" }]}>Submit Report</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -628,5 +697,9 @@ const s = StyleSheet.create({
   reviewLine: { fontSize: 13, fontFamily: "Inter_400Regular" },
   footer: { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1 },
   navBtn: { flex: 1, height: 48, borderWidth: 1, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  navBtnPrimary: { flexDirection: "row", gap: 6 },
   navBtnText: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  progressTrack: { height: 3, width: "100%" },
+  progressFill: { height: 3, borderRadius: 1.5 },
+  draftLink: { fontSize: 12, fontFamily: "Inter_700Bold" },
 });

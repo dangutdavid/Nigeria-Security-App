@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,6 +9,24 @@ import { usePatrol } from "@/context/PatrolContext";
 import { useAuth } from "@/context/AuthContext";
 import { IncidentCard } from "@/components/IncidentCard";
 
+function formatElapsed(startTime: string): string {
+  const diff = Math.max(0, Date.now() - new Date(startTime).getTime());
+  const totalSec = Math.floor(diff / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2, "0")}m`;
+  return `${m}m ${String(s).padStart(2, "0")}s`;
+}
+
+function greeting(name: string): string {
+  const hour = new Date().getHours();
+  const first = name.split(" ")[0];
+  if (hour < 12) return `Good morning, ${first}`;
+  if (hour < 17) return `Good afternoon, ${first}`;
+  return `Good evening, ${first}`;
+}
+
 export default function HomeScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -16,8 +34,47 @@ export default function HomeScreen() {
   const { incidents } = useIncidents();
   const { isOnDuty, activeSession } = usePatrol();
   const { user } = useAuth();
+  const [elapsed, setElapsed] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 800);
+  }, []);
 
+  useEffect(() => {
+    if (!isOnDuty || !activeSession) { setElapsed(""); return; }
+    setElapsed(formatElapsed(activeSession.startTime));
+    const id = setInterval(() => setElapsed(formatElapsed(activeSession.startTime)), 1000);
+    return () => clearInterval(id);
+  }, [isOnDuty, activeSession]);
+
+  const isSupervisor = user?.role === "supervisor";
+  const isCommander = user?.role === "commander";
+
+  const todayStr = new Date().toDateString();
+  const todayIncs = incidents.filter((inc) => new Date(inc.dateTime).toDateString() === todayStr);
+  const todayFatal = todayIncs.filter((inc) => inc.severity === "fatal").length;
+  const todayOpen = todayIncs.filter((inc) => inc.status !== "closed").length;
   const myReports = incidents.filter((incident) => incident.reportedBy === user?.id);
+  const assignedToMe = useMemo(
+    () => incidents.filter((i) => i.assignedTo === user?.id && i.status !== "closed"),
+    [incidents, user?.id],
+  );
+  const isFieldOfficer = user?.role === "field_officer";
+
+  const unassignedCount = incidents.filter((i) => i.status === "submitted").length;
+  const fatalOpenCount = incidents.filter((i) => i.severity === "fatal" && i.status !== "closed").length;
+
+  const sparkline = useMemo(() => {
+    const result: number[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const s = d.toDateString();
+      result.push(incidents.filter((inc) => new Date(inc.dateTime).toDateString() === s).length);
+    }
+    return result;
+  }, [incidents]);
   const recent = incidents.slice(0, 5);
   const openCount = incidents.filter((incident) => incident.status !== "closed").length;
   const fatalCount = incidents.filter((incident) => incident.severity === "fatal" && incident.status !== "closed").length;
@@ -38,12 +95,20 @@ export default function HomeScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         <View style={[styles.hero, { backgroundColor: colors.primary }]}>
           <View style={styles.heroTop}>
             <View>
               <Text style={styles.kicker}>FRSC Field Operations</Text>
-              <Text style={styles.heroTitle}>Live duty overview</Text>
+              <Text style={styles.heroTitle}>{user ? greeting(user.name) : "Dashboard"}</Text>
               <Text style={styles.heroSub}>Offline-first incident tracking and rapid reporting</Text>
             </View>
             <TouchableOpacity style={styles.heroBadge} onPress={() => router.push("/patrol-log")}>
@@ -57,7 +122,11 @@ export default function HomeScreen() {
                 {isOnDuty ? "On duty" : "Start duty"}
               </Text>
               <Text style={[styles.dutySub, { color: isOnDuty ? "rgba(255,255,255,0.85)" : "#163A2A" }]}>
-                {activeSession ? activeSession.route : "Tap to start duty"}
+                {isOnDuty && elapsed
+                  ? `${activeSession?.route ?? "Patrol"} · ${elapsed}`
+                  : activeSession
+                    ? activeSession.route
+                    : "Tap to start duty"}
               </Text>
             </View>
             <Feather name="chevron-right" size={16} color={isOnDuty ? "#fff" : "#163A2A"} />
@@ -76,6 +145,149 @@ export default function HomeScreen() {
               <Text style={styles.statLabel}>My reports</Text>
             </View>
           </View>
+
+          {sparkline.some((v) => v > 0) && (
+            <View style={styles.sparkRow}>
+              {sparkline.map((count, idx) => {
+                const maxSpark = Math.max(...sparkline, 1);
+                const barH = Math.max(Math.round((count / maxSpark) * 22), count > 0 ? 4 : 1);
+                const isToday = idx === 6;
+                return (
+                  <View key={idx} style={styles.sparkCol}>
+                    <View
+                      style={[
+                        styles.sparkBar,
+                        {
+                          height: barH,
+                          backgroundColor: isToday ? "#fff" : "rgba(255,255,255,0.45)",
+                        },
+                      ]}
+                    />
+                  </View>
+                );
+              })}
+              <Text style={styles.sparkLabel}>7-day trend</Text>
+            </View>
+          )}
+        </View>
+
+        {(isSupervisor || isCommander) && (unassignedCount > 0 || fatalOpenCount > 0) && (
+          <View style={[styles.urgentBanner, { backgroundColor: colors.fatal + "0E", borderColor: colors.fatal + "30" }]}>
+            <View style={[styles.urgentIcon, { backgroundColor: colors.fatal + "1A" }]}>
+              <Feather name="alert-octagon" size={18} color={colors.fatal} />
+            </View>
+            <View style={styles.urgentBody}>
+              <Text style={[styles.urgentTitle, { color: colors.fatal }]}>Action required</Text>
+              <Text style={[styles.urgentSub, { color: colors.mutedForeground }]}>
+                {[
+                  unassignedCount > 0 && `${unassignedCount} unassigned case${unassignedCount > 1 ? "s" : ""}`,
+                  fatalOpenCount > 0 && `${fatalOpenCount} fatal open`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.urgentBtn, { backgroundColor: colors.fatal }]}
+              onPress={() => router.push({ pathname: "/(tabs)/cases", params: { status: "submitted" } } as any)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.urgentBtnText}>Review</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isFieldOfficer && assignedToMe.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <View style={styles.sectionTitleRow}>
+                <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>ASSIGNED TO ME</Text>
+                <View style={[styles.assignedBadge, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.assignedBadgeText}>{assignedToMe.length}</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => router.push("/(tabs)/cases" as any)}>
+                <Text style={[styles.seeAll, { color: colors.primary }]}>View all</Text>
+              </TouchableOpacity>
+            </View>
+            {assignedToMe.slice(0, 3).map((inc) => (
+              <IncidentCard key={inc.id} incident={inc} />
+            ))}
+            {assignedToMe.length > 3 && (
+              <TouchableOpacity
+                style={[styles.showMoreBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+                onPress={() => router.push("/(tabs)/cases" as any)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.showMoreText, { color: colors.primary }]}>
+                  +{assignedToMe.length - 3} more assigned cases
+                </Text>
+                <Feather name="chevron-right" size={14} color={colors.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>TODAY</Text>
+            {todayIncs.length > 0 && (
+              <TouchableOpacity onPress={() => router.push("/(tabs)/cases" as any)}>
+                <Text style={[styles.seeAll, { color: colors.primary }]}>View all</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {todayIncs.length === 0 ? (
+            <TouchableOpacity
+              style={[styles.todayCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => router.push("/report" as any)}
+              activeOpacity={0.85}
+            >
+              <View style={styles.todayLeft}>
+                <View style={[styles.todayPill, { backgroundColor: colors.muted }]}>
+                  <Feather name="check" size={14} color={colors.mutedForeground} />
+                </View>
+                <View>
+                  <Text style={[styles.todayBigLabel, { color: colors.text }]}>No incidents today</Text>
+                  <Text style={[styles.todayBigSub, { color: colors.mutedForeground }]}>Tap to file a new report</Text>
+                </View>
+              </View>
+              <Feather name="plus-circle" size={22} color={colors.primary} />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={[styles.todayCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => router.push("/(tabs)/cases" as any)}
+              activeOpacity={0.85}
+            >
+              <View style={styles.todayLeft}>
+                <Text style={[styles.todayBigNum, { color: colors.text }]}>{todayIncs.length}</Text>
+                <View>
+                  <Text style={[styles.todayBigLabel, { color: colors.text }]}>
+                    incident{todayIncs.length > 1 ? "s" : ""} today
+                  </Text>
+                  <Text style={[styles.todayBigSub, { color: colors.mutedForeground }]}>
+                    {todayOpen} open · {todayIncs.length - todayOpen} closed
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.todayRight}>
+                {todayFatal > 0 && (
+                  <View style={[styles.todayPill, { backgroundColor: colors.fatalLight }]}>
+                    <Feather name="alert-triangle" size={10} color={colors.fatal} />
+                    <Text style={[styles.todayPillText, { color: colors.fatal }]}>{todayFatal} fatal</Text>
+                  </View>
+                )}
+                {todayOpen > 0 && (
+                  <View style={[styles.todayPill, { backgroundColor: colors.warningLight }]}>
+                    <Feather name="clock" size={10} color={colors.warning} />
+                    <Text style={[styles.todayPillText, { color: colors.warning }]}>{todayOpen} open</Text>
+                  </View>
+                )}
+                <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.section}>
@@ -334,5 +546,29 @@ const styles = StyleSheet.create({
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   statusLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   statusValue: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  sparkRow: { flexDirection: "row", alignItems: "flex-end", gap: 3, marginTop: 14, height: 28 },
+  sparkCol: { flex: 1, justifyContent: "flex-end", alignItems: "center" },
+  sparkBar: { width: "100%", borderRadius: 2 },
+  sparkLabel: { color: "rgba(255,255,255,0.65)", fontSize: 10, fontFamily: "Inter_500Medium", marginLeft: 8, alignSelf: "center" },
+  urgentBanner: { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 16, borderWidth: 1, padding: 14, marginTop: 14 },
+  urgentIcon: { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  urgentBody: { flex: 1 },
+  urgentTitle: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  urgentSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  urgentBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
+  urgentBtnText: { color: "#fff", fontSize: 12, fontFamily: "Inter_700Bold" },
+  todayCard: { borderRadius: 18, borderWidth: 1, padding: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  todayLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  todayRight: { gap: 6, alignItems: "flex-end" },
+  todayBigNum: { fontSize: 36, fontFamily: "Inter_700Bold", lineHeight: 38 },
+  todayBigLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  todayBigSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  todayPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  todayPillText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  assignedBadge: { minWidth: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 },
+  assignedBadgeText: { fontSize: 11, fontFamily: "Inter_700Bold", color: "#fff" },
+  showMoreBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderRadius: 14, paddingVertical: 12, marginTop: 6 },
+  showMoreText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   fab: { position: "absolute", right: 20, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", boxShadow: "0 3px 8px rgba(0,0,0,0.18)" },
 });

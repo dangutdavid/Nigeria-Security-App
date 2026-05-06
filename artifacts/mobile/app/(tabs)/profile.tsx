@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, UserRole } from "@/context/AuthContext";
+import { useIncidents } from "@/context/IncidentContext";
 import { usePatrol } from "@/context/PatrolContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
@@ -82,6 +83,10 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
   const { isOnDuty, activeSession } = usePatrol();
+  const { incidents } = useIncidents();
+  const myReported = incidents.filter((i) => i.reportedBy === user?.id).length;
+  const myAssigned = incidents.filter((i) => i.assignedTo === user?.id && i.status !== "closed").length;
+  const myClosed = incidents.filter((i) => i.reportedBy === user?.id && i.status === "closed").length;
   const canManageUsers = user?.role === "supervisor" || user?.role === "commander";
   const canAssignCases = canManageUsers;
   const canUseCommandTools = user?.role === "supervisor" || user?.role === "commander";
@@ -131,6 +136,26 @@ export default function ProfileScreen() {
         <Text style={styles.userName}>{user.name}</Text>
         <View style={[styles.roleChip, { backgroundColor: "rgba(255,255,255,0.15)" }]}> 
           <Text style={styles.roleText}>{ROLE_LABEL[user.role]}</Text>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>MY ACTIVITY</Text>
+        <View style={[styles.statsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: colors.text }]}>{myReported}</Text>
+            <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Reported</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: myAssigned > 0 ? colors.primary : colors.text }]}>{myAssigned}</Text>
+            <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Assigned</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: myClosed > 0 ? colors.success : colors.text }]}>{myClosed}</Text>
+            <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Closed</Text>
+          </View>
         </View>
       </View>
 
@@ -285,6 +310,11 @@ const styles = StyleSheet.create({
   analyticsCopy: { flex: 1 },
   analyticsTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
   analyticsSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2, lineHeight: 16 },
+  statsRow: { flexDirection: "row", borderRadius: 14, borderWidth: 1, paddingVertical: 16, overflow: "hidden" },
+  statItem: { flex: 1, alignItems: "center" },
+  statValue: { fontSize: 22, fontFamily: "Inter_700Bold" },
+  statLabel: { fontSize: 11, fontFamily: "Inter_500Medium", marginTop: 3 },
+  statDivider: { width: 1, height: 36, alignSelf: "center" },
   logoutBtn: { height: 50, borderRadius: 12, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   logoutBtnDisabled: { opacity: 0.75 },
   logoutText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 15 },

@@ -63,6 +63,17 @@ export default function PatrolLogScreen() {
   const [showStartModal, setShowStartModal] = useState(false);
   const [showEndModal, setShowEndModal] = useState(false);
   const [showEncounterModal, setShowEncounterModal] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [summaryData, setSummaryData] = useState<{
+    route: string;
+    duration: string;
+    encounters: number;
+    vehicleChecks: number;
+    incidents: number;
+    checkpoints: number;
+    notes: number;
+    km?: number;
+  } | null>(null);
   const [selectedRoute, setSelectedRoute] = useState(ROUTE_OPTIONS[0]);
   const [endNotes, setEndNotes] = useState("");
   const [totalKm, setTotalKm] = useState("");
@@ -90,11 +101,26 @@ export default function PatrolLogScreen() {
   }
 
   async function handleEndDuty() {
+    if (activeSession) {
+      const km = totalKm ? parseFloat(totalKm) : undefined;
+      const enc = activeSession.encounters ?? [];
+      setSummaryData({
+        route: activeSession.route,
+        duration: formatDuration(activeSession.startTime),
+        encounters: enc.length,
+        vehicleChecks: enc.filter((e) => e.type === "vehicle_check").length,
+        incidents: enc.filter((e) => e.type === "incident").length,
+        checkpoints: enc.filter((e) => e.type === "checkpoint").length,
+        notes: enc.filter((e) => e.type === "note").length,
+        km,
+      });
+    }
     await endDuty(endNotes, totalKm ? parseFloat(totalKm) : undefined);
     setShowEndModal(false);
     setEndNotes("");
     setTotalKm("");
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowSummary(true);
   }
 
   async function handleAddEncounter() {
@@ -570,6 +596,87 @@ export default function PatrolLogScreen() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      {/* ── Shift Summary Modal ── */}
+      <Modal visible={showSummary} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.summarySheet, { backgroundColor: colors.card }]}>
+            <View style={[styles.summaryIcon, { backgroundColor: colors.success + "18" }]}>
+              <Feather name="check-circle" size={32} color={colors.success} />
+            </View>
+            <Text style={[styles.summaryTitle, { color: colors.text }]}>Duty Ended</Text>
+            {summaryData && (
+              <>
+                <Text style={[styles.summaryRoute, { color: colors.mutedForeground }]} numberOfLines={2}>
+                  {summaryData.route}
+                </Text>
+
+                <View style={[styles.summaryRow, { borderTopColor: colors.border, marginTop: 18 }]}>
+                  <View style={styles.summaryItem}>
+                    <Text style={[styles.summaryItemValue, { color: colors.text }]}>{summaryData.duration}</Text>
+                    <Text style={[styles.summaryItemLabel, { color: colors.mutedForeground }]}>Duration</Text>
+                  </View>
+                  <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+                  <View style={styles.summaryItem}>
+                    <Text style={[styles.summaryItemValue, { color: colors.text }]}>{summaryData.encounters}</Text>
+                    <Text style={[styles.summaryItemLabel, { color: colors.mutedForeground }]}>Entries</Text>
+                  </View>
+                  {summaryData.km != null && (
+                    <>
+                      <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+                      <View style={styles.summaryItem}>
+                        <Text style={[styles.summaryItemValue, { color: colors.text }]}>{summaryData.km} km</Text>
+                        <Text style={[styles.summaryItemLabel, { color: colors.mutedForeground }]}>Distance</Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+
+                {summaryData.encounters > 0 && (
+                  <View style={[styles.summaryBreakdown, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                    {summaryData.vehicleChecks > 0 && (
+                      <View style={styles.bRow}>
+                        <Feather name="truck" size={14} color="#2C7BE5" />
+                        <Text style={[styles.bLabel, { color: colors.mutedForeground }]}>Vehicle checks</Text>
+                        <Text style={[styles.bValue, { color: colors.text }]}>{summaryData.vehicleChecks}</Text>
+                      </View>
+                    )}
+                    {summaryData.incidents > 0 && (
+                      <View style={styles.bRow}>
+                        <Feather name="alert-triangle" size={14} color="#C0392B" />
+                        <Text style={[styles.bLabel, { color: colors.mutedForeground }]}>Incidents</Text>
+                        <Text style={[styles.bValue, { color: colors.text }]}>{summaryData.incidents}</Text>
+                      </View>
+                    )}
+                    {summaryData.checkpoints > 0 && (
+                      <View style={styles.bRow}>
+                        <Feather name="map-pin" size={14} color="#1B5E3B" />
+                        <Text style={[styles.bLabel, { color: colors.mutedForeground }]}>Checkpoints</Text>
+                        <Text style={[styles.bValue, { color: colors.text }]}>{summaryData.checkpoints}</Text>
+                      </View>
+                    )}
+                    {summaryData.notes > 0 && (
+                      <View style={styles.bRow}>
+                        <Feather name="file-text" size={14} color="#C8960C" />
+                        <Text style={[styles.bLabel, { color: colors.mutedForeground }]}>Notes</Text>
+                        <Text style={[styles.bValue, { color: colors.text }]}>{summaryData.notes}</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </>
+            )}
+
+            <TouchableOpacity
+              style={[styles.summaryCloseBtn, { backgroundColor: colors.primary }]}
+              onPress={() => setShowSummary(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.summaryCloseBtnText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -967,5 +1074,90 @@ const styles = StyleSheet.create({
   encounterTypeText: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
+  },
+  summarySheet: {
+    borderRadius: 24,
+    padding: 24,
+    marginHorizontal: 20,
+    alignItems: "center",
+    gap: 8,
+  },
+  summaryIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  summaryTitle: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+  },
+  summaryRoute: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    width: "100%",
+    borderTopWidth: 1,
+    paddingTop: 18,
+    gap: 0,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  summaryItemValue: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+  },
+  summaryItemLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    marginTop: 3,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 40,
+    alignSelf: "center",
+  },
+  summaryBreakdown: {
+    width: "100%",
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 4,
+    gap: 10,
+  },
+  bRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  bLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+  },
+  bValue: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+  },
+  summaryCloseBtn: {
+    width: "100%",
+    paddingVertical: 15,
+    borderRadius: 16,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  summaryCloseBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
   },
 });

@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -20,6 +20,8 @@ const SEVERITY_COLORS: Record<string, string> = {
   property_only: "#6B7A8A",
 };
 
+const SEVERITY_ORDER = ["fatal", "serious", "minor", "property_only"];
+
 type Filter = "all" | "fatal" | "serious" | "minor";
 
 const FILTERS: { label: string; value: Filter }[] = [
@@ -29,6 +31,15 @@ const FILTERS: { label: string; value: Filter }[] = [
   { label: "Minor", value: "minor" },
 ];
 
+interface StateStats {
+  state: string;
+  total: number;
+  fatal: number;
+  serious: number;
+  minor: number;
+  property_only: number;
+}
+
 export default function MapScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -36,6 +47,7 @@ export default function MapScreen() {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<Incident | null>(null);
+  const [showHeatmap, setShowHeatmap] = useState(true);
 
   const topPad = insets.top + 67;
   const bottomPad = insets.bottom + 34 + 90;
@@ -43,11 +55,35 @@ export default function MapScreen() {
   const filtered =
     filter === "all" ? incidents : incidents.filter((i) => i.severity === filter);
 
+  const stateStats = useMemo<StateStats[]>(() => {
+    const map: Record<string, StateStats> = {};
+    for (const inc of incidents) {
+      const s = inc.state || "Unknown";
+      if (!map[s]) map[s] = { state: s, total: 0, fatal: 0, serious: 0, minor: 0, property_only: 0 };
+      map[s].total++;
+      const sev = inc.severity as keyof StateStats;
+      if (typeof map[s][sev] === "number") (map[s][sev] as number)++;
+    }
+    return Object.values(map).sort((a, b) => b.total - a.total).slice(0, 8);
+  }, [incidents]);
+
+  const maxTotal = stateStats.length > 0 ? stateStats[0].total : 1;
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.primary, paddingTop: topPad }]}>
-        <Text style={styles.headerTitle}>Live Map</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.headerTitle}>Live Map</Text>
+          <TouchableOpacity
+            style={[styles.reportFabInline, { backgroundColor: "rgba(255,255,255,0.2)", borderColor: "rgba(255,255,255,0.35)" }]}
+            onPress={() => router.push("/report" as any)}
+            activeOpacity={0.8}
+          >
+            <Feather name="plus" size={14} color="#fff" />
+            <Text style={styles.reportFabInlineText}>Report</Text>
+          </TouchableOpacity>
+        </View>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -86,11 +122,85 @@ export default function MapScreen() {
         </Text>
       </View>
 
-      {/* Incident list */}
       <ScrollView
         contentContainerStyle={{ padding: 14, paddingBottom: bottomPad, gap: 10 }}
         showsVerticalScrollIndicator={false}
       >
+        {/* State Heatmap */}
+        {stateStats.length > 0 && (
+          <View style={[styles.heatmapCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity
+              style={styles.heatmapHeader}
+              onPress={() => setShowHeatmap((v) => !v)}
+              activeOpacity={0.75}
+            >
+              <View style={styles.heatmapHeaderLeft}>
+                <Feather name="thermometer" size={15} color={colors.primary} />
+                <Text style={[styles.heatmapTitle, { color: colors.text }]}>State Severity Breakdown</Text>
+              </View>
+              <Feather name={showHeatmap ? "chevron-up" : "chevron-down"} size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
+
+            {showHeatmap && (
+              <View style={styles.heatmapBody}>
+                {stateStats.map((ss) => {
+                  const barWidth = ss.total / maxTotal;
+                  return (
+                    <View key={ss.state} style={styles.heatmapRow}>
+                      <Text style={[styles.heatmapState, { color: colors.text }]} numberOfLines={1}>
+                        {ss.state}
+                      </Text>
+                      <View style={styles.heatmapBarWrap}>
+                        <View style={[styles.heatmapBarBg, { backgroundColor: colors.muted }]}>
+                          {SEVERITY_ORDER.map((sev) => {
+                            const count = ss[sev as keyof StateStats] as number;
+                            if (!count) return null;
+                            const segWidth = (count / ss.total) * barWidth;
+                            return (
+                              <View
+                                key={sev}
+                                style={[styles.heatmapBarSeg, { flex: count, backgroundColor: SEVERITY_COLORS[sev] }]}
+                              />
+                            );
+                          })}
+                        </View>
+                      </View>
+                      <View style={styles.heatmapCountWrap}>
+                        <Text style={[styles.heatmapCount, { color: colors.text }]}>{ss.total}</Text>
+                        {ss.fatal > 0 && (
+                          <View style={[styles.heatmapFatalDot, { backgroundColor: SEVERITY_COLORS.fatal }]}>
+                            <Text style={styles.heatmapFatalNum}>{ss.fatal}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })}
+
+                {/* Legend */}
+                <View style={[styles.heatmapLegend, { borderTopColor: colors.border }]}>
+                  {SEVERITY_ORDER.map((sev) => (
+                    <View key={sev} style={styles.heatmapLegendItem}>
+                      <View style={[styles.heatmapLegendDot, { backgroundColor: SEVERITY_COLORS[sev] }]} />
+                      <Text style={[styles.heatmapLegendText, { color: colors.mutedForeground }]}>
+                        {sev === "property_only" ? "Property" : sev.charAt(0).toUpperCase() + sev.slice(1)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Incident list header */}
+        <View style={styles.listHeaderRow}>
+          <Text style={[styles.listHeaderText, { color: colors.mutedForeground }]}>
+            {filtered.length} incident{filtered.length !== 1 ? "s" : ""}
+            {filter !== "all" ? ` · ${filter}` : ""}
+          </Text>
+        </View>
+
         {filtered.length === 0 && (
           <View style={styles.empty}>
             <Feather name="map" size={40} color={colors.border} />
@@ -126,7 +236,7 @@ export default function MapScreen() {
               <View style={styles.incMeta}>
                 <Feather name="map-pin" size={11} color={colors.mutedForeground} />
                 <Text style={[styles.incLocation, { color: colors.mutedForeground }]} numberOfLines={1}>
-                  {inc.location}
+                  {inc.lga ? `${inc.lga}, ` : ""}{inc.state || inc.location}
                 </Text>
               </View>
               <View style={styles.incBadges}>
@@ -144,10 +254,14 @@ export default function MapScreen() {
         ))}
       </ScrollView>
 
-      {/* Count pill */}
-      <View style={[styles.countPill, { backgroundColor: colors.primary }]}>
-        <Text style={styles.countText}>{filtered.length} incidents</Text>
-      </View>
+      {/* Report FAB */}
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: colors.primary }]}
+        onPress={() => router.push("/report" as any)}
+        activeOpacity={0.85}
+      >
+        <Feather name="plus" size={22} color="#fff" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -158,11 +272,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 12,
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
   headerTitle: {
     fontSize: 20,
     fontFamily: "Inter_700Bold",
     color: "#fff",
-    marginBottom: 10,
+  },
+  reportFabInline: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  reportFabInlineText: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: "#fff",
   },
   filtersRow: {
     gap: 8,
@@ -190,6 +323,108 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_500Medium",
     flex: 1,
+  },
+  heatmapCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  heatmapHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+  },
+  heatmapHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  heatmapTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+  },
+  heatmapBody: {
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+    gap: 8,
+  },
+  heatmapRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  heatmapState: {
+    width: 72,
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
+  heatmapBarWrap: {
+    flex: 1,
+  },
+  heatmapBarBg: {
+    height: 10,
+    borderRadius: 5,
+    overflow: "hidden",
+    flexDirection: "row",
+  },
+  heatmapBarSeg: {
+    height: "100%",
+  },
+  heatmapCountWrap: {
+    width: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    justifyContent: "flex-end",
+  },
+  heatmapCount: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+  },
+  heatmapFatalDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heatmapFatalNum: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    color: "#fff",
+  },
+  heatmapLegend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    paddingTop: 8,
+    marginTop: 2,
+    borderTopWidth: 1,
+  },
+  heatmapLegendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  heatmapLegendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  heatmapLegendText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+  },
+  listHeaderRow: {
+    paddingHorizontal: 2,
+    paddingBottom: 4,
+  },
+  listHeaderText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   incCard: {
     flexDirection: "row",
@@ -239,18 +474,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_400Regular",
   },
-  countPill: {
+  fab: {
     position: "absolute",
     right: 16,
     bottom: 110,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    opacity: 0.9,
-  },
-  countText: {
-    color: "#fff",
-    fontSize: 12,
-    fontFamily: "Inter_700Bold",
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0px 4px 14px rgba(0,0,0,0.25)",
   },
 });

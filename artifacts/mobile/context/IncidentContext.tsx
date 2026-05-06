@@ -262,16 +262,19 @@ const SEED_INCIDENTS: Incident[] = [
     evidence: [],
     reportedBy: "u1",
     reportedByName: "Okafor Emmanuel",
-    assignedTo: "u3",
-    assignedToName: "Bello Ibrahim",
-    timeline: [{ id: "t4", action: "Assigned to patrol team", by: "System", timestamp: new Date(Date.now() - 86400000 * 2 + 1200000).toISOString() }],
+    assignedTo: "u1",
+    assignedToName: "Okafor Emmanuel",
+    timeline: [
+      { id: "t4a", action: "Incident reported", by: "Okafor Emmanuel", timestamp: new Date(Date.now() - 86400000 * 2).toISOString() },
+      { id: "t4", action: "Assigned to Field Officer Okafor", by: "Adaeze Nwosu", timestamp: new Date(Date.now() - 86400000 * 2 + 1200000).toISOString() },
+    ],
     pendingSync: false,
   },
   {
     id: "INC-2024-004",
     type: "flooding",
     severity: "serious",
-    status: "under_review",
+    status: "assigned",
     title: "Flash flood on expressway",
     location: "Abuja–Kaduna Highway",
     lga: "Bwari",
@@ -286,7 +289,12 @@ const SEED_INCIDENTS: Incident[] = [
     evidence: [],
     reportedBy: "u4",
     reportedByName: "Amina Musa",
-    timeline: [{ id: "t5", action: "Sent for review", by: "System", timestamp: new Date(Date.now() - 86400000 * 4 + 2400000).toISOString() }],
+    assignedTo: "u1",
+    assignedToName: "Okafor Emmanuel",
+    timeline: [
+      { id: "t5a", action: "Incident reported", by: "Amina Musa", timestamp: new Date(Date.now() - 86400000 * 4).toISOString() },
+      { id: "t5", action: "Assigned to Field Officer Okafor", by: "Adaeze Nwosu", timestamp: new Date(Date.now() - 86400000 * 4 + 2400000).toISOString() },
+    ],
     pendingSync: false,
   },
   {
@@ -309,6 +317,63 @@ const SEED_INCIDENTS: Incident[] = [
     reportedBy: "u2",
     reportedByName: "Adaeze Nwosu",
     timeline: [{ id: "t6", action: "Incident reported", by: "Adaeze Nwosu", timestamp: new Date(Date.now() - 86400000 * 5).toISOString() }],
+    pendingSync: false,
+  },
+  {
+    id: "INC-TODAY-001",
+    type: "crash",
+    severity: "fatal",
+    status: "submitted",
+    title: "Head-on collision — Kaduna–Zaria Road",
+    location: "Km 23, Kaduna–Zaria Expressway",
+    lga: "Kaduna North",
+    state: "Kaduna",
+    latitude: 10.562,
+    longitude: 7.438,
+    dateTime: new Date(new Date().setHours(7, 30, 0, 0)).toISOString(),
+    description: "Two passenger vehicles collided head-on. Scene not yet cleared.",
+    probableCauses: [
+      { category: "driver", code: "SPD", label: "Speed violation" },
+      { category: "environment", code: "BRD", label: "Bad road" },
+    ],
+    vehicles: [
+      { id: "v5", plate: "KD-445-AX", make: "Toyota", model: "Corolla", colour: "Silver", type: "car" },
+      { id: "v6", plate: "KD-812-GH", make: "Honda", model: "Accord", colour: "Black", type: "car" },
+    ],
+    victims: [
+      { id: "vt5", name: "Musa Umar", age: "38", gender: "male", condition: "fatal" },
+      { id: "vt6", name: "Fatima Yusuf", age: "29", gender: "female", condition: "critical", hospital: "Barau Dikko Teaching Hospital" },
+    ],
+    evidence: [],
+    reportedBy: "u1",
+    reportedByName: "Okafor Emmanuel",
+    timeline: [
+      { id: "td1", action: "Incident reported", by: "Okafor Emmanuel", timestamp: new Date(new Date().setHours(7, 30, 0, 0)).toISOString() },
+    ],
+    pendingSync: false,
+  },
+  {
+    id: "INC-TODAY-002",
+    type: "hazard",
+    severity: "minor",
+    status: "submitted",
+    title: "Debris obstruction — Ring Road",
+    location: "Ring Road, near GTB roundabout",
+    lga: "Jos North",
+    state: "Plateau",
+    latitude: 9.917,
+    longitude: 8.896,
+    dateTime: new Date(new Date().setHours(10, 15, 0, 0)).toISOString(),
+    description: "Construction debris scattered across two lanes. Traffic slowing down.",
+    probableCauses: [{ category: "environment", code: "ROB", label: "Road obstruction" }],
+    vehicles: [],
+    victims: [],
+    evidence: [],
+    reportedBy: "u1",
+    reportedByName: "Okafor Emmanuel",
+    timeline: [
+      { id: "td2", action: "Incident reported", by: "Okafor Emmanuel", timestamp: new Date(new Date().setHours(10, 15, 0, 0)).toISOString() },
+    ],
     pendingSync: false,
   },
 ];
@@ -353,7 +418,19 @@ export function IncidentProvider({ children }: { children: React.ReactNode }) {
     try {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       const parsed = stored ? (JSON.parse(stored) as Incident[]) : [];
-      setIncidents(Array.isArray(parsed) && parsed.length > 0 ? parsed : SEED_INCIDENTS);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const storedIds = new Set(parsed.map((i) => i.id));
+        const newSeedIncs = SEED_INCIDENTS.filter((i) => !storedIds.has(i.id));
+        if (newSeedIncs.length > 0) {
+          const merged = [...newSeedIncs, ...parsed];
+          setIncidents(merged);
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+        } else {
+          setIncidents(parsed);
+        }
+      } else {
+        setIncidents(SEED_INCIDENTS);
+      }
     } catch {
       setIncidents(SEED_INCIDENTS);
     } finally {
