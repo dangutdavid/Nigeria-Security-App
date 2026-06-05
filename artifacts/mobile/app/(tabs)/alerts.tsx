@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -159,6 +160,7 @@ export default function AlertsScreen() {
   const router = useRouter();
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [readIds, setReadIds] = useState<string[]>([]);
+  const [unreadOnly, setUnreadOnly] = useState(false);
 
   useEffect(() => {
     AsyncStorage.multiGet([DISMISSED_KEY, READ_KEY]).then((results) => {
@@ -170,6 +172,7 @@ export default function AlertsScreen() {
   }, []);
 
   const dismiss = useCallback((id: string) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setDismissed((prev) => {
       const next = [...prev, id];
       void AsyncStorage.setItem(DISMISSED_KEY, JSON.stringify(next));
@@ -178,6 +181,7 @@ export default function AlertsScreen() {
   }, []);
 
   const dismissAll = useCallback((ids: string[]) => {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setDismissed((prev) => {
       const next = [...new Set([...prev, ...ids])];
       void AsyncStorage.setItem(DISMISSED_KEY, JSON.stringify(next));
@@ -186,6 +190,7 @@ export default function AlertsScreen() {
   }, []);
 
   const markAllRead = useCallback((ids: string[]) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setReadIds((prev) => {
       const next = [...new Set([...prev, ...ids])];
       void AsyncStorage.setItem(READ_KEY, JSON.stringify(next));
@@ -207,6 +212,10 @@ export default function AlertsScreen() {
   );
 
   const unreadCount = alerts.filter((a) => !a.read).length;
+  const visibleAlerts = useMemo(
+    () => unreadOnly ? alerts.filter((a) => !a.read) : alerts,
+    [alerts, unreadOnly]
+  );
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
@@ -224,7 +233,14 @@ export default function AlertsScreen() {
         ]}
       >
         <View style={styles.headerRow}>
-          <Text style={[styles.title, { color: colors.text }]}>Alerts</Text>
+          <View>
+            <Text style={[styles.title, { color: colors.text }]}>Alerts</Text>
+            {alerts.length > 0 && (
+              <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
+                {unreadCount > 0 ? `${unreadCount} unread` : "All read"} · {alerts.length} total
+              </Text>
+            )}
+          </View>
           {unreadCount > 0 && (
             <View style={[styles.badge, { backgroundColor: colors.fatal }]}>
               <Text style={styles.badgeText}>{unreadCount}</Text>
@@ -252,21 +268,50 @@ export default function AlertsScreen() {
             </TouchableOpacity>
           )}
         </View>
-        <Text style={[styles.sub, { color: colors.mutedForeground }]}>
-          {unreadCount > 0
-            ? `${unreadCount} unread · ${alerts.length} total`
-            : alerts.length > 0
-              ? `${alerts.length} notification${alerts.length > 1 ? "s" : ""} · all read`
-              : "No active notifications"}
-        </Text>
+        <View style={styles.subRow}>
+          <Text style={[styles.sub, { color: colors.mutedForeground, flex: 1 }]}>
+            {unreadCount > 0
+              ? `${unreadCount} unread · ${alerts.length} total`
+              : alerts.length > 0
+                ? `${alerts.length} notification${alerts.length > 1 ? "s" : ""} · all read`
+                : "No active notifications"}
+          </Text>
+          {unreadCount > 0 && (
+            <TouchableOpacity
+              onPress={() => setUnreadOnly((v) => !v)}
+              style={[styles.unreadToggle, { backgroundColor: unreadOnly ? colors.primary : colors.muted, borderColor: unreadOnly ? colors.primary : colors.border }]}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.unreadToggleText, { color: unreadOnly ? "#fff" : colors.mutedForeground }]}>
+                {unreadOnly ? "Unread only ✓" : "Unread only"}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
+      {alerts.length > 0 && (() => {
+        const typeCounts: Record<string, number> = {};
+        for (const a of alerts) typeCounts[a.type] = (typeCounts[a.type] ?? 0) + 1;
+        const typeEntries = Object.entries(typeCounts).sort((x, y) => y[1] - x[1]);
+        return (
+          <View style={[styles.typeSummaryRow, { backgroundColor: colors.muted, borderBottomColor: colors.border }]}>
+            {typeEntries.map(([type, count]) => (
+              <View key={type} style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: (ALERT_COLORS[type] ?? colors.primary) + "18" }}>
+                <Feather name={ALERT_ICONS[type] as any} size={11} color={ALERT_COLORS[type] ?? colors.primary} />
+                <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: ALERT_COLORS[type] ?? colors.primary }}>{count}</Text>
+              </View>
+            ))}
+          </View>
+        );
+      })()}
+
       <FlatList
-        data={alerts}
+        data={visibleAlerts}
         keyExtractor={(a) => a.id}
         contentContainerStyle={[styles.list, { paddingBottom: bottomPad }]}
         showsVerticalScrollIndicator={false}
-        scrollEnabled={!!alerts.length}
+        scrollEnabled={!!visibleAlerts.length}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Feather name="bell-off" size={40} color={colors.mutedForeground} />
@@ -289,8 +334,9 @@ export default function AlertsScreen() {
                   borderLeftColor: item.read ? colors.border : iconColor,
                 },
               ]}
-              activeOpacity={item.incidentId ? 0.7 : 1}
+              activeOpacity={0.8}
               onPress={() => {
+                if (!item.read) markAllRead([item.id]);
                 if (item.incidentId === "unassigned") {
                   router.push("/(tabs)/cases?status=submitted" as any);
                   return;
@@ -359,6 +405,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontFamily: "Inter_700Bold",
   },
+  headerSub: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: 2,
+  },
   badge: {
     width: 22,
     height: 22,
@@ -376,6 +427,10 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
+  subRow: { flexDirection: "row", alignItems: "center", marginTop: 3, gap: 8 },
+  unreadToggle: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  unreadToggleText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  typeSummaryRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1 },
   list: {
     padding: 14,
     gap: 8,

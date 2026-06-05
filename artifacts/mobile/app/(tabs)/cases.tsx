@@ -1,9 +1,11 @@
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Platform,
@@ -272,7 +274,7 @@ export default function CasesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { incidents } = useIncidents();
+  const { incidents, updateIncident } = useIncidents();
   const { user } = useAuth();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("all");
@@ -280,15 +282,19 @@ export default function CasesScreen() {
   const [query, setQuery] = useState("");
   const [mineOnly, setMineOnly] = useState(false);
   const [todayOnly, setTodayOnly] = useState(false);
+  const [draftOnly, setDraftOnly] = useState(false);
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
   const [selectedLGAs, setSelectedLGAs] = useState<string[]>([]);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "severity">("newest");
 
   React.useEffect(() => {
     const nextStatus = typeof params.status === "string" ? params.status : null;
     const nextSeverity = typeof params.severity === "string" ? params.severity : null;
-    if (nextStatus && ["all", "open", "submitted", "assigned", "under_review", "closed"].includes(nextStatus)) {
+    if (nextStatus === "draft") {
+      setDraftOnly(true);
+    } else if (nextStatus && ["all", "open", "submitted", "assigned", "under_review", "closed"].includes(nextStatus)) {
       setStatusFilter(nextStatus as StatusFilterValue);
     }
     if (nextSeverity && ["all", "fatal", "serious", "minor"].includes(nextSeverity)) {
@@ -296,7 +302,10 @@ export default function CasesScreen() {
     }
   }, [params.status, params.severity]);
 
+  const SEV_ORDER: Record<string, number> = { fatal: 0, serious: 1, minor: 2, property_only: 3 };
+
   const filtered = incidents.filter((incident) => {
+    if (draftOnly && incident.status !== "draft") return false;
     if (mineOnly && incident.reportedBy !== user?.id) return false;
     if (todayOnly) {
       const d = new Date(incident.dateTime);
@@ -323,6 +332,12 @@ export default function CasesScreen() {
     return true;
   });
 
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortBy === "newest") return new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime();
+    if (sortBy === "oldest") return new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime();
+    return (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9);
+  });
+
   const locationActive = selectedStates.length > 0 || selectedLGAs.length > 0;
   const bottomPad = insets.bottom + 24;
 
@@ -333,6 +348,7 @@ export default function CasesScreen() {
       open: incidents.filter((i) => i.status !== "closed").length,
       fatal: incidents.filter((i) => i.severity === "fatal").length,
       today: incidents.filter((i) => new Date(i.dateTime).toDateString() === todayStr).length,
+      closed: incidents.filter((i) => i.status === "closed").length,
     };
   }, [incidents]);
 
@@ -341,14 +357,56 @@ export default function CasesScreen() {
     (severityFilter === "all" ? 0 : 1) +
     (mineOnly ? 1 : 0) +
     (todayOnly ? 1 : 0) +
+    (draftOnly ? 1 : 0) +
     selectedStates.length +
     selectedLGAs.length;
+
+  const draftCount = useMemo(
+    () => incidents.filter((i) => i.status === "draft").length,
+    [incidents],
+  );
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await new Promise((resolve) => setTimeout(resolve, 500));
     setRefreshing(false);
   };
+
+  const myDraftIds = useMemo(
+    () => filtered.filter((i) => i.status === "draft" && i.reportedBy === user?.id).map((i) => i.id),
+    [filtered, user?.id],
+  );
+
+  async function submitAllDrafts() {
+    if (myDraftIds.length === 0) return;
+    Alert.alert(
+      "Submit all drafts?",
+      `This will submit ${myDraftIds.length} draft${myDraftIds.length > 1 ? "s" : ""} for review.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Submit all",
+          onPress: async () => {
+            const now = new Date().toISOString();
+            for (const id of myDraftIds) {
+              const inc = incidents.find((i) => i.id === id);
+              if (!inc) continue;
+              await updateIncident(id, {
+                status: "submitted",
+                pendingSync: true,
+                timeline: [
+                  ...inc.timeline,
+                  { id: `TL-${Date.now()}`, action: "Draft submitted", by: user?.name ?? "Unknown", timestamp: now },
+                ],
+              });
+            }
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            setDraftOnly(false);
+          },
+        },
+      ]
+    );
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -433,6 +491,26 @@ export default function CasesScreen() {
             <Text style={[styles.statChipLabel, { color: mineOnly ? "rgba(255,255,255,0.85)" : colors.mutedForeground }]}>Mine</Text>
           </TouchableOpacity>
         )}
+        {quickStats.closed > 0 && (
+          <TouchableOpacity
+            style={[styles.statChip, { backgroundColor: statusFilter === "closed" ? "#27AE60" : colors.card, borderColor: statusFilter === "closed" ? "#27AE60" : colors.border }]}
+            onPress={() => setStatusFilter(statusFilter === "closed" ? "all" : "closed")}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.statChipNum, { color: statusFilter === "closed" ? "#fff" : "#27AE60" }]}>{quickStats.closed}</Text>
+            <Text style={[styles.statChipLabel, { color: statusFilter === "closed" ? "rgba(255,255,255,0.85)" : colors.mutedForeground }]}>Closed</Text>
+          </TouchableOpacity>
+        )}
+        {draftCount > 0 && (
+          <TouchableOpacity
+            style={[styles.statChip, { backgroundColor: draftOnly ? colors.warning : colors.card, borderColor: draftOnly ? colors.warning : colors.border }]}
+            onPress={() => setDraftOnly(!draftOnly)}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.statChipNum, { color: draftOnly ? "#fff" : colors.warning }]}>{draftCount}</Text>
+            <Text style={[styles.statChipLabel, { color: draftOnly ? "rgba(255,255,255,0.85)" : colors.mutedForeground }]}>Drafts</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       <View style={[styles.headerActionRow, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
@@ -444,7 +522,7 @@ export default function CasesScreen() {
           {(activeFiltersCount > 0 || query.length > 0) && (
             <TouchableOpacity
               style={[styles.clearAllBtn, { borderColor: colors.border }]}
-              onPress={() => { setQuery(""); setStatusFilter("all"); setSeverityFilter("all"); setMineOnly(false); setTodayOnly(false); setSelectedStates([]); setSelectedLGAs([]); }}
+              onPress={() => { setQuery(""); setStatusFilter("all"); setSeverityFilter("all"); setMineOnly(false); setTodayOnly(false); setDraftOnly(false); setSelectedStates([]); setSelectedLGAs([]); }}
               activeOpacity={0.75}
             >
               <Feather name="x" size={14} color={colors.mutedForeground} />
@@ -463,9 +541,54 @@ export default function CasesScreen() {
             </TouchableOpacity>
           </View>
         )}
-        <Text style={[styles.filterMeta, { color: colors.mutedForeground }]}>
-          {filtered.length} of {incidents.length} cases shown
-        </Text>
+        <View style={styles.filterMetaRow}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Text style={[styles.filterMeta, { color: colors.mutedForeground }]}>
+              {filtered.length} of {incidents.length}
+              {filtered.reduce((s, i) => s + i.victims.length, 0) > 0 ? ` · ${filtered.reduce((s, i) => s + i.victims.length, 0)} victims` : ""}
+              {filtered.filter((i) => i.severity === "fatal" && i.status !== "closed").length > 0 ? ` · ` : ""}
+            </Text>
+            {filtered.filter((i) => i.severity === "fatal" && i.status !== "closed").length > 0 && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: colors.fatalLight, borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2 }}>
+                <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.fatal }} />
+                <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.fatal }}>
+                  {filtered.filter((i) => i.severity === "fatal" && i.status !== "closed").length} fatal open
+                </Text>
+              </View>
+            )}
+            {activeFiltersCount > 0 && (
+              <TouchableOpacity
+                onPress={() => {
+                  setStatusFilter("all");
+                  setSeverityFilter("all");
+                  setMineOnly(false);
+                  setTodayOnly(false);
+                  setDraftOnly(false);
+                  setSelectedStates([]);
+                  setSelectedLGAs([]);
+                }}
+                style={[styles.resetBtn, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "40" }]}
+              >
+                <Feather name="x" size={10} color={colors.primary} />
+                <Text style={[styles.resetBtnText, { color: colors.primary }]}>Reset ({activeFiltersCount})</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={styles.sortRow}>
+            {(["newest", "oldest", "severity"] as const).map((s) => (
+              <TouchableOpacity
+                key={s}
+                onPress={() => setSortBy(s)}
+                style={[styles.sortChip, { backgroundColor: sortBy === s ? colors.primary : colors.muted, borderColor: sortBy === s ? colors.primary : colors.border }]}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.sortChipText, { color: sortBy === s ? "#fff" : colors.mutedForeground }]}>
+                  {s === "newest" ? "Newest" : s === "oldest" ? "Oldest" : "Severity"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presetRow}>
           <TouchableOpacity style={[styles.presetChip, { backgroundColor: mineOnly ? colors.primary + "18" : colors.card, borderColor: colors.border }]} onPress={() => setMineOnly((v) => !v)}>
             <Text style={[styles.presetChipText, { color: colors.text }]}>{mineOnly ? "My cases ✓" : "My cases"}</Text>
@@ -479,18 +602,37 @@ export default function CasesScreen() {
           <TouchableOpacity style={[styles.presetChip, { backgroundColor: statusFilter === "open" ? colors.primary + "18" : colors.card, borderColor: colors.border }]} onPress={() => setStatusFilter((v) => (v === "open" ? "all" : "open"))}>
             <Text style={[styles.presetChipText, { color: colors.text }]}>Open</Text>
           </TouchableOpacity>
+          {draftCount > 0 && (
+            <TouchableOpacity style={[styles.presetChip, { backgroundColor: draftOnly ? colors.warning + "22" : colors.card, borderColor: draftOnly ? colors.warning : colors.border }]} onPress={() => setDraftOnly((v) => !v)}>
+              <Feather name="cloud-off" size={12} color={draftOnly ? colors.warning : colors.mutedForeground} />
+              <Text style={[styles.presetChipText, { color: draftOnly ? colors.warning : colors.text }]}>Drafts{draftCount > 0 ? ` (${draftCount})` : ""}</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </View>
       <FlatList
-        data={filtered}
+        data={sorted}
         keyExtractor={(i) => i.id}
-        contentContainerStyle={[styles.list, { paddingBottom: bottomPad }, filtered.length === 0 && styles.emptyList]}
+        contentContainerStyle={[styles.list, { paddingBottom: draftOnly && myDraftIds.length > 0 ? bottomPad + 64 : bottomPad }, sorted.length === 0 && styles.emptyList]}
         renderItem={({ item }) => <IncidentCard incident={item} />}
-        scrollEnabled={!!filtered.length}
+        scrollEnabled={!!sorted.length}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
         ListEmptyComponent={<View style={styles.emptyState}><Feather name="map-pin" size={40} color={colors.mutedForeground} /><Text style={[styles.emptyTitle, { color: colors.text }]}>No cases found</Text></View>}
       />
+
+      {draftOnly && myDraftIds.length > 0 && (
+        <TouchableOpacity
+          style={[styles.submitAllBanner, { backgroundColor: colors.warning, bottom: insets.bottom + (Platform.OS === "web" ? 34 : 90) }]}
+          onPress={submitAllDrafts}
+          activeOpacity={0.88}
+        >
+          <Feather name="send" size={16} color="#fff" />
+          <Text style={styles.submitAllText}>Submit {myDraftIds.length} draft{myDraftIds.length > 1 ? "s" : ""}</Text>
+          <Feather name="chevron-right" size={16} color="#fff" />
+        </TouchableOpacity>
+      )}
+
       <LocationFilterSheet
         visible={locationModalVisible}
         selectedStates={selectedStates}
@@ -584,6 +726,12 @@ const styles = StyleSheet.create({
   locationSummaryText: { flex: 1, minWidth: 0, fontSize: 12, fontFamily: "Inter_500Medium" },
   locationClearText: { fontSize: 12, fontFamily: "Inter_700Bold" },
   filterMeta: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  filterMetaRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 4 },
+  sortRow: { flexDirection: "row", gap: 5 },
+  sortChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 4 },
+  sortChipText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  resetBtn: { flexDirection: "row", alignItems: "center", gap: 3, borderWidth: 1, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 },
+  resetBtnText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   presetRow: { paddingHorizontal: 0, paddingTop: 2, paddingBottom: 2, gap: 8 },
   presetChip: {
     flexDirection: "row",
@@ -682,4 +830,17 @@ const styles = StyleSheet.create({
   statChip: { alignItems: "center", justifyContent: "center", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 14, borderWidth: 1, minWidth: 64 },
   statChipNum: { fontSize: 18, fontFamily: "Inter_700Bold", lineHeight: 20 },
   statChipLabel: { fontSize: 10, fontFamily: "Inter_500Medium", marginTop: 2 },
+  submitAllBanner: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 14,
+    borderRadius: 16,
+    boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+  },
+  submitAllText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold", flex: 1, textAlign: "center" },
 });

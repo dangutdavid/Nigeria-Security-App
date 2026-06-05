@@ -1072,7 +1072,7 @@ export default function CaseDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getIncident, updateIncident, deleteIncident } = useIncidents();
+  const { getIncident, updateIncident, deleteIncident, incidents } = useIncidents();
   const { user, allUsers } = useAuth();
 
   const [noteText, setNoteText] = useState("");
@@ -1269,6 +1269,16 @@ export default function CaseDetailScreen() {
           <View style={st.metaItem}>
             <Feather name="clock" size={12} color={colors.mutedForeground} />
             <Text style={[st.metaText, { color: colors.mutedForeground }]}>{formatDate(inc.dateTime)}</Text>
+            {(() => {
+              const ageD = Math.floor((Date.now() - new Date(inc.dateTime).getTime()) / 86400000);
+              if (ageD < 1) return null;
+              const aged = ageD >= 7;
+              return (
+                <View style={[{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 4 }, { backgroundColor: aged ? colors.fatalLight : colors.muted }]}>
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: aged ? colors.fatal : colors.mutedForeground }}>{ageD}d old</Text>
+                </View>
+              );
+            })()}
           </View>
         </View>
 
@@ -1292,6 +1302,35 @@ export default function CaseDetailScreen() {
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
 
+        {/* ── Navigate to Scene ── */}
+        {(inc.location || inc.state) && (
+          <TouchableOpacity
+            style={[st.navigateBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+            activeOpacity={0.82}
+            onPress={() => {
+              const q = [inc.location, inc.lga, inc.state].filter(Boolean).join(", ");
+              const encoded = encodeURIComponent(q);
+              const url = Platform.OS === "ios"
+                ? `maps://?q=${encoded}`
+                : `geo:0,0?q=${encoded}`;
+              Linking.openURL(url).catch(() =>
+                Linking.openURL(`https://www.google.com/maps/search/?q=${encoded}`)
+              );
+            }}
+          >
+            <View style={[st.navigateIcon, { backgroundColor: colors.primary + "14" }]}>
+              <Feather name="navigation" size={18} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[st.navigateTitle, { color: colors.text }]}>Navigate to scene</Text>
+              <Text style={[st.navigateSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                {[inc.location, inc.lga, inc.state].filter(Boolean).join(", ")}
+              </Text>
+            </View>
+            <Feather name="external-link" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        )}
+
         {/* ── Status Actions ── */}
         {canTakeAction && actions.length > 0 && (
           <View style={[st.card, { marginTop: 14, borderColor: colors.border, backgroundColor: colors.card }]}>
@@ -1308,6 +1347,21 @@ export default function CaseDetailScreen() {
                   <Text style={st.actionBtnText}>{a.label}</Text>
                 </TouchableOpacity>
               ))}
+              {(user?.role === "supervisor" || user?.role === "commander") && inc.status !== "closed" && inc.status !== "draft" && actions[0]?.next !== "closed" && (
+                <TouchableOpacity
+                  style={[st.actionBtn, { backgroundColor: colors.muted, borderWidth: 1, borderColor: colors.border }]}
+                  onPress={() => {
+                    Alert.alert("Quick Close", "Mark this case as closed without proceeding through intermediate steps?", [
+                      { text: "Cancel", style: "cancel" },
+                      { text: "Close Case", style: "destructive", onPress: () => advanceStatus("closed") },
+                    ]);
+                  }}
+                  activeOpacity={0.82}
+                >
+                  <Feather name="check-circle" size={17} color={colors.mutedForeground} />
+                  <Text style={[st.actionBtnText, { color: colors.mutedForeground }]}>Quick Close</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         )}
@@ -1354,21 +1408,42 @@ export default function CaseDetailScreen() {
           {inc.victims.length === 0 ? (
             <Text style={[st.emptyInline, { color: colors.mutedForeground }]}>No persons recorded</Text>
           ) : (
-            inc.victims.map((v) => (
-              <View key={v.id} style={[st.subRow, { borderBottomColor: colors.border }]}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                  <Text style={[st.victimName, { color: colors.text }]}>{v.name || "Unknown"}</Text>
-                  <View style={[st.conditionPill, { backgroundColor: (CONDITION_COLORS[v.condition] ?? "#888") + "20" }]}>
-                    <Text style={[st.conditionPillText, { color: CONDITION_COLORS[v.condition] ?? "#888" }]}>
-                      {v.condition}
-                    </Text>
+            <>
+              {(() => {
+                const CONDS = ["fatal", "critical", "serious", "stable", "minor", "unknown"] as const;
+                const COND_C: Record<string, string> = { fatal: "#8B0000", critical: "#C0392B", serious: "#E67E22", stable: "#1B5E3B", minor: "#27AE60", unknown: "#888" };
+                const present = CONDS.filter((c) => inc.victims.some((v) => v.condition === c));
+                if (present.length <= 1) return null;
+                return (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                    {present.map((c) => {
+                      const cnt = inc.victims.filter((v) => v.condition === c).length;
+                      return (
+                        <View key={c} style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, backgroundColor: (COND_C[c] ?? "#888") + "18" }}>
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: COND_C[c] ?? "#888" }} />
+                          <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: COND_C[c] ?? "#888" }}>{cnt} {c}</Text>
+                        </View>
+                      );
+                    })}
                   </View>
+                );
+              })()}
+              {inc.victims.map((v) => (
+                <View key={v.id} style={[st.subRow, { borderBottomColor: colors.border }]}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                    <Text style={[st.victimName, { color: colors.text }]}>{v.name || "Unknown"}</Text>
+                    <View style={[st.conditionPill, { backgroundColor: (CONDITION_COLORS[v.condition] ?? "#888") + "20" }]}>
+                      <Text style={[st.conditionPillText, { color: CONDITION_COLORS[v.condition] ?? "#888" }]}>
+                        {v.condition}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={[st.victimMeta, { color: colors.mutedForeground }]}>
+                    {[v.age ? `Age ${v.age}` : null, v.gender, v.hospital ? `Admitted: ${v.hospital}` : null].filter(Boolean).join("  ·  ")}
+                  </Text>
                 </View>
-                <Text style={[st.victimMeta, { color: colors.mutedForeground }]}>
-                  {[v.age ? `Age ${v.age}` : null, v.gender, v.hospital ? `Admitted: ${v.hospital}` : null].filter(Boolean).join("  ·  ")}
-                </Text>
-              </View>
-            ))
+              ))}
+            </>
           )}
           {canEdit && (
             <TouchableOpacity
@@ -1448,21 +1523,34 @@ export default function CaseDetailScreen() {
         )}
 
         {/* ── Timeline ── */}
-        <Section label="TIMELINE" colors={colors}>
-          {inc.timeline.map((entry, idx) => (
+        {(() => {
+          const noteCount = inc.timeline.filter((t) => t.action.startsWith("Note:")).length;
+          return (
+        <Section label={`TIMELINE${noteCount > 0 ? `  ·  ${noteCount} note${noteCount !== 1 ? "s" : ""}` : ""}${inc.timeline.length > 0 ? `  ·  last updated ${(() => { const diff = Date.now() - new Date(inc.timeline[inc.timeline.length - 1].timestamp).getTime(); const m = Math.floor(diff / 60000); return m < 60 ? `${m}m ago` : m < 1440 ? `${Math.floor(m / 60)}h ago` : `${Math.floor(m / 1440)}d ago`; })()}` : ""}`} colors={colors}>
+          {inc.timeline.map((entry, idx) => {
+            const isNote = entry.action.startsWith("Note:");
+            const dotColor = isNote ? colors.warning : colors.primary;
+            return (
             <View key={entry.id} style={st.timelineRow}>
               <View style={st.timelineLeft}>
-                <View style={[st.timelineDot, { backgroundColor: colors.primary }]} />
+                <View style={[st.timelineDot, { backgroundColor: dotColor }]} />
                 {idx < inc.timeline.length - 1 && (
                   <View style={[st.timelineLine, { backgroundColor: colors.border }]} />
                 )}
               </View>
-              <View style={st.timelineRight}>
-                <Text style={[st.timelineAction, { color: colors.text }]}>{entry.action}</Text>
+              <View style={[st.timelineRight, isNote && { backgroundColor: colors.warningLight, borderRadius: 8, padding: 8, marginBottom: 4 }]}>
+                {isNote && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginBottom: 2 }}>
+                    <Feather name="message-square" size={11} color={colors.warning} />
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.warning, textTransform: "uppercase", letterSpacing: 0.5 }}>Note</Text>
+                  </View>
+                )}
+                <Text style={[st.timelineAction, { color: colors.text }]}>{isNote ? entry.action.replace(/^Note:\s*/, "") : entry.action}</Text>
                 <Text style={[st.timelineMeta, { color: colors.mutedForeground }]}>{entry.by} · {formatDate(entry.timestamp)}</Text>
               </View>
             </View>
-          ))}
+            );
+          })}
 
           {!addingNote ? (
             <TouchableOpacity
@@ -1479,21 +1567,59 @@ export default function CaseDetailScreen() {
                 placeholder="Write a note…"
                 placeholderTextColor={colors.mutedForeground}
                 value={noteText}
-                onChangeText={setNoteText}
+                onChangeText={(t) => setNoteText(t.slice(0, 500))}
                 multiline
                 autoFocus
+                maxLength={500}
               />
               <View style={st.noteActions}>
+                <Text style={{ color: noteText.length >= 450 ? colors.fatal : colors.mutedForeground, fontFamily: "Inter_400Regular", fontSize: 11 }}>
+                  {noteText.length}/500
+                </Text>
+                <View style={{ flex: 1 }} />
                 <TouchableOpacity onPress={() => { setAddingNote(false); setNoteText(""); }}>
                   <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_500Medium", fontSize: 13 }}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[st.noteSubmit, { backgroundColor: colors.primary }]} onPress={addNote}>
-                  <Text style={st.noteSubmitText}>Add note</Text>
+                <TouchableOpacity style={[st.noteSubmit, { backgroundColor: noteText.trim() ? colors.primary : colors.muted }]} onPress={addNote} disabled={!noteText.trim()}>
+                  <Text style={[st.noteSubmitText, { color: noteText.trim() ? "#fff" : colors.mutedForeground }]}>Add note</Text>
                 </TouchableOpacity>
               </View>
             </View>
           )}
         </Section>
+          );
+        })()}
+
+        {/* Similar cases */}
+        {(() => {
+          const similar = incidents
+            .filter((i) => i.id !== inc.id && i.type === inc.type && i.state === inc.state && i.status !== "draft")
+            .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
+            .slice(0, 3);
+          if (similar.length === 0) return null;
+          return (
+            <Section label={`SIMILAR CASES  ·  ${inc.type} in ${inc.state}`} colors={colors}>
+              {similar.map((s) => (
+                <TouchableOpacity
+                  key={s.id}
+                  onPress={() => router.replace({ pathname: "/case/[id]", params: { id: s.id } } as any)}
+                  activeOpacity={0.75}
+                  style={[{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderBottomWidth: 1 }, { borderBottomColor: colors.border }]}
+                >
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: s.severity === "fatal" ? "#8B0000" : s.severity === "serious" ? "#E67E22" : "#27AE60" }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.text }} numberOfLines={1}>{s.title}</Text>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, marginTop: 1 }}>
+                      {s.lga ?? s.state} · {(() => { const d = Math.floor((Date.now() - new Date(s.dateTime).getTime()) / 86400000); return d === 0 ? "Today" : `${d}d ago`; })()}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground, textTransform: "capitalize" }}>{s.status.replace("_"," ")}</Text>
+                  <Feather name="chevron-right" size={14} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              ))}
+            </Section>
+          );
+        })()}
       </ScrollView>
 
       {/* ── Assign modal ── */}
@@ -1590,6 +1716,11 @@ const st = StyleSheet.create({
   section: { marginTop: 18, paddingHorizontal: 14 },
   cardLabel: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1.0, marginBottom: 8, textTransform: "uppercase" },
   card: { borderRadius: 16, borderWidth: 1, padding: 14 },
+
+  navigateBtn: { flexDirection: "row", alignItems: "center", gap: 12, marginHorizontal: 14, marginTop: 14, padding: 14, borderRadius: 16, borderWidth: 1 },
+  navigateIcon: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  navigateTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  navigateSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
 
   actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 15, borderRadius: 13 },
   actionBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },

@@ -82,11 +82,15 @@ export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
-  const { isOnDuty, activeSession } = usePatrol();
+  const { isOnDuty, activeSession, sessions } = usePatrol();
   const { incidents } = useIncidents();
-  const myReported = incidents.filter((i) => i.reportedBy === user?.id).length;
+  const myReportedIncs = incidents.filter((i) => i.reportedBy === user?.id);
+  const myReported = myReportedIncs.length;
+  const myVictims = myReportedIncs.reduce((s, i) => s + i.victims.length, 0);
   const myAssigned = incidents.filter((i) => i.assignedTo === user?.id && i.status !== "closed").length;
   const myClosed = incidents.filter((i) => i.reportedBy === user?.id && i.status === "closed").length;
+  const myDrafts = incidents.filter((i) => i.reportedBy === user?.id && i.status === "draft").length;
+  const myPatrolSessions = sessions.filter((s) => s.officerId === user?.id).length;
   const canManageUsers = user?.role === "supervisor" || user?.role === "commander";
   const canAssignCases = canManageUsers;
   const canUseCommandTools = user?.role === "supervisor" || user?.role === "commander";
@@ -134,9 +138,21 @@ export default function ProfileScreen() {
           </View>
         </View>
         <Text style={styles.userName}>{user.name}</Text>
+        <Text style={styles.userBadge}>{user.badgeNumber}</Text>
         <View style={[styles.roleChip, { backgroundColor: "rgba(255,255,255,0.15)" }]}> 
           <Text style={styles.roleText}>{ROLE_LABEL[user.role]}</Text>
         </View>
+        {(user.station || user.sector) && (
+          <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "Inter_400Regular", marginTop: 4 }}>
+            {[user.station, user.sector].filter(Boolean).join(" · ")}
+          </Text>
+        )}
+        {isOnDuty && (
+          <View style={[styles.onDutyPill, { backgroundColor: "rgba(255,255,255,0.18)" }]}>
+            <View style={styles.onDutyDot} />
+            <Text style={styles.onDutyText}>On Duty</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -156,8 +172,71 @@ export default function ProfileScreen() {
             <Text style={[styles.statValue, { color: myClosed > 0 ? colors.success : colors.text }]}>{myClosed}</Text>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Closed</Text>
           </View>
+          {myDrafts > 0 && (
+            <>
+              <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: colors.warning }]}>{myDrafts}</Text>
+                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Drafts</Text>
+              </View>
+            </>
+          )}
+          {myVictims > 0 && (
+            <>
+              <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: colors.fatal }]}>{myVictims}</Text>
+                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Victims</Text>
+              </View>
+            </>
+          )}
+          {myPatrolSessions > 0 && (
+            <>
+              <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: colors.success }]}>{myPatrolSessions}</Text>
+                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Patrols</Text>
+              </View>
+            </>
+          )}
         </View>
+        {myReported > 0 && (() => {
+          const weekAgo = Date.now() - 7 * 86400000;
+          const thisWeek = myReportedIncs.filter((i) => new Date(i.dateTime).getTime() >= weekAgo).length;
+          const lastWeek = myReportedIncs.filter((i) => {
+            const t = new Date(i.dateTime).getTime();
+            return t >= weekAgo - 7 * 86400000 && t < weekAgo;
+          }).length;
+          const diff = thisWeek - lastWeek;
+          return (
+            <Text style={[styles.closureRate, { color: colors.mutedForeground }]}>
+              {Math.round((myClosed / myReported) * 100)}% closure rate · {myReported} total
+              {(thisWeek > 0 || lastWeek > 0) && ` · This week: ${thisWeek}${diff !== 0 ? ` (${diff > 0 ? "+" : ""}${diff} vs last)` : ""}`}
+            </Text>
+          );
+        })()}
       </View>
+
+      {myReported > 0 && (
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={[styles.myCasesBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => router.push({ pathname: "/(tabs)/cases", params: { mine: "1" } } as any)}
+            activeOpacity={0.85}
+          >
+            <View style={[styles.myCasesIcon, { backgroundColor: colors.primary + "14" }]}>
+              <Feather name="folder" size={16} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.myCasesLabel, { color: colors.text }]}>My Cases</Text>
+              <Text style={[styles.myCasesSub, { color: colors.mutedForeground }]}>
+                {myReported} reported · {myAssigned} assigned · {myClosed} closed
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>APPEARANCE</Text>
@@ -206,6 +285,7 @@ export default function ProfileScreen() {
           <SettingRow icon="briefcase" label="Role" value={ROLE_LABEL[user.role]} />
           <SettingRow icon="mail" label="Email" value={user.email || "—"} />
           <SettingRow icon="map-pin" label="Station" value={user.station} />
+          {user.sector ? <SettingRow icon="layers" label="Sector" value={user.sector} /> : null}
           <SettingRow icon="phone" label="Phone" value={user.phone} />
         </View>
       </View>
@@ -236,9 +316,7 @@ export default function ProfileScreen() {
           {canManageUsers ? (
             <SettingRow icon="users" label="Manage Users" subtitle="Create and assign officers" onPress={() => router.push("/users")} />
           ) : null}
-          {canUseCommandTools ? (
-            <SettingRow icon="key" label="Change PIN" subtitle="Update your login PIN" onPress={() => router.push("/change-pin")} />
-          ) : null}
+          <SettingRow icon="key" label="Change PIN" subtitle="Update your login PIN" onPress={() => router.push("/change-pin")} />
           <SettingRow icon="help-circle" label="Forgot PIN" subtitle="Recover access with OTP" onPress={() => router.push("/forgot-pin")} />
           {canUseCommandTools ? (
             <SettingRow
@@ -281,6 +359,11 @@ export default function ProfileScreen() {
           <Text style={styles.logoutText}>{loggingOut ? "Logging out..." : "Logout"}</Text>
         </TouchableOpacity>
       </View>
+
+      <View style={styles.appFooter}>
+        <Text style={[styles.appFooterText, { color: colors.mutedForeground }]}>FRSC Field Operations · v1.0.0</Text>
+        <Text style={[styles.appFooterText, { color: colors.mutedForeground }]}>Offline-first · Expo SDK 53</Text>
+      </View>
     </ScrollView>
   );
 }
@@ -292,8 +375,12 @@ const styles = StyleSheet.create({
   avatar: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center" },
   avatarText: { color: "#fff", fontSize: 26, fontFamily: "Inter_700Bold" },
   userName: { color: "#fff", fontSize: 20, fontFamily: "Inter_700Bold" },
+  userBadge: { color: "rgba(255,255,255,0.72)", fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 2 },
   roleChip: { marginTop: 8, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   roleText: { color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  onDutyPill: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
+  onDutyDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#4ADE80" },
+  onDutyText: { color: "#fff", fontSize: 11, fontFamily: "Inter_600SemiBold" },
   section: { paddingHorizontal: 16, marginTop: 18 },
   sectionLabel: { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8, marginBottom: 10 },
   sectionCard: { borderRadius: 14, borderWidth: 1, overflow: "hidden" },
@@ -318,4 +405,11 @@ const styles = StyleSheet.create({
   logoutBtn: { height: 50, borderRadius: 12, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 },
   logoutBtnDisabled: { opacity: 0.75 },
   logoutText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 15 },
+  closureRate: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 8 },
+  myCasesBtn: { flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderRadius: 14, padding: 14 },
+  myCasesIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  myCasesLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  myCasesSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  appFooter: { alignItems: "center", paddingVertical: 20, gap: 3 },
+  appFooterText: { fontSize: 11, fontFamily: "Inter_400Regular" },
 });

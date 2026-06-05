@@ -107,6 +107,24 @@ export function IncidentCard({ incident }: IncidentCardProps) {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
+  async function submitDraft() {
+    await updateIncident(incident.id, {
+      status: "submitted",
+      pendingSync: true,
+      timeline: [
+        ...incident.timeline,
+        {
+          id: `TL-${Date.now()}`,
+          action: "Draft submitted",
+          by: user?.name ?? "Unknown",
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    });
+    closeSheet();
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
   async function shareIncident() {
     const text = [
       `FRSC INCIDENT REPORT`,
@@ -128,15 +146,32 @@ export function IncidentCard({ incident }: IncidentCardProps) {
   const iconBg = getIconBg(incident.severity, colors);
   const iconColor = getIconColor(incident.severity, colors);
 
+  const isDraft = incident.status === "draft";
+
   return (
     <>
       <TouchableOpacity
-        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.card,
+            borderColor: isDraft ? colors.warning + "60" : colors.border,
+            borderLeftWidth: isDraft ? 3 : 1,
+            borderLeftColor: isDraft ? colors.warning : colors.border,
+          },
+        ]}
         onPress={() => router.push(`/case/${incident.id}` as any)}
         onLongPress={handleLongPress}
         delayLongPress={400}
         activeOpacity={0.7}
       >
+        {isDraft && (
+          <View style={[styles.draftBanner, { backgroundColor: colors.warning + "14" }]}>
+            <Feather name="cloud-off" size={11} color={colors.warning} />
+            <Text style={[styles.draftBannerText, { color: colors.warning }]}>UNSENT DRAFT</Text>
+          </View>
+        )}
+        <View style={styles.cardContent}>
         <View style={styles.header}>
           <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
             <Feather
@@ -207,6 +242,7 @@ export function IncidentCard({ incident }: IncidentCardProps) {
             )}
             <Text style={[styles.time, { color: colors.mutedForeground }]}>{timeAgo}</Text>
           </View>
+        </View>
         </View>
       </TouchableOpacity>
 
@@ -331,7 +367,15 @@ export function IncidentCard({ incident }: IncidentCardProps) {
                     onPress={() => setStatusMode(true)}
                   />
                 )}
-                <ActionRow
+                {isDraft && user?.id === incident.reportedBy && (
+                  <ActionRow
+                    icon="send"
+                    label="Submit Draft"
+                    color={colors.warning}
+                    onPress={submitDraft}
+                  />
+                )}
+              <ActionRow
                   icon="share-2"
                   label="Share Report"
                   color={colors.mutedForeground}
@@ -405,8 +449,23 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
     borderWidth: 1,
-    padding: 14,
+    overflow: "hidden",
     marginBottom: 10,
+  },
+  draftBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  draftBannerText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.6,
+  },
+  cardContent: {
+    padding: 14,
   },
   header: {
     flexDirection: "row",

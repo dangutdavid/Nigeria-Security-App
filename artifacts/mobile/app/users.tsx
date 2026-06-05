@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth, UserRole, UserStatus } from "@/context/AuthContext";
+import { useIncidents } from "@/context/IncidentContext";
 import { useColors } from "@/hooks/useColors";
 
 const ROLE_LABEL: Record<UserRole, string> = {
@@ -51,6 +52,7 @@ export default function UsersScreen() {
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
+  const [sortBy, setSortBy] = useState<"role" | "reports" | "name">("role");
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 20);
@@ -58,6 +60,15 @@ export default function UsersScreen() {
   const isCommander = user?.role === "commander";
   const isSupervisor = user?.role === "supervisor";
   const canManage = isCommander || isSupervisor;
+  const { incidents } = useIncidents();
+
+  const incidentCountByUser = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const inc of incidents) {
+      if (inc.reportedBy) map[inc.reportedBy] = (map[inc.reportedBy] ?? 0) + 1;
+    }
+    return map;
+  }, [incidents]);
 
   const filtered = useMemo(() => {
     let list = [...allUsers];
@@ -72,11 +83,17 @@ export default function UsersScreen() {
           u.sector.toLowerCase().includes(q)
       );
     }
-    return list.sort((a, b) => {
-      const order: UserRole[] = ["commander", "supervisor", "field_officer"];
-      return order.indexOf(a.role) - order.indexOf(b.role);
-    });
-  }, [allUsers, roleFilter, search]);
+    if (sortBy === "reports") {
+      return list.sort((a, b) => (incidentCountByUser[b.id] ?? 0) - (incidentCountByUser[a.id] ?? 0));
+    } else if (sortBy === "name") {
+      return list.sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+      return list.sort((a, b) => {
+        const order: UserRole[] = ["commander", "supervisor", "field_officer"];
+        return order.indexOf(a.role) - order.indexOf(b.role);
+      });
+    }
+  }, [allUsers, roleFilter, search, sortBy, incidentCountByUser]);
 
   const stats = useMemo(() => {
     const active = allUsers.filter((u) => u.status === "active").length;
@@ -123,6 +140,7 @@ export default function UsersScreen() {
           <StatChip label="Active" value={stats.active} color="#6EE39B" />
           <StatChip label="Inactive" value={stats.inactive} color="#FFC97A" />
           <StatChip label="Officers" value={stats.officers} />
+          <StatChip label="Reports" value={incidents.length} color="#A78BFA" />
         </View>
       </View>
 
@@ -173,6 +191,24 @@ export default function UsersScreen() {
         })}
       </View>
 
+      {/* Sort chips */}
+      <View style={[styles.sortRow, { borderBottomColor: colors.border }]}>
+        <Text style={[styles.sortLabel, { color: colors.mutedForeground }]}>Sort:</Text>
+        {(["role", "reports", "name"] as const).map((key) => {
+          const label = key === "role" ? "By Role" : key === "reports" ? "By Reports" : "By Name";
+          const active = sortBy === key;
+          return (
+            <Pressable
+              key={key}
+              onPress={() => setSortBy(key)}
+              style={[styles.sortChip, { backgroundColor: active ? colors.primary + "15" : "transparent", borderColor: active ? colors.primary : colors.border }]}
+            >
+              <Text style={[styles.sortChipText, { color: active ? colors.primary : colors.mutedForeground }]}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       {/* List */}
       <FlatList
         data={filtered}
@@ -217,12 +253,6 @@ export default function UsersScreen() {
                 >
                   {item.name}
                 </Text>
-                <View
-                  style={[
-                    styles.statusDot,
-                    { backgroundColor: STATUS_COLOR[item.status] },
-                  ]}
-                />
               </View>
               <Text style={[styles.cardBadge, { color: ROLE_COLOR[item.role] }]}>
                 {item.badgeNumber} · {ROLE_LABEL[item.role]}
@@ -231,8 +261,24 @@ export default function UsersScreen() {
                 style={[styles.cardStation, { color: colors.mutedForeground }]}
                 numberOfLines={1}
               >
-                {item.station}
+                {item.station}{item.sector ? ` · ${item.sector}` : ""}
               </Text>
+              <View style={styles.cardBottomRow}>
+                <View style={[styles.statusChip, { backgroundColor: STATUS_COLOR[item.status] + "18" }]}>
+                  <View style={[styles.statusDot, { backgroundColor: STATUS_COLOR[item.status] }]} />
+                  <Text style={[styles.statusChipText, { color: STATUS_COLOR[item.status] }]}>
+                    {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                  </Text>
+                </View>
+                {(incidentCountByUser[item.id] ?? 0) > 0 && (
+                  <View style={[styles.incidentBadge, { backgroundColor: colors.primary + "18" }]}>
+                    <Feather name="alert-triangle" size={10} color={colors.primary} />
+                    <Text style={[styles.incidentBadgeText, { color: colors.primary }]}>
+                      {incidentCountByUser[item.id]} report{incidentCountByUser[item.id] !== 1 ? "s" : ""}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
 
             {/* Right: chevron */}
@@ -338,6 +384,29 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 8,
   },
+  sortRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 8,
+    borderBottomWidth: 1,
+  },
+  sortLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    marginRight: 2,
+  },
+  sortChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 99,
+    borderWidth: 1,
+  },
+  sortChipText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
   chip: {
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -394,6 +463,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_400Regular",
   },
+  statusChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    marginTop: 3,
+  },
+  statusChipText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  cardBottomRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, marginTop: 3 },
+  incidentBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20 },
+  incidentBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   empty: {
     alignItems: "center",
     paddingTop: 60,

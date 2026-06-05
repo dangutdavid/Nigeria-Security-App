@@ -29,6 +29,8 @@ export default function ChangePinScreen() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const confirmRef = React.useRef<import("react-native").TextInput>(null);
+  const newPinRef = React.useRef<import("react-native").TextInput>(null);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
@@ -106,16 +108,47 @@ export default function ChangePinScreen() {
             <PinField
               label="New PIN"
               value={newPin}
-              onChange={setNewPin}
+              inputRef={newPinRef}
+              onChange={(v) => {
+                setNewPin(v);
+                if (v.length >= 4) confirmRef.current?.focus();
+              }}
               show={showNew}
               onToggleShow={() => setShowNew((v) => !v)}
               colors={colors}
             />
+            {newPin.length > 0 && (() => {
+              const isRepeating = /^(.)\1+$/.test(newPin);
+              const isSequential = newPin === "1234" || newPin === "4321" || newPin === "0000" || newPin === "1111";
+              const strength = newPin.length < 4 ? "weak" : newPin.length === 4 && (isRepeating || isSequential) ? "fair" : newPin.length >= 6 ? "strong" : "ok";
+              const colors_map: Record<string, string> = { weak: "#C0392B", fair: "#E67E22", ok: "#C8960C", strong: "#27AE60" };
+              const label_map: Record<string, string> = { weak: "Weak", fair: "Fair", ok: "Good", strong: "Strong" };
+              const width_map: Record<string, string> = { weak: "25%", fair: "50%", ok: "75%", strong: "100%" };
+              return (
+                <View style={[styles.divider, { backgroundColor: "transparent" }]}>
+                  <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>PIN strength</Text>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors_map[strength] }}>{label_map[strength]}</Text>
+                    </View>
+                    <View style={{ height: 4, borderRadius: 2, backgroundColor: colors.muted }}>
+                      <View style={{ height: 4, borderRadius: 2, backgroundColor: colors_map[strength], width: width_map[strength] as any }} />
+                    </View>
+                  </View>
+                </View>
+              );
+            })()}
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <PinField
               label="Confirm New PIN"
               value={confirmPin}
-              onChange={setConfirmPin}
+              inputRef={confirmRef}
+              onChange={(v) => {
+                setConfirmPin(v);
+                if (v.length >= 4 && v.length === newPin.length && v === newPin && currentPin.length >= 4) {
+                  handleChange();
+                }
+              }}
               show={showConfirm}
               onToggleShow={() => setShowConfirm((v) => !v)}
               colors={colors}
@@ -183,6 +216,7 @@ function PinField({
   show,
   onToggleShow,
   colors,
+  inputRef,
 }: {
   label: string;
   value: string;
@@ -190,12 +224,14 @@ function PinField({
   show: boolean;
   onToggleShow: () => void;
   colors: ReturnType<typeof import("@/hooks/useColors").useColors>;
+  inputRef?: React.RefObject<import("react-native").TextInput | null>;
 }) {
   return (
     <View style={styles.fieldRow}>
       <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{label}</Text>
       <View style={styles.fieldInput}>
         <TextInput
+          ref={inputRef}
           style={[styles.input, { color: colors.text }]}
           value={value}
           onChangeText={(v) => onChange(v.replace(/[^0-9]/g, ""))}

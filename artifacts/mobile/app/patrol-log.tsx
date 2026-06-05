@@ -9,6 +9,7 @@ import {
   Modal,
   Platform,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -123,6 +124,34 @@ export default function PatrolLogScreen() {
     setShowSummary(true);
   }
 
+  async function handleShareSession(session: (typeof sessions)[number]) {
+    const enc = session.encounters;
+    const lines = [
+      `FRSC PATROL LOG — ${session.officerName} (${session.officerBadge})`,
+      `Route: ${session.route}`,
+      `Date: ${new Date(session.startTime).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`,
+      `Time: ${formatTime(session.startTime)} – ${session.endTime ? formatTime(session.endTime) : "ongoing"}`,
+      `Duration: ${formatDuration(session.startTime, session.endTime)}`,
+      session.totalKm ? `Distance: ${session.totalKm} km` : null,
+      ``,
+      `SUMMARY`,
+      `Total entries: ${enc.length}`,
+      `Vehicle checks: ${enc.filter((e) => e.type === "vehicle_check").length}`,
+      `Incidents: ${enc.filter((e) => e.type === "incident").length}`,
+      `Checkpoints: ${enc.filter((e) => e.type === "checkpoint").length}`,
+      `Notes: ${enc.filter((e) => e.type === "note").length}`,
+      session.notes ? `\nSession notes: ${session.notes}` : null,
+      ``,
+      `PATROL ENTRIES`,
+      ...enc.map((e, i) => `${i + 1}. [${formatTime(e.timestamp)}] ${e.type.replace("_", " ").toUpperCase()}: ${e.description}${e.plate ? ` (${e.plate})` : ""}`),
+    ].filter((l) => l !== null).join("\n");
+    try {
+      await Share.share({ message: lines, title: "Patrol Log" });
+    } catch {
+      // dismissed
+    }
+  }
+
   async function handleAddEncounter() {
     if (!encounterDesc.trim()) {
       Alert.alert("Required", "Please enter a description.");
@@ -202,7 +231,7 @@ export default function PatrolLogScreen() {
             <>
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={styles.sessionHeader}>
-                  <View>
+                  <View style={{ flex: 1 }}>
                     <Text style={[styles.sessionRoute, { color: colors.text }]}>
                       {activeSession.route}
                     </Text>
@@ -214,6 +243,26 @@ export default function PatrolLogScreen() {
                     {activeSession.encounters.length} entries
                   </Text>
                 </View>
+                {/* Mini stats row */}
+                {activeSession.encounters.length > 0 && (
+                  <View style={[styles.miniStatsRow, { borderTopColor: colors.border }]}>
+                    {[
+                      { type: "vehicle_check", icon: "truck", color: "#2C7BE5", label: "Checks" },
+                      { type: "incident", icon: "alert-triangle", color: "#C0392B", label: "Incidents" },
+                      { type: "checkpoint", icon: "map-pin", color: "#1B5E3B", label: "Checkpts" },
+                      { type: "note", icon: "file-text", color: "#C8960C", label: "Notes" },
+                    ].map(({ type, icon, color, label }) => {
+                      const count = activeSession.encounters.filter((e) => e.type === type).length;
+                      return (
+                        <View key={type} style={styles.miniStatItem}>
+                          <Feather name={icon as any} size={14} color={count > 0 ? color : colors.border} />
+                          <Text style={[styles.miniStatNum, { color: count > 0 ? colors.text : colors.border }]}>{count}</Text>
+                          <Text style={[styles.miniStatLabel, { color: colors.mutedForeground }]}>{label}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
 
                 {/* Action buttons */}
                 <View style={styles.actionRow}>
@@ -313,6 +362,30 @@ export default function PatrolLogScreen() {
         </ScrollView>
       )}
 
+      {tab === "history" && sessions.length > 0 && (() => {
+        const totalEnc = sessions.reduce((sum, s) => sum + s.encounters.length, 0);
+        const totalKmAll = sessions.reduce((sum, s) => sum + (s.totalKm ?? 0), 0);
+        const totalVehicle = sessions.reduce((sum, s) => sum + s.encounters.filter((e) => e.type === "vehicle_check").length, 0);
+        return (
+          <View style={[styles.historyLifetimeRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {[
+              { label: "Sessions", value: sessions.length.toString() },
+              { label: "Encounters", value: totalEnc.toString() },
+              { label: "Checks", value: totalVehicle.toString() },
+              ...(totalKmAll > 0 ? [{ label: "Total km", value: totalKmAll.toFixed(1) }] : []),
+            ].map((item, i, arr) => (
+              <React.Fragment key={item.label}>
+                <View style={styles.historyLifetimeStat}>
+                  <Text style={[styles.historyLifetimeVal, { color: colors.primary }]}>{item.value}</Text>
+                  <Text style={[styles.historyLifetimeLabel, { color: colors.mutedForeground }]}>{item.label}</Text>
+                </View>
+                {i < arr.length - 1 && <View style={[styles.historyLifetimeDivider, { backgroundColor: colors.border }]} />}
+              </React.Fragment>
+            ))}
+          </View>
+        );
+      })()}
+
       {tab === "history" && (
         <FlatList
           data={sessions}
@@ -351,14 +424,14 @@ export default function PatrolLogScreen() {
                     {item.encounters.length} entries
                   </Text>
                 </View>
-                {item.totalKm && (
+                {item.totalKm ? (
                   <View style={[styles.historyStatChip, { backgroundColor: colors.muted }]}>
                     <Feather name="navigation" size={12} color={colors.mutedForeground} />
                     <Text style={[styles.historyStatText, { color: colors.mutedForeground }]}>
                       {item.totalKm} km
                     </Text>
                   </View>
-                )}
+                ) : null}
                 <View style={[styles.historyStatChip, { backgroundColor: colors.muted }]}>
                   <Feather name="user" size={12} color={colors.mutedForeground} />
                   <Text style={[styles.historyStatText, { color: colors.mutedForeground }]}>
@@ -366,6 +439,37 @@ export default function PatrolLogScreen() {
                   </Text>
                 </View>
               </View>
+              {item.encounters.length > 0 && (
+                <View style={[styles.historyTypeRow, { borderTopColor: colors.border }]}>
+                  {[
+                    { type: "vehicle_check", icon: "truck" as const, color: "#2C7BE5", label: "Checks" },
+                    { type: "incident", icon: "alert-triangle" as const, color: "#C0392B", label: "Incidents" },
+                    { type: "checkpoint", icon: "map-pin" as const, color: "#1B5E3B", label: "Checkpts" },
+                    { type: "note", icon: "file-text" as const, color: "#C8960C", label: "Notes" },
+                  ].map(({ type, icon, color, label }) => {
+                    const cnt = item.encounters.filter((e) => e.type === type).length;
+                    if (cnt === 0) return null;
+                    return (
+                      <View key={type} style={styles.historyTypeChip}>
+                        <Feather name={icon} size={11} color={color} />
+                        <Text style={[styles.historyTypeText, { color }]}>{cnt} {label}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+              {(() => {
+                const incidentEncs = item.encounters.filter((e) => e.type === "incident");
+                if (incidentEncs.length === 0) return null;
+                return (
+                  <View style={{ paddingHorizontal: 12, paddingVertical: 6, flexDirection: "row", alignItems: "center", gap: 6, borderTopWidth: 1, borderTopColor: "#C0392B20", backgroundColor: "#C0392B08" }}>
+                    <Feather name="alert-triangle" size={12} color="#C0392B" />
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#C0392B" }}>
+                      {incidentEncs.length} incident{incidentEncs.length > 1 ? "s" : ""} logged during this session
+                    </Text>
+                  </View>
+                );
+              })()}
               {item.notes ? (
                 <Text style={[styles.historyNotes, { color: colors.mutedForeground, borderTopColor: colors.border }]}>
                   {item.notes}
@@ -462,12 +566,21 @@ export default function PatrolLogScreen() {
                       {selectedSession.notes}
                     </Text>
                   ) : null}
-                  <TouchableOpacity
-                    style={[styles.modalConfirmBtn, { backgroundColor: colors.primary, marginTop: 12 }]}
-                    onPress={() => setSelectedSession(null)}
-                  >
-                    <Text style={styles.modalConfirmText}>Close</Text>
-                  </TouchableOpacity>
+                  <View style={[styles.modalActions, { marginTop: 12 }]}>
+                    <TouchableOpacity
+                      style={[styles.modalCancelBtn, { borderColor: colors.border, flexDirection: "row", alignItems: "center", gap: 6 }]}
+                      onPress={() => handleShareSession(selectedSession)}
+                    >
+                      <Feather name="share-2" size={14} color={colors.mutedForeground} />
+                      <Text style={[styles.modalCancelText, { color: colors.mutedForeground }]}>Share</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalConfirmBtn, { backgroundColor: colors.primary }]}
+                      onPress={() => setSelectedSession(null)}
+                    >
+                      <Text style={styles.modalConfirmText}>Close</Text>
+                    </TouchableOpacity>
+                  </View>
                 </>
               ) : null}
             </View>
@@ -958,6 +1071,14 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     marginTop: 6,
   },
+  historyTypeRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingTop: 8, marginTop: 4, borderTopWidth: 1 },
+  historyTypeChip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, backgroundColor: "rgba(0,0,0,0.04)" },
+  historyTypeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  historyLifetimeRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-around", marginHorizontal: 14, marginTop: 8, borderWidth: 1, borderRadius: 12, padding: 12 },
+  historyLifetimeStat: { alignItems: "center", flex: 1 },
+  historyLifetimeVal: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  historyLifetimeLabel: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  historyLifetimeDivider: { width: 1, height: 30 },
   historyNotes: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
@@ -1159,5 +1280,25 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontFamily: "Inter_700Bold",
+  },
+  miniStatsRow: {
+    flexDirection: "row",
+    borderTopWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  miniStatItem: {
+    flex: 1,
+    alignItems: "center",
+    gap: 3,
+  },
+  miniStatNum: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+  },
+  miniStatLabel: {
+    fontSize: 9,
+    fontFamily: "Inter_500Medium",
+    letterSpacing: 0.3,
   },
 });

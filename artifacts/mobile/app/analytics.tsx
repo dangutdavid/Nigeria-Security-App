@@ -243,6 +243,86 @@ export default function AnalyticsScreen() {
     property_only: "#6B7A8A",
   };
 
+  // Peak hour of day
+  const peakHour = useMemo(() => {
+    const hourCounts: number[] = Array(24).fill(0);
+    for (const inc of incidents) {
+      const h = new Date(inc.dateTime).getHours();
+      hourCounts[h]++;
+    }
+    const maxCount = Math.max(...hourCounts);
+    if (maxCount === 0) return null;
+    const hour = hourCounts.indexOf(maxCount);
+    const label = hour === 0 ? "12am" : hour < 12 ? `${hour}am` : hour === 12 ? "12pm" : `${hour - 12}pm`;
+    return { hour, label, count: maxCount };
+  }, [incidents]);
+
+  // Most common incident type
+  const topType = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const inc of incidents) counts[inc.type] = (counts[inc.type] || 0) + 1;
+    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    if (entries.length === 0) return null;
+    const [type, count] = entries[0];
+    const label = type.charAt(0).toUpperCase() + type.slice(1);
+    const pct = incidents.length > 0 ? Math.round((count / incidents.length) * 100) : 0;
+    return { type, label, count, pct };
+  }, [incidents]);
+
+  // Busiest day of week
+  const peakDay = useMemo(() => {
+    const dayCounts = [0, 0, 0, 0, 0, 0, 0];
+    for (const inc of incidents) dayCounts[new Date(inc.dateTime).getDay()]++;
+    const maxCount = Math.max(...dayCounts);
+    if (maxCount === 0) return null;
+    const dayIdx = dayCounts.indexOf(maxCount);
+    const labels = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    return { label: labels[dayIdx], count: maxCount };
+  }, [incidents]);
+
+  // Most active officer (by report count)
+  const topOfficer = useMemo(() => {
+    const counts: Record<string, { name: string; count: number }> = {};
+    for (const inc of incidents) {
+      if (!inc.reportedBy || !inc.reportedByName) continue;
+      if (!counts[inc.reportedBy]) counts[inc.reportedBy] = { name: inc.reportedByName, count: 0 };
+      counts[inc.reportedBy].count++;
+    }
+    const entries = Object.values(counts).sort((a, b) => b.count - a.count);
+    return entries.length > 0 ? entries[0] : null;
+  }, [incidents]);
+
+  // Week-over-week comparison
+  const weekComparison = useMemo(() => {
+    const now = Date.now();
+    const thisWeekStart = now - 7 * 86400000;
+    const lastWeekStart = now - 14 * 86400000;
+    const thisWeek = incidents.filter((i) => new Date(i.dateTime).getTime() >= thisWeekStart).length;
+    const lastWeek = incidents.filter((i) => {
+      const t = new Date(i.dateTime).getTime();
+      return t >= lastWeekStart && t < thisWeekStart;
+    }).length;
+    const diff = thisWeek - lastWeek;
+    const pct = lastWeek > 0 ? Math.abs(Math.round((diff / lastWeek) * 100)) : null;
+    return { thisWeek, lastWeek, diff, pct };
+  }, [incidents]);
+
+  // Average resolution time (submitted → closed)
+  const avgResolutionHours = useMemo(() => {
+    const closed = incidents.filter((i) => i.status === "closed" && i.timeline.length > 1);
+    if (closed.length === 0) return null;
+    let total = 0;
+    for (const inc of closed) {
+      const submitted = inc.timeline.find((t) => t.action.includes("submitted") || t.action.includes("Incident reported"));
+      const closedEntry = [...inc.timeline].reverse().find((t) => t.action.toLowerCase().includes("closed"));
+      if (submitted && closedEntry) {
+        const diff = new Date(closedEntry.timestamp).getTime() - new Date(submitted.timestamp).getTime();
+        total += diff / 3600000;
+      }
+    }
+    return Math.round(total / closed.length);
+  }, [incidents]);
+
   const totalCasualties = filteredIncidents.reduce((sum, i) => sum + i.victims.length, 0);
   const fatalVictims = incidents.reduce(
     (sum, i) => sum + i.victims.filter((v) => v.condition === "fatal").length,
@@ -403,15 +483,17 @@ export default function AnalyticsScreen() {
 
         {/* By type */}
         <Section title="BY INCIDENT TYPE" colors={colors}>
-          {Object.entries(stats.byType).map(([type, count]) => (
-            <HorizontalBar
-              key={type}
-              label={type}
-              value={count}
-              max={maxType}
-              color={typeColors[type] || colors.mutedForeground}
-            />
-          ))}
+          {Object.entries(stats.byType).map(([type, count]) => {
+            const pct = filteredIncidents.length > 0 ? Math.round((count / filteredIncidents.length) * 100) : 0;
+            return (
+              <View key={type} style={{ marginBottom: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                  <HorizontalBar label={type} value={count} max={maxType} color={typeColors[type] || colors.mutedForeground} />
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, marginLeft: 4, width: 32, textAlign: "right" }}>{pct}%</Text>
+                </View>
+              </View>
+            );
+          })}
         </Section>
 
         {/* By severity */}
@@ -470,6 +552,22 @@ export default function AnalyticsScreen() {
             );
           })}
         </Section>
+
+        {/* Monthly breakdown */}
+        {Object.keys(stats.byMonth).length > 1 && (
+          <Section title="MONTHLY ACTIVITY" colors={colors}>
+            {(() => {
+              const MONTH_ORDER = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+              const entries = Object.entries(stats.byMonth).sort(
+                (a, b) => MONTH_ORDER.indexOf(a[0]) - MONTH_ORDER.indexOf(b[0])
+              );
+              const maxMonthly = Math.max(...entries.map(([, v]) => v), 1);
+              return entries.map(([month, count]) => (
+                <HorizontalBar key={month} label={month} value={count} max={maxMonthly} color={colors.primary} />
+              ));
+            })()}
+          </Section>
+        )}
 
         {/* By LGA */}
           {Object.keys(stats.byLGA).length > 0 && (
@@ -555,6 +653,14 @@ export default function AnalyticsScreen() {
             iconColor={colors.success}
             text={`${stats.byStatus["closed"] || 0} of ${incidents.length} cases closed (${incidents.length > 0 ? Math.round(((stats.byStatus["closed"] || 0) / incidents.length) * 100) : 0}% closure rate)`}
           />
+          {avgResolutionHours !== null && (
+            <InsightRow
+              colors={colors}
+              icon="watch"
+              iconColor={colors.info}
+              text={`Average resolution time: ${avgResolutionHours < 24 ? `${avgResolutionHours}h` : `${Math.round(avgResolutionHours / 24)}d`} from report to close`}
+            />
+          )}
           <InsightRow
             colors={colors}
             icon="alert-triangle"
@@ -567,6 +673,78 @@ export default function AnalyticsScreen() {
             iconColor={colors.warning}
             text={`${stats.byStatus["submitted"] || 0} reports awaiting assignment`}
           />
+          <InsightRow
+            colors={colors}
+            icon={weekComparison.diff > 0 ? "trending-up" : weekComparison.diff < 0 ? "trending-down" : "minus"}
+            iconColor={weekComparison.diff > 0 ? colors.fatal : weekComparison.diff < 0 ? colors.success : colors.mutedForeground}
+            text={
+              weekComparison.diff === 0
+                ? `This week: ${weekComparison.thisWeek} incidents — same as last week`
+                : weekComparison.pct !== null
+                ? `This week: ${weekComparison.thisWeek} incidents (${weekComparison.diff > 0 ? "+" : ""}${weekComparison.pct}% vs last week's ${weekComparison.lastWeek})`
+                : `This week: ${weekComparison.thisWeek} incidents vs last week: ${weekComparison.lastWeek}`
+            }
+          />
+          {peakHour !== null && (
+            <InsightRow
+              colors={colors}
+              icon="sun"
+              iconColor={colors.warning}
+              text={`Peak incident hour: ${peakHour.label} (${peakHour.count} incident${peakHour.count !== 1 ? "s" : ""} recorded at that hour)`}
+            />
+          )}
+          {topType !== null && (
+            <InsightRow
+              colors={colors}
+              icon="pie-chart"
+              iconColor={typeColors[topType.type] ?? colors.primary}
+              text={`Most common type: ${topType.label} — ${topType.pct}% of all incidents (${topType.count} cases)`}
+            />
+          )}
+          {filteredIncidents.length > 0 && (() => {
+            const crashCount = stats.byType["crash"] || 0;
+            const crashPct = Math.round((crashCount / filteredIncidents.length) * 100);
+            return (
+              <InsightRow
+                colors={colors}
+                icon="alert-triangle"
+                iconColor="#C0392B"
+                text={`Crash incidents: ${crashCount} (${crashPct}% of all reports) — leading incident category`}
+              />
+            );
+          })()}
+          {peakHour && (
+            <InsightRow
+              colors={colors}
+              icon="sun"
+              iconColor={colors.warning}
+              text={`Peak reporting hour: ${peakHour.label} (${peakHour.count} incident${peakHour.count !== 1 ? "s" : ""} — highest single-hour volume)`}
+            />
+          )}
+          {topType && (
+            <InsightRow
+              colors={colors}
+              icon="pie-chart"
+              iconColor={colors.primary}
+              text={`Most common type: ${topType.label} (${topType.count} incidents, ${topType.pct}% of all cases)`}
+            />
+          )}
+          {topOfficer && (
+            <InsightRow
+              colors={colors}
+              icon="award"
+              iconColor="#9B59B6"
+              text={`Most active officer: ${topOfficer.name} (${topOfficer.count} report${topOfficer.count !== 1 ? "s" : ""} filed)`}
+            />
+          )}
+          {peakDay && (
+            <InsightRow
+              colors={colors}
+              icon="calendar"
+              iconColor="#16A085"
+              text={`Busiest day: ${peakDay.label} (${peakDay.count} incident${peakDay.count !== 1 ? "s" : ""} — most reports on this day of the week)`}
+            />
+          )}
         </Section>
 
         {/* Officer activity */}

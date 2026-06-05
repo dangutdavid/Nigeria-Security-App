@@ -23,12 +23,21 @@ const SEVERITY_COLORS: Record<string, string> = {
 const SEVERITY_ORDER = ["fatal", "serious", "minor", "property_only"];
 
 type Filter = "all" | "fatal" | "serious" | "minor";
+type TypeFilter = "all" | "crash" | "breakdown" | "hazard" | "flooding";
 
 const FILTERS: { label: string; value: Filter }[] = [
   { label: "All", value: "all" },
   { label: "Fatal", value: "fatal" },
   { label: "Serious", value: "serious" },
   { label: "Minor", value: "minor" },
+];
+
+const TYPE_FILTERS: { label: string; value: TypeFilter; icon: string }[] = [
+  { label: "All Types", value: "all", icon: "layers" },
+  { label: "Crash", value: "crash", icon: "alert-triangle" },
+  { label: "Breakdown", value: "breakdown", icon: "tool" },
+  { label: "Hazard", value: "hazard", icon: "alert-circle" },
+  { label: "Flooding", value: "flooding", icon: "droplet" },
 ];
 
 interface StateStats {
@@ -46,14 +55,34 @@ export default function MapScreen() {
   const { incidents } = useIncidents();
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [selected, setSelected] = useState<Incident | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(true);
 
   const topPad = insets.top + 67;
   const bottomPad = insets.bottom + 34 + 90;
 
-  const filtered =
-    filter === "all" ? incidents : incidents.filter((i) => i.severity === filter);
+  const filterCounts = useMemo(() => {
+    const counts: Record<Filter, number> = { all: incidents.length, fatal: 0, serious: 0, minor: 0 };
+    for (const inc of incidents) {
+      if (inc.severity === "fatal") counts.fatal++;
+      else if (inc.severity === "serious") counts.serious++;
+      else if (inc.severity === "minor") counts.minor++;
+    }
+    return counts;
+  }, [incidents]);
+
+  const typeFilterCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: incidents.length };
+    for (const inc of incidents) counts[inc.type] = (counts[inc.type] ?? 0) + 1;
+    return counts;
+  }, [incidents]);
+
+  const filtered = incidents.filter((i) => {
+    if (filter !== "all" && i.severity !== filter) return false;
+    if (typeFilter !== "all" && i.type !== typeFilter) return false;
+    return true;
+  });
 
   const stateStats = useMemo<StateStats[]>(() => {
     const map: Record<string, StateStats> = {};
@@ -74,7 +103,12 @@ export default function MapScreen() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.primary, paddingTop: topPad }]}>
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>Live Map</Text>
+          <View>
+            <Text style={styles.headerTitle}>Live Map</Text>
+            <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", fontFamily: "Inter_400Regular", marginTop: 1 }}>
+              {filtered.length} incident{filtered.length !== 1 ? "s" : ""} · {stateStats.length} state{stateStats.length !== 1 ? "s" : ""}
+            </Text>
+          </View>
           <TouchableOpacity
             style={[styles.reportFabInline, { backgroundColor: "rgba(255,255,255,0.2)", borderColor: "rgba(255,255,255,0.35)" }]}
             onPress={() => router.push("/report" as any)}
@@ -109,6 +143,44 @@ export default function MapScreen() {
               >
                 {f.label}
               </Text>
+              {filterCounts[f.value] > 0 && (
+                <View style={[styles.chipCount, { backgroundColor: filter === f.value ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.15)" }]}>
+                  <Text style={[styles.chipCountText, { color: filter === f.value ? "#fff" : "rgba(255,255,255,0.85)" }]}>
+                    {filterCounts[f.value]}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[styles.filtersRow, { paddingTop: 4 }]}
+        >
+          {TYPE_FILTERS.map((f) => (
+            <TouchableOpacity
+              key={f.value}
+              style={[
+                styles.chip,
+                {
+                  backgroundColor: typeFilter === f.value ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.08)",
+                  borderColor: typeFilter === f.value ? "#fff" : "rgba(255,255,255,0.15)",
+                },
+              ]}
+              onPress={() => setTypeFilter(f.value)}
+            >
+              <Feather name={f.icon as any} size={11} color={typeFilter === f.value ? "#fff" : "rgba(255,255,255,0.65)"} />
+              <Text style={[styles.chipText, { color: typeFilter === f.value ? "#fff" : "rgba(255,255,255,0.7)" }]}>
+                {f.label}
+              </Text>
+              {(typeFilterCounts[f.value] ?? 0) > 0 && f.value !== "all" && (
+                <View style={[styles.chipCount, { backgroundColor: typeFilter === f.value ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.15)" }]}>
+                  <Text style={[styles.chipCountText, { color: typeFilter === f.value ? "#fff" : "rgba(255,255,255,0.85)" }]}>
+                    {typeFilterCounts[f.value]}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -198,7 +270,17 @@ export default function MapScreen() {
           <Text style={[styles.listHeaderText, { color: colors.mutedForeground }]}>
             {filtered.length} incident{filtered.length !== 1 ? "s" : ""}
             {filter !== "all" ? ` · ${filter}` : ""}
+            {typeFilter !== "all" ? ` · ${typeFilter}` : ""}
           </Text>
+          {(filter !== "all" || typeFilter !== "all") && (
+            <TouchableOpacity
+              onPress={() => { setFilter("all"); setTypeFilter("all"); }}
+              style={[styles.clearFiltersBtn, { borderColor: colors.border }]}
+            >
+              <Feather name="x" size={11} color={colors.mutedForeground} />
+              <Text style={[styles.clearFiltersBtnText, { color: colors.mutedForeground }]}>Clear</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {filtered.length === 0 && (
@@ -306,6 +388,20 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  chipCount: {
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    minWidth: 18,
+    alignItems: "center",
+  },
+  chipCountText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
   },
   chipText: {
     fontSize: 12,
@@ -417,9 +513,14 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
   },
   listHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 2,
     paddingBottom: 4,
   },
+  clearFiltersBtn: { flexDirection: "row", alignItems: "center", gap: 3, borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  clearFiltersBtnText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   listHeaderText: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",

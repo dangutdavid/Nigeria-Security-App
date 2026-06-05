@@ -120,10 +120,17 @@ function FieldInput({ colors, label, value, onChangeText, placeholder, multiline
   );
 }
 
-function StepPill({ label, active, colors }: { label: string; active: boolean; colors: any }) {
+function StepPill({ label, active, done, colors }: { label: string; active: boolean; done?: boolean; colors: any }) {
   return (
-    <View style={[s.stepPill, { backgroundColor: active ? colors.primary : colors.muted, borderColor: active ? colors.primary : colors.border }]}>
-      <Text style={[s.stepPillText, { color: active ? "#fff" : colors.mutedForeground }]}>{label}</Text>
+    <View style={[
+      s.stepPill,
+      {
+        backgroundColor: active ? colors.primary : done ? colors.success + "18" : colors.muted,
+        borderColor: active ? colors.primary : done ? colors.success : colors.border,
+      },
+    ]}>
+      {done && !active && <Feather name="check" size={11} color={colors.success} />}
+      <Text style={[s.stepPillText, { color: active ? "#fff" : done ? colors.success : colors.mutedForeground }]}>{label}</Text>
     </View>
   );
 }
@@ -189,6 +196,12 @@ export default function ReportScreen() {
   const filteredLgas = useMemo(() => selectedLgas.filter((l) => !lgaSearch || l.toLowerCase().includes(lgaSearch.toLowerCase())), [selectedLgas, lgaSearch]);
   const allowedSeverities = form.type ? TYPE_SEVERITY_MAP[form.type] : [];
   const probableCauseGroups = groupProbableCauses(form.type);
+  const stepDone: Record<number, boolean> = {
+    1: !!(form.type && form.severity),
+    2: !!(form.state && form.location),
+    3: true,
+    4: false,
+  };
 
   useEffect(() => {
     Animated.timing(progressAnim, {
@@ -303,6 +316,12 @@ export default function ReportScreen() {
   }
 
   function nextStep() {
+    if (!canContinue()) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (step === 1) Alert.alert("Required", "Please select an incident type and severity before continuing.");
+      else if (step === 2) Alert.alert("Required", "Please enter a location, LGA, and state before continuing.");
+      return;
+    }
     if (step < TOTAL_STEPS) setStep((s) => (s + 1) as Step);
   }
 
@@ -414,7 +433,15 @@ export default function ReportScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 16 }}>
-          {STEP_LABELS.map((label) => <StepPill key={`${label}`} label={label} active={step === STEP_LABELS.indexOf(label) + 1} colors={colors} />)}
+          {STEP_LABELS.map((label, idx) => (
+            <StepPill
+              key={label}
+              label={label}
+              active={step === idx + 1}
+              done={step > idx + 1 || (step !== idx + 1 && !!stepDone[idx + 1])}
+              colors={colors}
+            />
+          ))}
         </ScrollView>
 
         {step === 1 && (
@@ -460,6 +487,14 @@ export default function ReportScreen() {
               <Feather name="navigation" size={14} color="#fff" />
               <Text style={s.gpsBtnText}>Use My Location</Text>
             </TouchableOpacity>
+            {form.latitude !== undefined && form.latitude !== null && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.successLight, borderWidth: 1, borderColor: colors.success + "40" }}>
+                <Feather name="check-circle" size={12} color={colors.success} />
+                <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.success }}>
+                  GPS obtained{form.gpsAccuracy !== null && form.gpsAccuracy !== undefined ? ` · ±${Math.round(form.gpsAccuracy)}m accuracy` : ""}
+                </Text>
+              </View>
+            )}
 
             <View>
               <Text style={[s.fieldLabel, { color: colors.mutedForeground }]}>State</Text>
@@ -540,7 +575,7 @@ export default function ReportScreen() {
 
             <View style={[s.block, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={s.sectionHeaderRow}>
-                <Text style={[s.blockTitle, { color: colors.text }]}>Victims / persons ({form.victims.length})</Text>
+                <Text style={[s.blockTitle, { color: colors.text }]}>Victims / persons{form.victims.length > 0 ? ` (${form.victims.length})` : ""}</Text>
                 <TouchableOpacity onPress={addVictim}>
                   <Text style={[s.linkText, { color: colors.primary }]}>Add person</Text>
                 </TouchableOpacity>
@@ -592,7 +627,15 @@ export default function ReportScreen() {
 
         {step === 4 && (
           <View style={{ gap: 16 }}>
-            <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>EVIDENCE</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <Text style={[s.sectionTitle, { color: colors.mutedForeground }]}>EVIDENCE</Text>
+              {form.evidence.length > 0 && (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.primary + "14", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                  <Feather name="image" size={11} color={colors.primary} />
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.primary }}>{form.evidence.length} photo{form.evidence.length !== 1 ? "s" : ""}</Text>
+                </View>
+              )}
+            </View>
             <View style={s.evidenceRow}>
               <TouchableOpacity style={[s.addBtn, { backgroundColor: colors.primary }]} onPress={() => pickPhoto(true)}>
                 <Feather name="camera" size={14} color="#fff" />
@@ -614,6 +657,45 @@ export default function ReportScreen() {
               ))}
             </ScrollView>
             <FieldInput colors={colors} label="Notes" value={form.notes} onChangeText={(notes: string) => update({ notes })} placeholder="Additional remarks…" multiline rows={4} />
+
+            {/* Pre-submission summary */}
+            <View style={[s.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[s.sectionTitle, { color: colors.mutedForeground, marginBottom: 10 }]}>REPORT SUMMARY</Text>
+              <View style={s.summaryRow}>
+                <Feather name="alert-triangle" size={14} color={colors.mutedForeground} />
+                <Text style={[s.summaryLabel, { color: colors.mutedForeground }]}>Type</Text>
+                <Text style={[s.summaryValue, { color: colors.text }]}>{form.type ? INCIDENT_TYPES.find((t) => t.value === form.type)?.label : "—"}</Text>
+              </View>
+              <View style={s.summaryRow}>
+                <Feather name="zap" size={14} color={colors.mutedForeground} />
+                <Text style={[s.summaryLabel, { color: colors.mutedForeground }]}>Severity</Text>
+                <Text style={[s.summaryValue, { color: form.severity ? SEVERITY_LEVELS.find((sv) => sv.value === form.severity)?.color || colors.text : colors.mutedForeground }]}>
+                  {form.severity ? SEVERITY_LEVELS.find((sv) => sv.value === form.severity)?.label : "—"}
+                </Text>
+              </View>
+              <View style={s.summaryRow}>
+                <Feather name="map-pin" size={14} color={colors.mutedForeground} />
+                <Text style={[s.summaryLabel, { color: colors.mutedForeground }]}>Location</Text>
+                <Text style={[s.summaryValue, { color: colors.text }]} numberOfLines={1}>
+                  {[form.location, form.lga, form.state].filter(Boolean).join(", ") || "—"}
+                </Text>
+              </View>
+              <View style={s.summaryRow}>
+                <Feather name="truck" size={14} color={colors.mutedForeground} />
+                <Text style={[s.summaryLabel, { color: colors.mutedForeground }]}>Vehicles</Text>
+                <Text style={[s.summaryValue, { color: colors.text }]}>{form.vehicles.length}</Text>
+              </View>
+              <View style={s.summaryRow}>
+                <Feather name="users" size={14} color={colors.mutedForeground} />
+                <Text style={[s.summaryLabel, { color: colors.mutedForeground }]}>Persons</Text>
+                <Text style={[s.summaryValue, { color: colors.text }]}>{form.victims.length}</Text>
+              </View>
+              <View style={[s.summaryRow, { borderBottomWidth: 0 }]}>
+                <Feather name="camera" size={14} color={colors.mutedForeground} />
+                <Text style={[s.summaryLabel, { color: colors.mutedForeground }]}>Evidence</Text>
+                <Text style={[s.summaryValue, { color: colors.text }]}>{form.evidence.length} photo{form.evidence.length !== 1 ? "s" : ""}</Text>
+              </View>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -695,6 +777,10 @@ const s = StyleSheet.create({
   reviewCard: { borderWidth: 1, borderRadius: 14, padding: 14, gap: 8 },
   reviewTitle: { fontSize: 16, fontFamily: "Inter_700Bold" },
   reviewLine: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  summaryCard: { borderWidth: 1, borderRadius: 14, padding: 14 },
+  summaryRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)" },
+  summaryLabel: { fontSize: 12, fontFamily: "Inter_500Medium", width: 60 },
+  summaryValue: { flex: 1, fontSize: 13, fontFamily: "Inter_600SemiBold", textAlign: "right" },
   footer: { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1 },
   navBtn: { flex: 1, height: 48, borderWidth: 1, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   navBtnPrimary: { flexDirection: "row", gap: 6 },

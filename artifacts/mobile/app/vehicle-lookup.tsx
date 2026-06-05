@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -14,9 +14,13 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { lookupVehicle, VehicleRecord, VehicleStatus } from "@/data/vehicleDb";
 import { useColors } from "@/hooks/useColors";
 import { usePatrol } from "@/context/PatrolContext";
+import { useIncidents } from "@/context/IncidentContext";
+
+const RECENT_KEY = "@frsc_recent_plates";
 
 const STATUS_COLOR: Record<VehicleStatus, string> = {
   valid: "#27AE60",
@@ -52,20 +56,39 @@ export default function VehicleLookupScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { activeSession, addEncounter } = usePatrol();
+  const { incidents } = useIncidents();
 
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<VehicleRecord | null | "not_found">(null);
   const [loading, setLoading] = useState(false);
   const [logged, setLogged] = useState(false);
+  const [recentPlates, setRecentPlates] = useState<string[]>([]);
+  const inputRef = useRef<TextInput>(null);
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 20);
+
+  useEffect(() => {
+    AsyncStorage.getItem(RECENT_KEY).then((val) => {
+      if (val) {
+        try { setRecentPlates(JSON.parse(val) as string[]); } catch { /* ignore */ }
+      }
+    });
+  }, []);
+
+  async function addToRecent(plate: string) {
+    const cleaned = plate.trim().toUpperCase();
+    const next = [cleaned, ...recentPlates.filter((p) => p !== cleaned)].slice(0, 6);
+    setRecentPlates(next);
+    await AsyncStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  }
 
   function handleSearch(plate?: string) {
     const searchPlate = plate ?? query;
     if (!searchPlate.trim()) return;
     setLoading(true);
     setLogged(false);
+    void addToRecent(searchPlate);
     setTimeout(() => {
       const found = lookupVehicle(searchPlate.trim());
       setResult(found ?? "not_found");
@@ -76,6 +99,11 @@ export default function VehicleLookupScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     }, 600);
+  }
+
+  async function clearRecent() {
+    setRecentPlates([]);
+    await AsyncStorage.removeItem(RECENT_KEY);
   }
 
   async function logToPatrol() {
@@ -93,6 +121,14 @@ export default function VehicleLookupScreen() {
 
   const vehicle = result !== "not_found" ? result : null;
 
+  const relatedIncidents = useMemo(() => {
+    if (!vehicle) return [];
+    const plate = vehicle.plate.toUpperCase();
+    return incidents.filter((inc) =>
+      inc.vehicles?.some((v) => v.plate?.toUpperCase().replace(/\s/g, "") === plate.replace(/\s/g, ""))
+    );
+  }, [vehicle, incidents]);
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -108,7 +144,9 @@ export default function VehicleLookupScreen() {
             <Text style={styles.headerTitle}>Vehicle Lookup</Text>
             <View style={{ width: 22 }} />
           </View>
-          <Text style={styles.headerSub}>FRSC Vehicle Registration Database</Text>
+          <Text style={styles.headerSub}>
+            FRSC Vehicle Registration Database{recentPlates.length > 0 ? ` · ${recentPlates.length} recent search${recentPlates.length !== 1 ? "es" : ""}` : ""}
+          </Text>
 
           {/* Search bar */}
           <View style={[styles.searchBox, { backgroundColor: "rgba(255,255,255,0.15)" }]}>
@@ -147,9 +185,31 @@ export default function VehicleLookupScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Quick examples */}
+          {/* Quick examples + recent */}
           {!result && !loading && (
             <View style={{ paddingHorizontal: 14 }}>
+              {recentPlates.length > 0 && (
+                <>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>RECENT SEARCHES</Text>
+                    <TouchableOpacity onPress={clearRecent}>
+                      <Text style={[styles.clearText, { color: colors.mutedForeground }]}>Clear</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.quickRow}>
+                    {recentPlates.map((p) => (
+                      <TouchableOpacity
+                        key={p}
+                        onPress={() => { setQuery(p); handleSearch(p); }}
+                        style={[styles.quickChip, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "40" }]}
+                      >
+                        <Feather name="clock" size={12} color={colors.primary} />
+                        <Text style={[styles.quickChipText, { color: colors.primary }]}>{p}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
               <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
                 SAMPLE PLATES (TAP TO SEARCH)
               </Text>
@@ -288,6 +348,34 @@ export default function VehicleLookupScreen() {
                   last
                 />
               </SectionCard>
+
+              {/* Related incidents */}
+              {relatedIncidents.length > 0 && (
+                <View style={[styles.relatedCard, { backgroundColor: colors.warningLight, borderColor: colors.warning + "40" }]}>
+                  <View style={styles.relatedHeader}>
+                    <Feather name="alert-triangle" size={14} color={colors.warning} />
+                    <Text style={[styles.relatedTitle, { color: colors.warning }]}>
+                      {relatedIncidents.length} incident{relatedIncidents.length > 1 ? "s" : ""} on record for this plate
+                    </Text>
+                  </View>
+                  {relatedIncidents.slice(0, 3).map((inc) => (
+                    <TouchableOpacity
+                      key={inc.id}
+                      style={[styles.relatedRow, { borderTopColor: colors.warning + "30" }]}
+                      onPress={() => router.push(`/case/${inc.id}` as any)}
+                      activeOpacity={0.75}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.relatedRowTitle, { color: colors.text }]} numberOfLines={1}>{inc.title}</Text>
+                        <Text style={[styles.relatedRowMeta, { color: colors.mutedForeground }]}>
+                          {inc.severity.toUpperCase()} · {new Date(inc.dateTime).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                        </Text>
+                      </View>
+                      <Feather name="chevron-right" size={14} color={colors.mutedForeground} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
 
               {/* Log to patrol */}
               {activeSession && (
@@ -621,4 +709,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
   },
+  clearText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  relatedCard: { borderWidth: 1, borderRadius: 14, padding: 14 },
+  relatedHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
+  relatedTitle: { fontSize: 13, fontFamily: "Inter_700Bold", flex: 1 },
+  relatedRow: { flexDirection: "row", alignItems: "center", paddingTop: 10, marginTop: 6, borderTopWidth: 1, gap: 8 },
+  relatedRowTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  relatedRowMeta: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
 });
