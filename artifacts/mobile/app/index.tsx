@@ -3,7 +3,6 @@ import * as Haptics from "expo-haptics";
 import { Redirect, useRouter } from "expo-router";
 import React from "react";
 import {
-  Image,
   Platform,
   ScrollView,
   StatusBar,
@@ -59,7 +58,9 @@ export default function AgencySelectScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Image source={require("../assets/images/icon.png")} style={styles.logo} />
+          <View style={styles.platformIconWrap}>
+            <Feather name="shield" size={36} color="#fff" />
+          </View>
           <Text style={styles.appName}>Nigeria Safety & Security</Text>
           <Text style={styles.appSub}>Integrated Field Operations Platform</Text>
         </View>
@@ -127,7 +128,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: { paddingHorizontal: 20 },
   header: { alignItems: "center", marginBottom: 32 },
-  logo: { width: 72, height: 72, borderRadius: 20, marginBottom: 14 },
+  platformIconWrap: { width: 72, height: 72, borderRadius: 20, marginBottom: 14, backgroundColor: "rgba(255,255,255,0.12)", alignItems: "center", justifyContent: "center" },
   appName: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#fff", textAlign: "center" },
   appSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.55)", marginTop: 4, textAlign: "center" },
   sectionLabel: { fontSize: 11, fontFamily: "Inter_700Bold", color: "rgba(255,255,255,0.45)", letterSpacing: 1.5, marginBottom: 12 },

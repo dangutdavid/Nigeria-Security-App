@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useAgency } from "@/context/AgencyContext";
@@ -23,17 +24,41 @@ export default function VIOProfile() {
   const { user, logout } = useAuth();
   const { clearAgency } = useAgency();
   const { inspections } = useInspections();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const myInspections = inspections.filter((i) => i.inspectedBy === user?.id);
   const myPass = myInspections.filter((i) => i.result === "pass").length;
   const myFail = myInspections.filter((i) => i.result === "fail").length;
   const passRate = myInspections.length > 0 ? Math.round((myPass / myInspections.length) * 100) : 0;
 
+  async function doLogout() {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setLoggingOut(true);
+    await logout();
+    router.replace("/logout");
+  }
+
+  function handleLogout() {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: () => {
+          void doLogout().catch(() => {
+            setLoggingOut(false);
+            Alert.alert("Sign Out Failed", "Please try again.");
+          });
+        },
+      },
+    ]);
+  }
+
   const menuItems = [
     { icon: "clipboard" as const, label: "My Inspections", sub: `${myInspections.length} completed`, onPress: () => router.push("/(vio)/inspections" as any) },
     { icon: "award" as const, label: "Certificates", sub: "View all issued certs", onPress: () => router.push("/(vio)/certificates" as any) },
     { icon: "lock" as const, label: "Change PIN", sub: "Update your security PIN", onPress: () => router.push("/change-pin" as any) },
-    { icon: "log-out" as const, label: "Sign Out", sub: "Return to agency selection", onPress: async () => { await logout(); await clearAgency(); router.replace("/"); }, destructive: true },
+    { icon: "log-out" as const, label: loggingOut ? "Signing out…" : "Sign Out", sub: "Return to agency selection", onPress: handleLogout, destructive: true },
   ];
 
   return (

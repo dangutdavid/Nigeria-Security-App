@@ -3,32 +3,39 @@ import { useRouter } from "expo-router";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAgency } from "@/context/AgencyContext";
 import { useColors } from "@/hooks/useColors";
 
 export default function LogoutScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { clearAgency } = useAgency();
+
+  async function handleGoToLogin() {
+    await clearAgency();
+    router.replace("/");
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top + 24 }]}>
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={[styles.iconWrap, { backgroundColor: colors.primary + "14" }]}>
-          <Feather name="log-out" size={28} color={colors.primary} />
+        <View style={[styles.iconWrap, { backgroundColor: "#F3F4F6" }]}>
+          <Feather name="log-out" size={28} color="#374151" />
         </View>
         <Text style={[styles.title, { color: colors.text }]}>You&apos;re signed out</Text>
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-          Tap below to return to the FRSC sign-in page.
+          Tap below to return to the agency selection screen.
         </Text>
         <Pressable
-          onPress={() => router.replace("/")}
+          onPress={handleGoToLogin}
           style={({ pressed }) => [
             styles.button,
-            { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
+            { backgroundColor: "#1B5E3B", opacity: pressed ? 0.85 : 1 },
           ]}
         >
           <Feather name="log-in" size={16} color="#fff" />
-          <Text style={styles.buttonText}>Go to login</Text>
+          <Text style={styles.buttonText}>Select Agency</Text>
         </Pressable>
       </View>
     </View>

@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useAgency } from "@/context/AgencyContext";
@@ -23,15 +24,39 @@ export default function PoliceProfile() {
   const { user, logout } = useAuth();
   const { clearAgency } = useAgency();
   const { reports } = useCrimeReports();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const myReports = reports.filter((r) => r.reportedBy === user?.id);
   const myOpen = myReports.filter((r) => r.status === "open" || r.status === "investigating").length;
   const myArrested = myReports.filter((r) => r.status === "arrested").length;
 
+  async function doLogout() {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setLoggingOut(true);
+    await logout();
+    router.replace("/logout");
+  }
+
+  function handleLogout() {
+    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Sign Out",
+        style: "destructive",
+        onPress: () => {
+          void doLogout().catch(() => {
+            setLoggingOut(false);
+            Alert.alert("Sign Out Failed", "Please try again.");
+          });
+        },
+      },
+    ]);
+  }
+
   const menuItems = [
     { icon: "file-text" as const, label: "My Crime Reports", sub: `${myReports.length} total`, onPress: () => router.push("/(police)/crime-reports" as any) },
     { icon: "lock" as const, label: "Change PIN", sub: "Update your security PIN", onPress: () => router.push("/change-pin" as any) },
-    { icon: "log-out" as const, label: "Sign Out", sub: "Return to agency selection", onPress: async () => { await logout(); await clearAgency(); router.replace("/"); }, destructive: true },
+    { icon: "log-out" as const, label: loggingOut ? "Signing out…" : "Sign Out", sub: "Return to agency selection", onPress: handleLogout, destructive: true },
   ];
 
   return (
