@@ -115,6 +115,34 @@ export default function LoginScreen() {
             <Text style={[styles.forgotLinkText, { color: colors.mutedForeground }]}>Forgot your PIN?</Text>
           </TouchableOpacity>
 
+          <View style={[styles.dividerRow, { borderTopColor: colors.border }]}>
+            <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>or</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.theftBtn}
+            onPress={() => router.push("/report-theft" as any)}
+            activeOpacity={0.85}
+          >
+            <View style={styles.theftBtnLeft}>
+              <Feather name="alert-triangle" size={20} color="#C0392B" />
+              <View>
+                <Text style={styles.theftBtnTitle}>Report Stolen Vehicle</Text>
+                <Text style={[styles.theftBtnSub, { color: colors.mutedForeground }]}>No account needed · Public access</Text>
+              </View>
+            </View>
+            <Feather name="chevron-right" size={18} color="#C0392B" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.viewAlertsBtn, { borderColor: "#C0392B30", backgroundColor: "#FEE8E8" }]}
+            onPress={() => router.push("/theft-alerts" as any)}
+            activeOpacity={0.85}
+          >
+            <Feather name="radio" size={14} color="#C0392B" />
+            <Text style={styles.viewAlertsBtnText}>View Nearby Stolen Vehicle Alerts</Text>
+          </TouchableOpacity>
+
           <View style={[styles.demoSection, { borderTopColor: colors.border }]}>
             <Text style={[styles.demoTitle, { color: colors.mutedForeground }]}>Demo Accounts</Text>
             <View style={styles.demoList}>
@@ -159,4 +187,12 @@ const styles = StyleSheet.create({
   demoChip: { borderWidth: 1, borderRadius: 14, padding: 12 },
   demoChipBadge: { fontSize: 14, fontFamily: "Inter_700Bold" },
   demoChipRole: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  dividerRow: { borderTopWidth: 1, marginVertical: 16, alignItems: "center", paddingTop: 16 },
+  dividerText: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  theftBtn: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#FEE8E8", borderRadius: 14, padding: 14, borderWidth: 1, borderColor: "#C0392B30", marginBottom: 10 },
+  theftBtnLeft: { flexDirection: "row", alignItems: "center", gap: 12 },
+  theftBtnTitle: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#C0392B" },
+  theftBtnSub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  viewAlertsBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 14, padding: 12, borderWidth: 1, marginBottom: 6 },
+  viewAlertsBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#C0392B" },
 });

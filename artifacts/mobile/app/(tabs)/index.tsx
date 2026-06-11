@@ -8,6 +8,7 @@ import { useIncidents } from "@/context/IncidentContext";
 import { usePatrol } from "@/context/PatrolContext";
 import { useAuth } from "@/context/AuthContext";
 import { IncidentCard } from "@/components/IncidentCard";
+import { formatMinutesAgo, useTheftReports } from "@/context/TheftReportContext";
 
 function formatElapsed(startTime: string): string {
   const diff = Math.max(0, Date.now() - new Date(startTime).getTime());
@@ -34,6 +35,7 @@ export default function HomeScreen() {
   const { incidents } = useIncidents();
   const { isOnDuty, activeSession, sessions } = usePatrol();
   const { user } = useAuth();
+  const { nearbyAlerts, reports: theftReports, locationPermission, requestLocationPermission } = useTheftReports();
   const [elapsed, setElapsed] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(() => {
@@ -590,6 +592,48 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* Stolen Vehicle Quick Actions */}
+        <View style={styles.quickRow}>
+          <TouchableOpacity
+            style={[styles.quickAction, { backgroundColor: "#C0392B", flex: 1 }]}
+            onPress={() => router.push("/report-theft" as any)}
+            activeOpacity={0.85}
+          >
+            <Feather name="alert-triangle" size={18} color="#fff" />
+            <Text style={styles.quickActionText}>Report Stolen Vehicle</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Nearby Stolen Vehicle Alerts */}
+        {theftReports.filter((r) => r.status === "active").length > 0 && (
+          <TouchableOpacity
+            style={[styles.theftAlertBanner, { backgroundColor: "#FEE8E8", borderColor: "#C0392B30" }]}
+            onPress={() => router.push("/theft-alerts" as any)}
+            activeOpacity={0.85}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <View style={[styles.theftAlertIcon, { backgroundColor: "#C0392B22" }]}>
+                <Feather name="radio" size={16} color="#C0392B" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.theftAlertTitle}>
+                  {nearbyAlerts.length > 0
+                    ? `${nearbyAlerts.length} stolen vehicle${nearbyAlerts.length > 1 ? "s" : ""} near you`
+                    : `${theftReports.filter((r) => r.status === "active").length} active stolen vehicle report${theftReports.filter((r) => r.status === "active").length !== 1 ? "s" : ""}`}
+                </Text>
+                <Text style={styles.theftAlertSub}>
+                  {nearbyAlerts.length > 0
+                    ? `Latest: ${nearbyAlerts[0].plate} · ${nearbyAlerts[0].color} ${nearbyAlerts[0].make} · ${formatMinutesAgo(nearbyAlerts[0].reportedAt)}`
+                    : locationPermission !== "granted"
+                    ? "Enable location to see nearby alerts"
+                    : "View all reports in your area"}
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={16} color="#C0392B" />
+            </View>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.section}>
           <TouchableOpacity
             style={[styles.analyticsCard, { backgroundColor: colors.card, borderColor: colors.border }]}
@@ -755,4 +799,8 @@ const styles = StyleSheet.create({
   showMoreBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderRadius: 14, paddingVertical: 12, marginTop: 6 },
   showMoreText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   fab: { position: "absolute", right: 20, width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", boxShadow: "0 3px 8px rgba(0,0,0,0.18)" },
+  theftAlertBanner: { marginHorizontal: 16, marginBottom: 10, borderRadius: 14, borderWidth: 1, padding: 14 },
+  theftAlertIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  theftAlertTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#C0392B" },
+  theftAlertSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#8B0000", marginTop: 2 },
 });

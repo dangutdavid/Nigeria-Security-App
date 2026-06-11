@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -15,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import { useIncidents } from "@/context/IncidentContext";
+import { formatMinutesAgo, getAlertRadiusMiles, useTheftReports } from "@/context/TheftReportContext";
 
 const DISMISSED_KEY = "@frsc_dismissed_alerts";
 const READ_KEY = "@frsc_read_alerts";
@@ -158,9 +160,12 @@ export default function AlertsScreen() {
   const { user } = useAuth();
   const { incidents } = useIncidents();
   const router = useRouter();
+  const { nearbyAlerts, reports: theftReports, locationPermission, requestLocationPermission } = useTheftReports();
   const [dismissed, setDismissed] = useState<string[]>([]);
   const [readIds, setReadIds] = useState<string[]>([]);
   const [unreadOnly, setUnreadOnly] = useState(false);
+
+  const activeTheftCount = theftReports.filter((r) => r.status === "active").length;
 
   useEffect(() => {
     AsyncStorage.multiGet([DISMISSED_KEY, READ_KEY]).then((results) => {
@@ -289,6 +294,35 @@ export default function AlertsScreen() {
           )}
         </View>
       </View>
+
+      {/* Stolen Vehicle Alert Banner */}
+      {activeTheftCount > 0 && (
+        <TouchableOpacity
+          style={[styles.theftBanner, { backgroundColor: "#FEE8E8", borderColor: "#C0392B30" }]}
+          onPress={() => router.push("/theft-alerts" as any)}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.theftBannerIcon, { backgroundColor: "#C0392B22" }]}>
+            <Feather name="alert-triangle" size={18} color="#C0392B" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.theftBannerTitle}>
+              {nearbyAlerts.length > 0
+                ? `${nearbyAlerts.length} Stolen Vehicle${nearbyAlerts.length > 1 ? "s" : ""} Nearby`
+                : `${activeTheftCount} Active Stolen Vehicle Report${activeTheftCount > 1 ? "s" : ""}`}
+            </Text>
+            {nearbyAlerts.length > 0 && (
+              <Text style={styles.theftBannerSub}>
+                Nearest: {nearbyAlerts[0].plate} · {nearbyAlerts[0].color} {nearbyAlerts[0].make} · {formatMinutesAgo(nearbyAlerts[0].reportedAt)}
+              </Text>
+            )}
+            {nearbyAlerts.length === 0 && locationPermission !== "granted" && (
+              <Text style={styles.theftBannerSub}>Tap to enable location & see nearby alerts</Text>
+            )}
+          </View>
+          <Feather name="chevron-right" size={16} color="#C0392B" />
+        </TouchableOpacity>
+      )}
 
       {alerts.length > 0 && (() => {
         const typeCounts: Record<string, number> = {};
@@ -520,4 +554,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_400Regular",
   },
+  theftBanner: { flexDirection: "row", alignItems: "center", gap: 12, marginHorizontal: 14, marginTop: 10, marginBottom: 2, borderRadius: 14, borderWidth: 1, padding: 12 },
+  theftBannerIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  theftBannerTitle: { fontSize: 13, fontFamily: "Inter_700Bold", color: "#C0392B" },
+  theftBannerSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#8B0000", marginTop: 2 },
 });

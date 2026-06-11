@@ -18,6 +18,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { IncidentProvider } from "@/context/IncidentContext";
 import { PatrolProvider } from "@/context/PatrolContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { TheftReportProvider } from "@/context/TheftReportContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -39,6 +40,8 @@ function RootLayoutNav() {
       <Stack.Screen name="vehicle-lookup" options={{ headerShown: false }} />
       <Stack.Screen name="patrol-log" options={{ headerShown: false }} />
       <Stack.Screen name="change-pin" options={{ headerShown: false }} />
+      <Stack.Screen name="report-theft" options={{ headerShown: false, presentation: "modal" }} />
+      <Stack.Screen name="theft-alerts" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -66,13 +69,15 @@ export default function RootLayout() {
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
               <IncidentProvider>
-                <PatrolProvider>
-                  <GestureHandlerRootView style={{ flex: 1 }}>
-                    <KeyboardProvider>
-                      <RootLayoutNav />
-                    </KeyboardProvider>
-                  </GestureHandlerRootView>
-                </PatrolProvider>
+                <TheftReportProvider>
+                  <PatrolProvider>
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                      <KeyboardProvider>
+                        <RootLayoutNav />
+                      </KeyboardProvider>
+                    </GestureHandlerRootView>
+                  </PatrolProvider>
+                </TheftReportProvider>
               </IncidentProvider>
             </AuthProvider>
           </QueryClientProvider>
