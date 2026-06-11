@@ -61,7 +61,7 @@ export default function AgencySelectScreen() {
           <View style={styles.platformIconWrap}>
             <Feather name="shield" size={36} color="#fff" />
           </View>
-          <Text style={styles.appName}>Nigeria Safety & Security</Text>
+          <Text style={styles.appName}>Safety & Security</Text>
           <Text style={styles.appSub}>Integrated Field Operations Platform</Text>
         </View>
 
@@ -117,7 +117,7 @@ export default function AgencySelectScreen() {
         </View>
 
         <Text style={[styles.footer, { color: colors.mutedForeground }]}>
-          Federal Republic of Nigeria · Official Field Operations System
+          Official Field Operations System
         </Text>
       </ScrollView>
     </View>

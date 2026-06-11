@@ -1,0 +1,1 @@
+- [Country-neutral branding](branding-neutrality.md) — launch/shared surfaces must stay country- and agency-agnostic (intended for multi-country adoption); app name "Safety & Security".
