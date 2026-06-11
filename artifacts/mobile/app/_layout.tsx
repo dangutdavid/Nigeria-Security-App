@@ -50,6 +50,7 @@ function RootLayoutNav() {
       <Stack.Screen name="logout" options={{ headerShown: false }} />
       <Stack.Screen name="report-theft" options={{ headerShown: false, presentation: "modal" }} />
       <Stack.Screen name="theft-alerts" options={{ headerShown: false }} />
+      <Stack.Screen name="track-report" options={{ headerShown: false }} />
       <Stack.Screen name="crime/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="inspection/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="referrals" options={{ headerShown: false }} />

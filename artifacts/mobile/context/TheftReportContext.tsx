@@ -11,8 +11,26 @@ import React, {
 
 const STORAGE_KEY = "@frsc_theft_reports_v1";
 
+export type TheftStage = "new" | "acknowledged" | "investigating";
+
+export type TheftStatusAction =
+  | "reported"
+  | "acknowledged"
+  | "investigating"
+  | "recovered"
+  | "false_alarm";
+
+export interface TheftStatusEvent {
+  at: string;
+  action: TheftStatusAction;
+  by?: string;
+  agency?: string;
+  note?: string;
+}
+
 export interface TheftReport {
   id: string;
+  reference: string;
   plate: string;
   make: string;
   model: string;
@@ -27,6 +45,8 @@ export interface TheftReport {
   reporterName?: string;
   contactPhone?: string;
   status: "active" | "recovered" | "false_alarm";
+  stage: TheftStage;
+  history: TheftStatusEvent[];
 }
 
 export interface NearbyTheftAlert extends TheftReport {
@@ -70,7 +90,60 @@ export function formatMinutesAgo(reportedAt: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-const SEED_REPORTS: TheftReport[] = [
+function refPrefix(year: number): string {
+  return `STV-${year}-`;
+}
+
+function nextRefForYear(existing: TheftReport[], year: number): string {
+  const prefix = refPrefix(year);
+  const maxSeq = existing
+    .map((r) => r.reference)
+    .filter((ref): ref is string => !!ref && ref.startsWith(prefix))
+    .map((ref) => parseInt(ref.slice(prefix.length), 10))
+    .filter((n) => !Number.isNaN(n))
+    .reduce((m, n) => Math.max(m, n), 0);
+  return `${prefix}${String(maxSeq + 1).padStart(4, "0")}`;
+}
+
+/**
+ * Backfills reference / stage / history on reports loaded from older storage
+ * formats, ensuring references never collide with existing ones.
+ */
+function normalizeReports(list: TheftReport[]): TheftReport[] {
+  const usedSeq: Record<string, number> = {};
+  for (const r of list) {
+    if (r.reference) {
+      const m = /^STV-(\d{4})-(\d+)$/.exec(r.reference);
+      if (m) {
+        const prefix = refPrefix(parseInt(m[1], 10));
+        usedSeq[prefix] = Math.max(usedSeq[prefix] ?? 0, parseInt(m[2], 10));
+      }
+    }
+  }
+  return list.map((r) => {
+    let rec = r;
+    if (!rec.reference) {
+      const year =
+        new Date(rec.reportedAt).getFullYear() || new Date().getFullYear();
+      const prefix = refPrefix(year);
+      const seq = (usedSeq[prefix] ?? 0) + 1;
+      usedSeq[prefix] = seq;
+      rec = { ...rec, reference: `${prefix}${String(seq).padStart(4, "0")}` };
+    }
+    if (!rec.stage) rec = { ...rec, stage: "new" };
+    if (!rec.history || rec.history.length === 0) {
+      rec = {
+        ...rec,
+        history: [
+          { at: rec.reportedAt, action: "reported", by: rec.reporterName },
+        ],
+      };
+    }
+    return rec;
+  });
+}
+
+const SEED_BASE: Omit<TheftReport, "reference" | "stage" | "history">[] = [
   {
     id: "theft-seed-1",
     plate: "AGL 234 KJ",
@@ -159,18 +232,57 @@ const SEED_REPORTS: TheftReport[] = [
   },
 ];
 
+const SEED_STAGES: TheftStage[] = [
+  "investigating",
+  "acknowledged",
+  "new",
+  "new",
+  "new",
+];
+
+const SEED_REPORTS: TheftReport[] = SEED_BASE.map((r, i) => {
+  const stage = SEED_STAGES[i] ?? "new";
+  const history: TheftStatusEvent[] = [
+    { at: r.reportedAt, action: "reported", by: r.reporterName },
+  ];
+  if (stage === "acknowledged" || stage === "investigating") {
+    history.push({ at: r.reportedAt, action: "acknowledged", agency: "police" });
+  }
+  if (stage === "investigating") {
+    history.push({ at: r.reportedAt, action: "investigating", agency: "police" });
+  }
+  return {
+    ...r,
+    reference: `STV-2026-${String(i + 1).padStart(4, "0")}`,
+    stage,
+    history,
+  };
+});
+
 interface TheftReportContextType {
   reports: TheftReport[];
   nearbyAlerts: NearbyTheftAlert[];
   userLocation: { latitude: number; longitude: number } | null;
   locationPermission: "granted" | "denied" | "undetermined";
   addReport: (
-    report: Omit<TheftReport, "id" | "reportedAt" | "status">,
+    report: Omit<
+      TheftReport,
+      "id" | "reportedAt" | "status" | "reference" | "stage" | "history"
+    >,
   ) => Promise<TheftReport>;
   updateReportStatus: (
     id: string,
     status: TheftReport["status"],
+    by?: string,
+    agency?: string,
   ) => Promise<void>;
+  advanceStage: (
+    id: string,
+    stage: Exclude<TheftStage, "new">,
+    by?: string,
+    agency?: string,
+  ) => Promise<void>;
+  getReportByReference: (reference: string) => TheftReport | null;
   requestLocationPermission: () => Promise<boolean>;
 }
 
@@ -181,6 +293,8 @@ const TheftReportContext = createContext<TheftReportContextType>({
   locationPermission: "undetermined",
   addReport: async () => ({} as TheftReport),
   updateReportStatus: async () => {},
+  advanceStage: async () => {},
+  getReportByReference: () => null,
   requestLocationPermission: async () => false,
 });
 
@@ -209,8 +323,9 @@ export function TheftReportProvider({
       if (val) {
         try {
           const stored = JSON.parse(val) as TheftReport[];
-          const merged = mergeWithSeed(stored);
+          const merged = normalizeReports(mergeWithSeed(stored));
           setReports(merged);
+          void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
         } catch {
           setReports(SEED_REPORTS);
         }
@@ -323,13 +438,27 @@ export function TheftReportProvider({
 
   const addReport = useCallback(
     async (
-      data: Omit<TheftReport, "id" | "reportedAt" | "status">,
+      data: Omit<
+        TheftReport,
+        "id" | "reportedAt" | "status" | "reference" | "stage" | "history"
+      >,
     ): Promise<TheftReport> => {
+      const nowIso = new Date().toISOString();
+      const reference = nextRefForYear(reports, new Date().getFullYear());
       const report: TheftReport = {
         ...data,
         id: `theft-${Date.now()}`,
-        reportedAt: new Date().toISOString(),
+        reference,
+        reportedAt: nowIso,
         status: "active",
+        stage: "new",
+        history: [
+          {
+            at: nowIso,
+            action: "reported",
+            by: data.reporterName || "Citizen",
+          },
+        ],
       };
       setReports((prev) => {
         const next = [report, ...prev];
@@ -338,18 +467,80 @@ export function TheftReportProvider({
       });
       return report;
     },
-    [],
+    [reports],
   );
 
   const updateReportStatus = useCallback(
-    async (id: string, status: TheftReport["status"]) => {
+    async (
+      id: string,
+      status: TheftReport["status"],
+      by?: string,
+      agency?: string,
+    ) => {
       setReports((prev) => {
-        const next = prev.map((r) => (r.id === id ? { ...r, status } : r));
+        const next = prev.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                status,
+                history: [
+                  ...(r.history ?? []),
+                  {
+                    at: new Date().toISOString(),
+                    action: status,
+                    by,
+                    agency,
+                  } as TheftStatusEvent,
+                ],
+              }
+            : r,
+        );
         void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         return next;
       });
     },
     [],
+  );
+
+  const advanceStage = useCallback(
+    async (
+      id: string,
+      stage: Exclude<TheftStage, "new">,
+      by?: string,
+      agency?: string,
+    ) => {
+      setReports((prev) => {
+        const next = prev.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                stage,
+                history: [
+                  ...(r.history ?? []),
+                  {
+                    at: new Date().toISOString(),
+                    action: stage,
+                    by,
+                    agency,
+                  } as TheftStatusEvent,
+                ],
+              }
+            : r,
+        );
+        void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        return next;
+      });
+    },
+    [],
+  );
+
+  const getReportByReference = useCallback(
+    (reference: string): TheftReport | null => {
+      const norm = reference.trim().toUpperCase();
+      if (!norm) return null;
+      return reports.find((r) => r.reference.toUpperCase() === norm) ?? null;
+    },
+    [reports],
   );
 
   return (
@@ -361,6 +552,8 @@ export function TheftReportProvider({
         locationPermission,
         addReport,
         updateReportStatus,
+        advanceStage,
+        getReportByReference,
         requestLocationPermission,
       }}
     >

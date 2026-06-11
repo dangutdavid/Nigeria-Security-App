@@ -9,16 +9,25 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuth } from "@/context/AuthContext";
 import { useTheftReports, formatMinutesAgo, getAlertRadiusMiles } from "@/context/TheftReportContext";
 import { useColors } from "@/hooks/useColors";
 
 const PRIMARY = "#1A3A6C";
 
+const STAGE_LABEL: Record<string, string> = {
+  new: "New report",
+  acknowledged: "Acknowledged",
+  investigating: "Under investigation",
+};
+
 export default function PoliceStolenAlertsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { reports: theftReports, updateReportStatus } = useTheftReports();
+  const { reports: theftReports, updateReportStatus, advanceStage } = useTheftReports();
+  const { user } = useAuth();
+  const officerName = user?.name;
 
   const active = [...theftReports]
     .filter((r) => r.status === "active")
@@ -62,6 +71,9 @@ export default function PoliceStolenAlertsScreen() {
                   </View>
                   <Text style={[styles.timeText, { color: colors.mutedForeground }]}>{formatMinutesAgo(r.reportedAt)}</Text>
                 </View>
+                <Text style={[styles.refText, { color: colors.mutedForeground }]}>
+                  {r.reference} · {STAGE_LABEL[r.stage] ?? "New report"}
+                </Text>
                 <Text style={[styles.vehicleDesc, { color: colors.text }]}>
                   {r.year} {r.color} {r.make} {r.model}
                 </Text>
@@ -76,17 +88,37 @@ export default function PoliceStolenAlertsScreen() {
                     Reporter: {r.reporterName} {r.contactPhone ? `· ${r.contactPhone}` : ""}
                   </Text>
                 ) : null}
+                {r.stage !== "investigating" && (
+                  <View style={styles.actions}>
+                    {r.stage === "new" && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: "#E67E2218", borderColor: "#E67E2233" }]}
+                        onPress={() => advanceStage(r.id, "acknowledged", officerName, "police")}
+                      >
+                        <Feather name="eye" size={14} color="#E67E22" />
+                        <Text style={[styles.actionText, { color: "#E67E22" }]}>Acknowledge</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { backgroundColor: PRIMARY + "18", borderColor: PRIMARY + "33" }]}
+                      onPress={() => advanceStage(r.id, "investigating", officerName, "police")}
+                    >
+                      <Feather name="search" size={14} color={PRIMARY} />
+                      <Text style={[styles.actionText, { color: PRIMARY }]}>Start Investigation</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
                 <View style={styles.actions}>
                   <TouchableOpacity
                     style={[styles.actionBtn, { backgroundColor: "#388E3C18", borderColor: "#388E3C33" }]}
-                    onPress={() => updateReportStatus(r.id, "recovered")}
+                    onPress={() => updateReportStatus(r.id, "recovered", officerName, "police")}
                   >
                     <Feather name="check" size={14} color="#388E3C" />
                     <Text style={[styles.actionText, { color: "#388E3C" }]}>Mark Recovered</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}
-                    onPress={() => updateReportStatus(r.id, "false_alarm")}
+                    onPress={() => updateReportStatus(r.id, "false_alarm", officerName, "police")}
                   >
                     <Feather name="x" size={14} color={colors.mutedForeground} />
                     <Text style={[styles.actionText, { color: colors.mutedForeground }]}>False Alarm</Text>
@@ -118,6 +150,7 @@ const styles = StyleSheet.create({
   radiusBadge: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   radiusText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   timeText: { fontSize: 11, fontFamily: "Inter_400Regular", marginLeft: "auto" },
+  refText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   vehicleDesc: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   locationText: { fontSize: 12, fontFamily: "Inter_400Regular" },
   descText: { fontSize: 12, fontFamily: "Inter_400Regular" },
