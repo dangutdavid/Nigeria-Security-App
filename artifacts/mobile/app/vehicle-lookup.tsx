@@ -19,6 +19,7 @@ import { lookupVehicle, VehicleRecord, VehicleStatus } from "@/data/vehicleDb";
 import { useColors } from "@/hooks/useColors";
 import { usePatrol } from "@/context/PatrolContext";
 import { useIncidents } from "@/context/IncidentContext";
+import { PlateFlagBanner } from "@/components/PlateFlagBanner";
 
 const RECENT_KEY = "@frsc_recent_plates";
 
@@ -185,6 +186,13 @@ export default function VehicleLookupScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Cross-agency plate intelligence */}
+          {result && !loading && (
+            <View style={{ paddingHorizontal: 14, marginBottom: 14 }}>
+              <PlateFlagBanner plate={vehicle?.plate ?? query} />
+            </View>
+          )}
+
           {/* Quick examples + recent */}
           {!result && !loading && (
             <View style={{ paddingHorizontal: 14 }}>

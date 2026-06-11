@@ -14,8 +14,10 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAgency } from "@/context/AgencyContext";
 import { useAuth, UserRole, UserStatus } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { assignableRoles } from "@/lib/permissions";
 
 const ROLE_OPTIONS: { label: string; value: UserRole; color: string }[] = [
   { label: "Field Officer", value: "field_officer", color: "#2C7BE5" },
@@ -66,12 +68,13 @@ export default function UserFormScreen() {
   const editTarget = id ? getUserById(id) : undefined;
 
   const isCommander = currentUser?.role === "commander";
-  const isSupervisor = currentUser?.role === "supervisor";
+  const { getAgencyById } = useAgency();
+  const agencyColor =
+    (currentUser ? getAgencyById(currentUser.agency)?.primaryColor : undefined) ?? colors.primary;
 
-  // Supervisors can only manage field officers
-  const allowedRoles: UserRole[] = isCommander
-    ? ["field_officer", "supervisor", "commander"]
-    : ["field_officer"];
+  // Roles this user is allowed to assign (centralized RBAC rule:
+  // commanders → any role, supervisors → field officers only).
+  const allowedRoles: UserRole[] = assignableRoles(currentUser);
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -155,7 +158,7 @@ export default function UserFormScreen() {
             station: form.station.trim(),
             phone: form.phone.trim(),
             status: form.status,
-            agency: "frsc",
+            agency: currentUser?.agency ?? "frsc",
           },
           form.pin
         );
@@ -220,7 +223,7 @@ export default function UserFormScreen() {
         <View
           style={[
             styles.header,
-            { backgroundColor: colors.primary, paddingTop: topPad + 12 },
+            { backgroundColor: agencyColor, paddingTop: topPad + 12 },
           ]}
         >
           <TouchableOpacity onPress={() => router.back()}>

@@ -12,18 +12,14 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuth, UserRole } from "@/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { useIncidents } from "@/context/IncidentContext";
 import { usePatrol } from "@/context/PatrolContext";
+import { useReferrals } from "@/context/ReferralContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
+import { usePermissions } from "@/lib/permissions";
 import { confirmAction } from "@/utils/confirm";
-
-const ROLE_LABEL: Record<UserRole, string> = {
-  field_officer: "Field Officer",
-  supervisor: "Supervisor",
-  commander: "Operations Commander",
-};
 
 function SettingRow({
   icon,
@@ -35,6 +31,7 @@ function SettingRow({
   onToggle,
   destructive,
   subtitle,
+  badge,
 }: {
   icon: string;
   label: string;
@@ -45,6 +42,7 @@ function SettingRow({
   onToggle?: (v: boolean) => void;
   destructive?: boolean;
   subtitle?: string;
+  badge?: number;
 }) {
   const colors = useColors();
   return (
@@ -62,6 +60,11 @@ function SettingRow({
         {subtitle ? <Text style={[styles.settingSub, { color: colors.mutedForeground }]}>{subtitle}</Text> : null}
       </View>
       {value && <Text style={[styles.settingValue, { color: colors.mutedForeground }]}>{value}</Text>}
+      {typeof badge === "number" && badge > 0 ? (
+        <View style={[styles.settingBadge, { backgroundColor: colors.primary }]}>
+          <Text style={styles.settingBadgeText}>{badge > 99 ? "99+" : badge}</Text>
+        </View>
+      ) : null}
       {toggle && onToggle ? (
         <Switch
           value={toggled}
@@ -84,6 +87,8 @@ export default function ProfileScreen() {
   const { isDark, toggleTheme } = useTheme();
   const { isOnDuty, activeSession, sessions } = usePatrol();
   const { incidents } = useIncidents();
+  const { pendingCountFor } = useReferrals();
+  const pendingReferrals = user ? pendingCountFor(user.agency) : 0;
   const myReportedIncs = incidents.filter((i) => i.reportedBy === user?.id);
   const myReported = myReportedIncs.length;
   const myVictims = myReportedIncs.reduce((s, i) => s + i.victims.length, 0);
@@ -91,9 +96,10 @@ export default function ProfileScreen() {
   const myClosed = incidents.filter((i) => i.reportedBy === user?.id && i.status === "closed").length;
   const myDrafts = incidents.filter((i) => i.reportedBy === user?.id && i.status === "draft").length;
   const myPatrolSessions = sessions.filter((s) => s.officerId === user?.id).length;
-  const canManageUsers = user?.role === "supervisor" || user?.role === "commander";
-  const canAssignCases = canManageUsers;
-  const canUseCommandTools = user?.role === "supervisor" || user?.role === "commander";
+  const { can, roleLabel } = usePermissions();
+  const canManageUsers = can("manage_users", "user");
+  const canAssignCases = can("assign", "incident");
+  const canUseCommandTools = canManageUsers;
 
   const [offlineMode, setOfflineMode] = useState(false);
   const [autoSync, setAutoSync] = useState(true);
@@ -130,7 +136,7 @@ export default function ProfileScreen() {
         <Text style={styles.userName}>{user.name}</Text>
         <Text style={styles.userBadge}>{user.badgeNumber}</Text>
         <View style={[styles.roleChip, { backgroundColor: "rgba(255,255,255,0.15)" }]}> 
-          <Text style={styles.roleText}>{ROLE_LABEL[user.role]}</Text>
+          <Text style={styles.roleText}>{roleLabel}</Text>
         </View>
         {(user.station || user.sector) && (
           <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontFamily: "Inter_400Regular", marginTop: 4 }}>
@@ -272,7 +278,7 @@ export default function ProfileScreen() {
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>ACCOUNT</Text>
         <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}> 
           <SettingRow icon="shield" label="Badge Number" value={user.badgeNumber} />
-          <SettingRow icon="briefcase" label="Role" value={ROLE_LABEL[user.role]} />
+          <SettingRow icon="briefcase" label="Role" value={roleLabel} />
           <SettingRow icon="mail" label="Email" value={user.email || "—"} />
           <SettingRow icon="map-pin" label="Station" value={user.station} />
           {user.sector ? <SettingRow icon="layers" label="Sector" value={user.sector} /> : null}
@@ -294,6 +300,13 @@ export default function ProfileScreen() {
             label="Vehicle Lookup"
             subtitle="Check registration and owner records"
             onPress={() => router.push("/vehicle-lookup")}
+          />
+          <SettingRow
+            icon="git-pull-request"
+            label="Referrals"
+            subtitle="Cross-agency shared records"
+            badge={pendingReferrals}
+            onPress={() => router.push("/referrals")}
           />
           {canAssignCases ? (
             <SettingRow
@@ -379,6 +392,8 @@ const styles = StyleSheet.create({
   settingLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   settingSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
   settingValue: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  settingBadge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
+  settingBadgeText: { color: "#fff", fontSize: 11, fontFamily: "Inter_700Bold" },
   dutyCta: { borderRadius: 16, paddingHorizontal: 16, paddingVertical: 16, flexDirection: "row", alignItems: "center", gap: 12 },
   dutyCtaTitle: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
   dutyCtaSub: { color: "rgba(255,255,255,0.88)", fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 2 },

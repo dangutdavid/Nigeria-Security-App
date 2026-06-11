@@ -13,6 +13,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCrimeReports, CRIME_TYPE_LABELS, CrimeType } from "@/context/CrimeReportContext";
 import { useTheftReports } from "@/context/TheftReportContext";
 import { useColors } from "@/hooks/useColors";
+import { PlateFlagBanner } from "@/components/PlateFlagBanner";
+import { normalizePlate } from "@/lib/plate";
 
 const PRIMARY = "#1A3A6C";
 
@@ -27,8 +29,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 interface CheckResult {
-  type: "crime" | "theft" | "clear";
-  data?: any;
+  crime: any[];
+  theft: any[];
 }
 
 export default function VehicleCheckScreen() {
@@ -43,18 +45,14 @@ export default function VehicleCheckScreen() {
   async function handleCheck() {
     if (!plate.trim()) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const q = plate.trim().toUpperCase();
+    const q = normalizePlate(plate);
 
-    const crimeMatches = reports.filter((r) => r.plate?.toUpperCase() === q);
-    const theftMatches = theftReports.filter((r: { plate: string; status: string }) => r.plate.toUpperCase().replace(/\s/g, "") === q.replace(/\s/g, "") && r.status === "active");
+    const crimeMatches = reports.filter((r) => r.plate && normalizePlate(r.plate) === q);
+    const theftMatches = theftReports.filter(
+      (r: { plate: string; status: string }) => normalizePlate(r.plate) === q && r.status === "active",
+    );
 
-    if (crimeMatches.length > 0) {
-      setResult({ type: "crime", data: crimeMatches });
-    } else if (theftMatches.length > 0) {
-      setResult({ type: "theft", data: theftMatches });
-    } else {
-      setResult({ type: "clear" });
-    }
+    setResult({ crime: crimeMatches, theft: theftMatches });
     setSearched(true);
   }
 
@@ -108,7 +106,7 @@ export default function VehicleCheckScreen() {
         {/* Result */}
         {searched && result && (
           <View style={{ gap: 12 }}>
-            {result.type === "clear" && (
+            {result.crime.length === 0 && result.theft.length === 0 && (
               <View style={[styles.resultCard, { backgroundColor: "#E8F5E9", borderColor: "#C8E6C9" }]}>
                 <View style={[styles.resultIcon, { backgroundColor: "#388E3C22" }]}>
                   <Feather name="check-circle" size={28} color="#388E3C" />
@@ -122,16 +120,16 @@ export default function VehicleCheckScreen() {
               </View>
             )}
 
-            {result.type === "crime" && (
+            {result.crime.length > 0 && (
               <>
                 <View style={[styles.alertBanner, { backgroundColor: "#FFEBEE", borderColor: "#FFCDD2" }]}>
                   <Feather name="alert-octagon" size={22} color="#C62828" />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.alertTitle}>⚠ CRIME RECORD FOUND</Text>
-                    <Text style={styles.alertSub}>This vehicle is linked to {result.data.length} crime report{result.data.length !== 1 ? "s" : ""} in NPF database</Text>
+                    <Text style={styles.alertSub}>This vehicle is linked to {result.crime.length} crime report{result.crime.length !== 1 ? "s" : ""} in NPF database</Text>
                   </View>
                 </View>
-                {result.data.map((r: any) => (
+                {result.crime.map((r: any) => (
                   <View key={r.id} style={[styles.matchCard, { backgroundColor: colors.card, borderColor: "#E53935" + "44" }]}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
                       <Text style={[styles.matchTitle, { color: colors.text }]} numberOfLines={2}>{r.title}</Text>
@@ -146,7 +144,7 @@ export default function VehicleCheckScreen() {
               </>
             )}
 
-            {result.type === "theft" && (
+            {result.theft.length > 0 && (
               <>
                 <View style={[styles.alertBanner, { backgroundColor: "#FFF3E0", borderColor: "#FFE0B2" }]}>
                   <Feather name="alert-triangle" size={22} color="#E65100" />
@@ -155,7 +153,7 @@ export default function VehicleCheckScreen() {
                     <Text style={[styles.alertSub, { color: "#BF360C" }]}>This vehicle is currently reported stolen</Text>
                   </View>
                 </View>
-                {result.data.map((r: any) => (
+                {result.theft.map((r: any) => (
                   <View key={r.id} style={[styles.matchCard, { backgroundColor: colors.card, borderColor: "#E65100" + "44" }]}>
                     <Text style={[styles.matchTitle, { color: colors.text }]}>{r.color} {r.make} {r.model} ({r.year})</Text>
                     <Text style={[styles.matchMeta, { color: colors.mutedForeground }]}>
@@ -169,6 +167,9 @@ export default function VehicleCheckScreen() {
                 ))}
               </>
             )}
+
+            {/* Open cross-agency referrals for this plate */}
+            <PlateFlagBanner plate={plate} kinds={["referral"]} />
           </View>
         )}
 

@@ -17,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AGENCIES } from "@/context/AgencyContext";
 import { useAuth } from "@/context/AuthContext";
 import { usePatrol, PatrolEncounter } from "@/context/PatrolContext";
 import { useColors } from "@/hooks/useColors";
@@ -55,11 +56,14 @@ function formatDuration(start: string, end?: string) {
 }
 
 export default function PatrolLogScreen() {
-  const colors = useColors();
+  const baseColors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
   const { activeSession, sessions, startDuty, endDuty, setBreak, addEncounter, isOnDuty } = usePatrol();
+
+  const agencyPrimary = AGENCIES.find((a) => a.id === user?.agency)?.primaryColor ?? baseColors.primary;
+  const colors = { ...baseColors, primary: agencyPrimary };
 
   const [showStartModal, setShowStartModal] = useState(false);
   const [showEndModal, setShowEndModal] = useState(false);

@@ -2,19 +2,28 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useInspections } from "@/context/InspectionContext";
+import { useReferrals } from "@/context/ReferralContext";
+import { useTheme } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
+import { usePermissions } from "@/lib/permissions";
 import { confirmAction } from "@/utils/confirm";
 
 const PRIMARY = "#7B3F00";
 
-const ROLE_LABELS: Record<string, string> = {
-  field_officer: "Inspection Officer",
-  supervisor: "Senior Inspector",
-  commander: "Director / Chief Inspector",
+type MenuItem = {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  sub: string;
+  onPress?: () => void;
+  destructive?: boolean;
+  badge?: number;
+  toggle?: boolean;
+  toggled?: boolean;
+  onToggle?: (v: boolean) => void;
 };
 
 export default function VIOProfile() {
@@ -23,12 +32,17 @@ export default function VIOProfile() {
   const router = useRouter();
   const { user } = useAuth();
   const { inspections } = useInspections();
+  const { can, roleLabel } = usePermissions();
+  const { pendingCountFor } = useReferrals();
+  const { isDark, toggleTheme } = useTheme();
   const [loggingOut, setLoggingOut] = useState(false);
 
   const myInspections = inspections.filter((i) => i.inspectedBy === user?.id);
   const myPass = myInspections.filter((i) => i.result === "pass").length;
   const myFail = myInspections.filter((i) => i.result === "fail").length;
   const passRate = myInspections.length > 0 ? Math.round((myPass / myInspections.length) * 100) : 0;
+  const pendingReferrals = user ? pendingCountFor(user.agency) : 0;
+  const canManageUsers = can("manage_users", "user");
 
   function handleLogout() {
     confirmAction({
@@ -44,11 +58,19 @@ export default function VIOProfile() {
     });
   }
 
-  const menuItems = [
-    { icon: "clipboard" as const, label: "My Inspections", sub: `${myInspections.length} completed`, onPress: () => router.push("/(vio)/inspections" as any) },
-    { icon: "award" as const, label: "Certificates", sub: "View all issued certs", onPress: () => router.push("/(vio)/certificates" as any) },
-    { icon: "lock" as const, label: "Change PIN", sub: "Update your security PIN", onPress: () => router.push("/change-pin" as any) },
-    { icon: "log-out" as const, label: loggingOut ? "Signing out…" : "Sign Out", sub: "Return to agency selection", onPress: handleLogout, destructive: true },
+  const menuItems: MenuItem[] = [
+    { icon: "clipboard", label: "My Inspections", sub: `${myInspections.length} completed`, onPress: () => router.push("/(vio)/inspections" as any) },
+    { icon: "award", label: "Certificates", sub: "View all issued certs", onPress: () => router.push("/(vio)/certificates" as any) },
+    { icon: "search", label: "Vehicle Lookup", sub: "Check registration and records", onPress: () => router.push("/vehicle-lookup") },
+    { icon: "git-pull-request", label: "Referrals", sub: "Cross-agency shared records", badge: pendingReferrals, onPress: () => router.push("/referrals") },
+    { icon: "anchor", label: "Duty Log", sub: "Start or review patrol sessions", onPress: () => router.push("/patrol-log") },
+    { icon: "bar-chart-2", label: "Analytics", sub: "Inspection trends and pass rates", onPress: () => router.push("/analytics-vio") },
+    ...(canManageUsers
+      ? [{ icon: "users" as const, label: "Manage Officers", sub: "Create and manage your zone", onPress: () => router.push("/users") }]
+      : []),
+    { icon: isDark ? "moon" : "sun", label: "Dark Mode", sub: isDark ? "On" : "Off", toggle: true, toggled: isDark, onToggle: toggleTheme },
+    { icon: "lock", label: "Change PIN", sub: "Update your security PIN", onPress: () => router.push("/change-pin" as any) },
+    { icon: "log-out", label: loggingOut ? "Signing out…" : "Sign Out", sub: "Return to agency selection", onPress: handleLogout, destructive: true },
   ];
 
   return (
@@ -62,7 +84,7 @@ export default function VIOProfile() {
           <Text style={styles.heroName}>{user?.name}</Text>
           <Text style={styles.heroBadge}>{user?.badgeNumber}</Text>
           <View style={[styles.roleChip, { backgroundColor: "rgba(255,255,255,0.18)" }]}>
-            <Text style={styles.roleText}>{ROLE_LABELS[user?.role ?? "field_officer"] ?? user?.role}</Text>
+            <Text style={styles.roleText}>{roleLabel}</Text>
           </View>
           <Text style={styles.heroStation}>{user?.station} · {user?.sector}</Text>
         </View>
@@ -103,7 +125,13 @@ export default function VIOProfile() {
         {/* Menu */}
         <View style={[styles.menu, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {menuItems.map((m, i) => (
-            <TouchableOpacity key={m.label} style={[styles.menuItem, { borderBottomColor: colors.border, borderBottomWidth: i < menuItems.length - 1 ? 1 : 0 }]} onPress={m.onPress} activeOpacity={0.7}>
+            <TouchableOpacity
+              key={m.label}
+              style={[styles.menuItem, { borderBottomColor: colors.border, borderBottomWidth: i < menuItems.length - 1 ? 1 : 0 }]}
+              onPress={m.onPress}
+              disabled={m.toggle}
+              activeOpacity={m.toggle ? 1 : 0.7}
+            >
               <View style={[styles.menuIcon, { backgroundColor: m.destructive ? "#FFEBEE" : colors.muted }]}>
                 <Feather name={m.icon} size={18} color={m.destructive ? "#E53935" : PRIMARY} />
               </View>
@@ -111,7 +139,23 @@ export default function VIOProfile() {
                 <Text style={[styles.menuLabel, { color: m.destructive ? "#E53935" : colors.text }]}>{m.label}</Text>
                 <Text style={[styles.menuSub, { color: colors.mutedForeground }]}>{m.sub}</Text>
               </View>
-              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+              {m.toggle ? (
+                <Switch
+                  value={m.toggled}
+                  onValueChange={m.onToggle}
+                  trackColor={{ false: colors.border, true: PRIMARY + "88" }}
+                  thumbColor={m.toggled ? PRIMARY : colors.mutedForeground}
+                />
+              ) : (
+                <View style={styles.menuRight}>
+                  {typeof m.badge === "number" && m.badge > 0 ? (
+                    <View style={[styles.badge, { backgroundColor: PRIMARY }]}>
+                      <Text style={styles.badgeText}>{m.badge > 99 ? "99+" : m.badge}</Text>
+                    </View>
+                  ) : null}
+                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                </View>
+              )}
             </TouchableOpacity>
           ))}
         </View>
@@ -145,4 +189,7 @@ const styles = StyleSheet.create({
   menuIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   menuLabel: { fontSize: 15, fontFamily: "Inter_500Medium" },
   menuSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
+  menuRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  badge: { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
+  badgeText: { color: "#fff", fontSize: 11, fontFamily: "Inter_700Bold" },
 });

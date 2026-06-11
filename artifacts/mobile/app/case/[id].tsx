@@ -32,6 +32,8 @@ import {
   useIncidents,
 } from "@/context/IncidentContext";
 import { useColors } from "@/hooks/useColors";
+import { ReferModal } from "@/components/ReferModal";
+import { usePermissions } from "@/lib/permissions";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -1074,12 +1076,14 @@ export default function CaseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getIncident, updateIncident, deleteIncident, incidents } = useIncidents();
   const { user, allUsers } = useAuth();
+  const { can } = usePermissions();
 
   const [noteText, setNoteText] = useState("");
   const [addingNote, setAddingNote] = useState(false);
   const [lightboxItem, setLightboxItem] = useState<EvidenceItem | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showRefer, setShowRefer] = useState(false);
 
   const incident = getIncident(id as string);
 
@@ -1104,6 +1108,7 @@ export default function CaseDetailScreen() {
 
   const canEdit = user?.id === inc.reportedBy || user?.role === "supervisor" || user?.role === "commander";
   const canAssign = (user?.role === "supervisor" || user?.role === "commander") && inc.status !== "closed";
+  const canRefer = can("refer", "incident");
   const canTakeAction = user?.role === "supervisor" || user?.role === "commander" || inc.reportedBy === user?.id;
   const actions = STATUS_ACTIONS[inc.status];
 
@@ -1506,6 +1511,15 @@ export default function CaseDetailScreen() {
               </Text>
             </TouchableOpacity>
           )}
+          {canRefer && (
+            <TouchableOpacity
+              style={[st.inlineAddBtn, { borderColor: colors.primary + "30", backgroundColor: colors.primary + "10", marginTop: 12 }]}
+              onPress={() => setShowRefer(true)}
+            >
+              <Feather name="git-pull-request" size={13} color={colors.primary} />
+              <Text style={[st.inlineAddText, { color: colors.primary }]}>Refer to another agency</Text>
+            </TouchableOpacity>
+          )}
         </Section>
 
         {/* ── Danger zone ── */}
@@ -1662,6 +1676,21 @@ export default function CaseDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ── Refer modal ── */}
+      <ReferModal
+        visible={showRefer}
+        onClose={() => setShowRefer(false)}
+        recordType="incident"
+        recordId={inc.id}
+        snapshot={{
+          title: inc.title,
+          plate: inc.vehicles.find((v) => v.plate)?.plate,
+          severity: inc.severity,
+          location: [inc.location, inc.lga, inc.state].filter(Boolean).join(", "),
+          summary: inc.description,
+        }}
+      />
 
       {/* ── Full-screen edit modal ── */}
       {showEditModal && (

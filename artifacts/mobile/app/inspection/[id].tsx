@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -9,8 +9,10 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ReferModal } from "@/components/ReferModal";
 import { InspectionResult, useInspections } from "@/context/InspectionContext";
 import { useColors } from "@/hooks/useColors";
+import { usePermissions } from "@/lib/permissions";
 
 const PRIMARY = "#7B3F00";
 
@@ -36,6 +38,9 @@ export default function InspectionDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { getInspection } = useInspections();
+  const { can } = usePermissions();
+  const [showRefer, setShowRefer] = useState(false);
+  const canRefer = can("refer", "inspection");
 
   const report = getInspection(id ?? "");
 
@@ -144,6 +149,23 @@ export default function InspectionDetailScreen() {
           ))}
         </View>
 
+        {/* Cross-agency referral */}
+        {canRefer && (
+          <TouchableOpacity
+            style={[styles.referBtn, { backgroundColor: colors.card, borderColor: PRIMARY + "55" }]}
+            onPress={() => setShowRefer(true)}
+          >
+            <View style={[styles.referIcon, { backgroundColor: PRIMARY + "15" }]}>
+              <Feather name="git-pull-request" size={18} color={PRIMARY} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.referTitle, { color: colors.text }]}>Refer to another agency</Text>
+              <Text style={[styles.referSub, { color: colors.mutedForeground }]}>Share this inspection with another agency</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        )}
+
         {/* Failed Items Highlighted */}
         {failItems.length > 0 && (
           <View style={[styles.card, { backgroundColor: "#FFEBEE", borderColor: "#FFCDD2" }]}>
@@ -189,6 +211,20 @@ export default function InspectionDetailScreen() {
           </View>
         ) : null}
       </ScrollView>
+
+      <ReferModal
+        visible={showRefer}
+        onClose={() => setShowRefer(false)}
+        recordType="inspection"
+        recordId={report.id}
+        snapshot={{
+          title: `${report.make} ${report.model} — ${report.result.toUpperCase()}`,
+          plate: report.plate,
+          severity: report.result,
+          location: report.station,
+          summary: report.defectNotes || `Roadworthiness inspection result: ${report.result}.`,
+        }}
+      />
     </View>
   );
 }
@@ -211,4 +247,8 @@ const styles = StyleSheet.create({
   detailValue: { fontSize: 13, fontFamily: "Inter_600SemiBold", textAlign: "right", flex: 1 },
   itemRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, borderRadius: 8, borderWidth: 1, padding: 10 },
   itemStatusDot: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 3 },
+  referBtn: { flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderRadius: 14, padding: 14 },
+  referIcon: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
+  referTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  referSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
 });

@@ -20,6 +20,7 @@ import { CrimeReportProvider } from "@/context/CrimeReportContext";
 import { IncidentProvider } from "@/context/IncidentContext";
 import { InspectionProvider } from "@/context/InspectionContext";
 import { PatrolProvider } from "@/context/PatrolContext";
+import { ReferralProvider } from "@/context/ReferralContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { TheftReportProvider } from "@/context/TheftReportContext";
 
@@ -51,6 +52,9 @@ function RootLayoutNav() {
       <Stack.Screen name="theft-alerts" options={{ headerShown: false }} />
       <Stack.Screen name="crime/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="inspection/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="referrals" options={{ headerShown: false }} />
+      <Stack.Screen name="analytics-police" options={{ headerShown: false }} />
+      <Stack.Screen name="analytics-vio" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -83,11 +87,13 @@ export default function RootLayout() {
                     <CrimeReportProvider>
                       <InspectionProvider>
                         <PatrolProvider>
-                          <GestureHandlerRootView style={{ flex: 1 }}>
-                            <KeyboardProvider>
-                              <RootLayoutNav />
-                            </KeyboardProvider>
-                          </GestureHandlerRootView>
+                          <ReferralProvider>
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                              <KeyboardProvider>
+                                <RootLayoutNav />
+                              </KeyboardProvider>
+                            </GestureHandlerRootView>
+                          </ReferralProvider>
                         </PatrolProvider>
                       </InspectionProvider>
                     </CrimeReportProvider>

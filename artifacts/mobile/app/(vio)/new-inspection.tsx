@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
+import { PlateFlagBanner } from "@/components/PlateFlagBanner";
 import {
   INSPECTION_CHECKLIST,
   InspectionResult,
@@ -195,6 +196,9 @@ export default function NewInspectionScreen() {
                 />
               </View>
             </View>
+
+            {/* Cross-agency plate intelligence */}
+            <PlateFlagBanner plate={plate} />
 
             {/* Category */}
             <View style={styles.field}>

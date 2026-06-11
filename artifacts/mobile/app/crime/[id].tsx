@@ -11,9 +11,11 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ReferModal } from "@/components/ReferModal";
 import { useAuth } from "@/context/AuthContext";
 import { CrimeStatus, CRIME_TYPE_LABELS, CrimeType, useCrimeReports } from "@/context/CrimeReportContext";
 import { useColors } from "@/hooks/useColors";
+import { usePermissions } from "@/lib/permissions";
 
 const PRIMARY = "#1A3A6C";
 
@@ -54,8 +56,11 @@ export default function CrimeDetailScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { getReport, updateReport } = useCrimeReports();
+  const { can } = usePermissions();
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showRefer, setShowRefer] = useState(false);
+  const canRefer = can("refer", "crime_report");
 
   const report = getReport(id ?? "");
 
@@ -190,6 +195,23 @@ export default function CrimeDetailScreen() {
           </View>
         )}
 
+        {/* Cross-agency referral */}
+        {canRefer && (
+          <TouchableOpacity
+            style={[styles.referBtn, { backgroundColor: colors.card, borderColor: PRIMARY + "55" }]}
+            onPress={() => setShowRefer(true)}
+          >
+            <View style={[styles.referIcon, { backgroundColor: PRIMARY + "15" }]}>
+              <Feather name="git-pull-request" size={18} color={PRIMARY} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.referTitle, { color: colors.text }]}>Refer to another agency</Text>
+              <Text style={[styles.referSub, { color: colors.mutedForeground }]}>Share this case with another agency</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        )}
+
         {/* Notes */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.cardSectionTitle, { color: colors.text }]}>Case Notes</Text>
@@ -217,6 +239,20 @@ export default function CrimeDetailScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <ReferModal
+        visible={showRefer}
+        onClose={() => setShowRefer(false)}
+        recordType="crime_report"
+        recordId={report.id}
+        snapshot={{
+          title: report.title,
+          plate: report.plate,
+          severity: report.severity,
+          location: `${report.location}, ${report.lga}, ${report.state}`,
+          summary: report.description,
+        }}
+      />
     </View>
   );
 }
@@ -243,4 +279,8 @@ const styles = StyleSheet.create({
   statusBtn: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
   noteInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 13, fontFamily: "Inter_400Regular", minHeight: 70, textAlignVertical: "top" },
   addNoteBtn: { borderRadius: 12, paddingVertical: 12, alignItems: "center" },
+  referBtn: { flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderRadius: 14, padding: 14 },
+  referIcon: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
+  referTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  referSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
 });

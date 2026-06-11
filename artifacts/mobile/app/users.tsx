@@ -13,9 +13,11 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAgency } from "@/context/AgencyContext";
 import { useAuth, UserRole, UserStatus } from "@/context/AuthContext";
 import { useIncidents } from "@/context/IncidentContext";
 import { useColors } from "@/hooks/useColors";
+import { scopeToAgency, usePermissions } from "@/lib/permissions";
 
 const ROLE_LABEL: Record<UserRole, string> = {
   field_officer: "Field Officer",
@@ -49,6 +51,8 @@ export default function UsersScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, allUsers } = useAuth();
+  const { can } = usePermissions();
+  const { getAgencyById } = useAgency();
 
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
@@ -57,10 +61,13 @@ export default function UsersScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 20);
 
-  const isCommander = user?.role === "commander";
-  const isSupervisor = user?.role === "supervisor";
-  const canManage = isCommander || isSupervisor;
+  const canManage = can("manage_users", "user");
+  const isFrsc = user?.agency === "frsc";
+  const agencyColor = (user ? getAgencyById(user.agency)?.primaryColor : undefined) ?? colors.primary;
   const { incidents } = useIncidents();
+
+  // Data tenancy: a user only ever sees officers within their own agency.
+  const agencyUsers = useMemo(() => scopeToAgency(user, allUsers), [allUsers, user]);
 
   const incidentCountByUser = useMemo(() => {
     const map: Record<string, number> = {};
@@ -71,7 +78,7 @@ export default function UsersScreen() {
   }, [incidents]);
 
   const filtered = useMemo(() => {
-    let list = [...allUsers];
+    let list = [...agencyUsers];
     if (roleFilter !== "all") list = list.filter((u) => u.role === roleFilter);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -93,14 +100,14 @@ export default function UsersScreen() {
         return order.indexOf(a.role) - order.indexOf(b.role);
       });
     }
-  }, [allUsers, roleFilter, search, sortBy, incidentCountByUser]);
+  }, [agencyUsers, roleFilter, search, sortBy, incidentCountByUser]);
 
   const stats = useMemo(() => {
-    const active = allUsers.filter((u) => u.status === "active").length;
-    const inactive = allUsers.filter((u) => u.status !== "active").length;
-    const officers = allUsers.filter((u) => u.role === "field_officer").length;
-    return { active, inactive, officers, total: allUsers.length };
-  }, [allUsers]);
+    const active = agencyUsers.filter((u) => u.status === "active").length;
+    const inactive = agencyUsers.filter((u) => u.status !== "active").length;
+    const officers = agencyUsers.filter((u) => u.role === "field_officer").length;
+    return { active, inactive, officers, total: agencyUsers.length };
+  }, [agencyUsers]);
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -108,7 +115,7 @@ export default function UsersScreen() {
       <View
         style={[
           styles.header,
-          { backgroundColor: colors.primary, paddingTop: topPad + 12 },
+          { backgroundColor: agencyColor, paddingTop: topPad + 12 },
         ]}
       >
         <View style={styles.headerRow}>
@@ -140,7 +147,7 @@ export default function UsersScreen() {
           <StatChip label="Active" value={stats.active} color="#6EE39B" />
           <StatChip label="Inactive" value={stats.inactive} color="#FFC97A" />
           <StatChip label="Officers" value={stats.officers} />
-          <StatChip label="Reports" value={incidents.length} color="#A78BFA" />
+          {isFrsc && <StatChip label="Reports" value={incidents.length} color="#A78BFA" />}
         </View>
       </View>
 
@@ -173,8 +180,8 @@ export default function UsersScreen() {
               style={[
                 styles.chip,
                 {
-                  backgroundColor: active ? colors.primary : colors.card,
-                  borderColor: active ? colors.primary : colors.border,
+                  backgroundColor: active ? agencyColor : colors.card,
+                  borderColor: active ? agencyColor : colors.border,
                 },
               ]}
             >
@@ -201,9 +208,9 @@ export default function UsersScreen() {
             <Pressable
               key={key}
               onPress={() => setSortBy(key)}
-              style={[styles.sortChip, { backgroundColor: active ? colors.primary + "15" : "transparent", borderColor: active ? colors.primary : colors.border }]}
+              style={[styles.sortChip, { backgroundColor: active ? agencyColor + "15" : "transparent", borderColor: active ? agencyColor : colors.border }]}
             >
-              <Text style={[styles.sortChipText, { color: active ? colors.primary : colors.mutedForeground }]}>{label}</Text>
+              <Text style={[styles.sortChipText, { color: active ? agencyColor : colors.mutedForeground }]}>{label}</Text>
             </Pressable>
           );
         })}
@@ -271,9 +278,9 @@ export default function UsersScreen() {
                   </Text>
                 </View>
                 {(incidentCountByUser[item.id] ?? 0) > 0 && (
-                  <View style={[styles.incidentBadge, { backgroundColor: colors.primary + "18" }]}>
-                    <Feather name="alert-triangle" size={10} color={colors.primary} />
-                    <Text style={[styles.incidentBadgeText, { color: colors.primary }]}>
+                  <View style={[styles.incidentBadge, { backgroundColor: agencyColor + "18" }]}>
+                    <Feather name="alert-triangle" size={10} color={agencyColor} />
+                    <Text style={[styles.incidentBadgeText, { color: agencyColor }]}>
                       {incidentCountByUser[item.id]} report{incidentCountByUser[item.id] !== 1 ? "s" : ""}
                     </Text>
                   </View>
