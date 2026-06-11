@@ -308,6 +308,12 @@ export default function ProfileScreen() {
             badge={pendingReferrals}
             onPress={() => router.push("/referrals")}
           />
+          <SettingRow
+            icon="clipboard"
+            label="MVP Audit Blueprint"
+            subtitle="Review implementation status and agency modules"
+            onPress={() => router.push("/audit-blueprint")}
+          />
           {canAssignCases ? (
             <SettingRow
               icon="clipboard"
