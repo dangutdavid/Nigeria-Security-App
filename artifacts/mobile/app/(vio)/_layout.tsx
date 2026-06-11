@@ -18,10 +18,7 @@ export default function VIOTabLayout() {
 
   if (isLoading) return null;
   if (!user) return <Redirect href="/" />;
-  if (user.agency !== "vio") {
-    if (user.agency === "police") return <Redirect href="/(police)" />;
-    return <Redirect href="/(tabs)" />;
-  }
+  if (user.agency !== "vio") return <Redirect href="/" />;
 
   return (
     <Tabs

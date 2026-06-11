@@ -4,6 +4,7 @@ import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
+import { useAgency } from "@/context/AgencyContext";
 import { useCrimeReports } from "@/context/CrimeReportContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -20,6 +21,7 @@ export default function PoliceProfile() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { clearAgency } = useAgency();
   const { reports } = useCrimeReports();
 
   const myReports = reports.filter((r) => r.reportedBy === user?.id);
@@ -29,7 +31,7 @@ export default function PoliceProfile() {
   const menuItems = [
     { icon: "file-text" as const, label: "My Crime Reports", sub: `${myReports.length} total`, onPress: () => router.push("/(police)/crime-reports" as any) },
     { icon: "lock" as const, label: "Change PIN", sub: "Update your security PIN", onPress: () => router.push("/change-pin" as any) },
-    { icon: "log-out" as const, label: "Sign Out", sub: "Return to agency selection", onPress: async () => { await logout(); router.replace("/"); }, destructive: true },
+    { icon: "log-out" as const, label: "Sign Out", sub: "Return to agency selection", onPress: async () => { await logout(); await clearAgency(); router.replace("/"); }, destructive: true },
   ];
 
   return (

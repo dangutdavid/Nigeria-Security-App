@@ -4,6 +4,7 @@ import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
+import { useAgency } from "@/context/AgencyContext";
 import { useInspections } from "@/context/InspectionContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -20,6 +21,7 @@ export default function VIOProfile() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { clearAgency } = useAgency();
   const { inspections } = useInspections();
 
   const myInspections = inspections.filter((i) => i.inspectedBy === user?.id);
@@ -31,7 +33,7 @@ export default function VIOProfile() {
     { icon: "clipboard" as const, label: "My Inspections", sub: `${myInspections.length} completed`, onPress: () => router.push("/(vio)/inspections" as any) },
     { icon: "award" as const, label: "Certificates", sub: "View all issued certs", onPress: () => router.push("/(vio)/certificates" as any) },
     { icon: "lock" as const, label: "Change PIN", sub: "Update your security PIN", onPress: () => router.push("/change-pin" as any) },
-    { icon: "log-out" as const, label: "Sign Out", sub: "Return to agency selection", onPress: async () => { await logout(); router.replace("/"); }, destructive: true },
+    { icon: "log-out" as const, label: "Sign Out", sub: "Return to agency selection", onPress: async () => { await logout(); await clearAgency(); router.replace("/"); }, destructive: true },
   ];
 
   return (

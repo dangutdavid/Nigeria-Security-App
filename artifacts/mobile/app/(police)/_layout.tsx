@@ -18,10 +18,7 @@ export default function PoliceTabLayout() {
 
   if (isLoading) return null;
   if (!user) return <Redirect href="/" />;
-  if (user.agency !== "police") {
-    if (user.agency === "vio") return <Redirect href="/(vio)" />;
-    return <Redirect href="/(tabs)" />;
-  }
+  if (user.agency !== "police") return <Redirect href="/" />;
 
   return (
     <Tabs
