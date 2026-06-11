@@ -3,7 +3,6 @@ import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
   Platform,
   ScrollView,
   StyleSheet,
@@ -18,6 +17,7 @@ import { useIncidents } from "@/context/IncidentContext";
 import { usePatrol } from "@/context/PatrolContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
+import { confirmAction } from "@/utils/confirm";
 
 const ROLE_LABEL: Record<UserRole, string> = {
   field_officer: "Field Officer",
@@ -79,7 +79,7 @@ function SettingRow({
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const { isDark, toggleTheme } = useTheme();
   const { isOnDuty, activeSession, sessions } = usePatrol();
@@ -103,28 +103,18 @@ export default function ProfileScreen() {
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
   const bottomPad = insets.bottom + (Platform.OS === "web" ? 34 : 90);
 
-  async function doLogout() {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setOfflineMode(false);
-    setAutoSync(true);
-    setLocationSharing(true);
-    await logout();
-    router.replace("/logout");
-  }
-
   function handleLogout() {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: () => {
-          void doLogout().catch(() => {
-            Alert.alert("Sign Out Failed", "Please try again.");
-          });
-        },
+    confirmAction({
+      title: "Sign Out",
+      message: "Are you sure you want to sign out?",
+      confirmText: "Sign Out",
+      destructive: true,
+      onConfirm: () => {
+        setLoggingOut(true);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        router.replace("/logout");
       },
-    ]);
+    });
   }
 
   if (!user) return null;

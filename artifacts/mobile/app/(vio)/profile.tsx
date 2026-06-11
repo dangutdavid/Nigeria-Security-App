@@ -2,12 +2,12 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
-import { useAgency } from "@/context/AgencyContext";
 import { useInspections } from "@/context/InspectionContext";
 import { useColors } from "@/hooks/useColors";
+import { confirmAction } from "@/utils/confirm";
 
 const PRIMARY = "#7B3F00";
 
@@ -21,8 +21,7 @@ export default function VIOProfile() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, logout } = useAuth();
-  const { clearAgency } = useAgency();
+  const { user } = useAuth();
   const { inspections } = useInspections();
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -31,27 +30,18 @@ export default function VIOProfile() {
   const myFail = myInspections.filter((i) => i.result === "fail").length;
   const passRate = myInspections.length > 0 ? Math.round((myPass / myInspections.length) * 100) : 0;
 
-  async function doLogout() {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setLoggingOut(true);
-    await logout();
-    router.replace("/logout");
-  }
-
   function handleLogout() {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: () => {
-          void doLogout().catch(() => {
-            setLoggingOut(false);
-            Alert.alert("Sign Out Failed", "Please try again.");
-          });
-        },
+    confirmAction({
+      title: "Sign Out",
+      message: "Are you sure you want to sign out?",
+      confirmText: "Sign Out",
+      destructive: true,
+      onConfirm: () => {
+        setLoggingOut(true);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        router.replace("/logout");
       },
-    ]);
+    });
   }
 
   const menuItems = [

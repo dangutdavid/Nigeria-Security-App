@@ -1,1 +1,3 @@
 - [Country-neutral branding](branding-neutrality.md) — launch/shared surfaces must stay country- and agency-agnostic (intended for multi-country adoption); app name "Safety & Security".
+- [Expo Router logout guard race](expo-router-logout-guard-race.md) — sign out from an unguarded root route, never inside a guarded tab-group screen, or the guard's <Redirect> races the navigation (logout stalls on web).
+- [Expo SDK native module pins](expo-sdk-native-module-pins.md) — native Expo modules must match the SDK's bundledNativeModules.json or native builds crash while web works; don't use expo install --fix.

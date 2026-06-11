@@ -1,16 +1,27 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAgency } from "@/context/AgencyContext";
+import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
 export default function LogoutScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { logout } = useAuth();
   const { clearAgency } = useAgency();
+
+  // Clear the authenticated session as soon as this screen mounts. This screen
+  // lives at the root (outside the agency tab groups), so it is not affected by
+  // their auth-guard redirects — that is exactly why we sign out here instead of
+  // inside the guarded profile screens.
+  useEffect(() => {
+    void logout();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleGoToLogin() {
     await clearAgency();
