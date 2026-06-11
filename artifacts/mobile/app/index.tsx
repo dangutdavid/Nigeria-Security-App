@@ -15,13 +15,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { AGENCIES, useAgency } from "@/context/AgencyContext";
+import { AgencyEmblem, AgencyEmblemId } from "@/components/AgencyEmblem";
 import { useColors } from "@/hooks/useColors";
-
-const AGENCY_ICONS: Record<string, React.ComponentProps<typeof Feather>["name"]> = {
-  frsc: "shield",
-  police: "star",
-  vio: "clipboard",
-};
 
 const PUBLIC_ACTIONS = [
   { icon: "alert-triangle" as const, label: "Report Stolen Vehicle", route: "/report-theft", color: "#C0392B" },
@@ -80,9 +75,7 @@ export default function AgencySelectScreen() {
               activeOpacity={0.85}
             >
               <View style={styles.agencyCardInner}>
-                <View style={[styles.agencyIconBg, { backgroundColor: "rgba(255,255,255,0.18)" }]}>
-                  <Feather name={AGENCY_ICONS[agency.id] ?? "shield"} size={26} color="#fff" />
-                </View>
+                <AgencyEmblem agency={agency.id as AgencyEmblemId} size={54} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.agencyShort}>{agency.shortName}</Text>
                   <Text style={styles.agencyFull}>{agency.fullName}</Text>

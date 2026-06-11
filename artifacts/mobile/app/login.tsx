@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AgencyType, useAuth } from "@/context/AuthContext";
 import { useAgency } from "@/context/AgencyContext";
+import { AgencyEmblem, AgencyEmblemId } from "@/components/AgencyEmblem";
 import { useColors } from "@/hooks/useColors";
 
 const DEMO_HINTS: Record<string, { badge: string; pin: string; role: string }[]> = {
@@ -110,9 +111,7 @@ export default function LoginScreen() {
 
         {/* Agency identity */}
         <View style={styles.logoArea}>
-          <View style={[styles.agencyIconCircle, { backgroundColor: "rgba(255,255,255,0.15)" }]}>
-            <Feather name={(selectedAgency?.icon as any) ?? "shield"} size={36} color="#fff" />
-          </View>
+          <AgencyEmblem agency={(agencyId as AgencyEmblemId) ?? "frsc"} size={90} />
           <Text style={styles.agencyName}>{selectedAgency?.shortName ?? "FRSC"}</Text>
           <Text style={styles.agencyFull}>{selectedAgency?.fullName ?? "Federal Road Safety Corps"}</Text>
           <Text style={styles.appSub2}>Field Operations System</Text>
@@ -205,8 +204,7 @@ const styles = StyleSheet.create({
   backBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 16 },
   backText: { fontSize: 14, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.7)" },
   logoArea: { alignItems: "center", marginBottom: 28 },
-  agencyIconCircle: { width: 76, height: 76, borderRadius: 24, alignItems: "center", justifyContent: "center", marginBottom: 14 },
-  agencyName: { fontSize: 28, fontFamily: "Inter_700Bold", color: "#fff" },
+  agencyName: { fontSize: 28, fontFamily: "Inter_700Bold", color: "#fff", marginTop: 12 },
   agencyFull: { fontSize: 13, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.7)", marginTop: 2, textAlign: "center" },
   appSub2: { fontSize: 11, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.5)", marginTop: 4 },
   card: { borderRadius: 20, padding: 22, marginBottom: 20 },
