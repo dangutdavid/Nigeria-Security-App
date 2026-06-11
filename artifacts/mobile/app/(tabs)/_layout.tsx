@@ -172,6 +172,8 @@ export default function TabLayout() {
 
   if (isLoading) return null;
   if (!user) return <Redirect href="/" />;
+  if (user.agency === "police") return <Redirect href="/(police)" />;
+  if (user.agency === "vio") return <Redirect href="/(vio)" />;
 
   if (isLiquidGlassAvailable()) {
     return <NativeTabLayout />;

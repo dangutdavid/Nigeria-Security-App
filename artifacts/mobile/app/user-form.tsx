@@ -155,6 +155,7 @@ export default function UserFormScreen() {
             station: form.station.trim(),
             phone: form.phone.trim(),
             status: form.status,
+            agency: "frsc",
           },
           form.pin
         );

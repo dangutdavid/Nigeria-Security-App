@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 
 export type UserRole = "field_officer" | "supervisor" | "commander";
 export type UserStatus = "active" | "inactive" | "suspended";
+export type AgencyType = "frsc" | "police" | "vio";
 
 export interface User {
   id: string;
@@ -15,6 +16,7 @@ export interface User {
   phone: string;
   status: UserStatus;
   createdAt: string;
+  agency: AgencyType;
 }
 
 export interface UserRecord {
@@ -35,7 +37,7 @@ interface PendingOtp {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (badgeNumber: string, pin: string) => Promise<LoginResult>;
+  login: (badgeNumber: string, pin: string, agency?: AgencyType) => Promise<LoginResult>;
   logout: () => Promise<void>;
   allUsers: User[];
   addUser: (user: Omit<User, "id" | "createdAt">, pin: string) => Promise<void>;
@@ -65,79 +67,117 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 const SEED_RECORDS: UserRecord[] = [
+  // ── FRSC ───────────────────────────────────────────────
   {
     pin: "1234",
     user: {
-      id: "u1",
-      name: "Okafor Emmanuel",
-      badgeNumber: "FO-001",
-      email: "o.emmanuel@frsc.gov.ng",
-      role: "field_officer",
-      sector: "Abuja FCT",
-      station: "Kubwa Outpost",
-      phone: "+234 803 111 2222",
-      status: "active",
-      createdAt: "2024-01-15T08:00:00.000Z",
+      id: "u1", name: "Okafor Emmanuel", badgeNumber: "FO-001",
+      email: "o.emmanuel@frsc.gov.ng", role: "field_officer",
+      sector: "Abuja FCT", station: "Kubwa Outpost",
+      phone: "+234 803 111 2222", status: "active",
+      createdAt: "2024-01-15T08:00:00.000Z", agency: "frsc",
     },
   },
   {
     pin: "1234",
     user: {
-      id: "u2",
-      name: "Adaeze Nwosu",
-      badgeNumber: "SV-042",
-      email: "a.nwosu@frsc.gov.ng",
-      role: "supervisor",
-      sector: "Abuja FCT",
-      station: "FCT Sector Command",
-      phone: "+234 805 333 4444",
-      status: "active",
-      createdAt: "2023-06-10T08:00:00.000Z",
+      id: "u2", name: "Adaeze Nwosu", badgeNumber: "SV-042",
+      email: "a.nwosu@frsc.gov.ng", role: "supervisor",
+      sector: "Abuja FCT", station: "FCT Sector Command",
+      phone: "+234 805 333 4444", status: "active",
+      createdAt: "2023-06-10T08:00:00.000Z", agency: "frsc",
     },
   },
   {
     pin: "1234",
     user: {
-      id: "u3",
-      name: "Brig. Usman Aliyu",
-      badgeNumber: "CMD-007",
-      email: "u.aliyu@frsc.gov.ng",
-      role: "commander",
-      sector: "North Central Zone",
-      station: "Zonal Command HQ",
-      phone: "+234 809 555 6666",
-      status: "active",
-      createdAt: "2022-03-01T08:00:00.000Z",
+      id: "u3", name: "Brig. Usman Aliyu", badgeNumber: "CMD-007",
+      email: "u.aliyu@frsc.gov.ng", role: "commander",
+      sector: "North Central Zone", station: "Zonal Command HQ",
+      phone: "+234 809 555 6666", status: "active",
+      createdAt: "2022-03-01T08:00:00.000Z", agency: "frsc",
     },
   },
   {
     pin: "5678",
     user: {
-      id: "u4",
-      name: "Chukwudi Eze",
-      badgeNumber: "FO-022",
-      email: "c.eze@frsc.gov.ng",
-      role: "field_officer",
-      sector: "Lagos State",
-      station: "Ikeja Checkpoint",
-      phone: "+234 802 444 5555",
-      status: "active",
-      createdAt: "2024-03-20T08:00:00.000Z",
+      id: "u4", name: "Chukwudi Eze", badgeNumber: "FO-022",
+      email: "c.eze@frsc.gov.ng", role: "field_officer",
+      sector: "Lagos State", station: "Ikeja Checkpoint",
+      phone: "+234 802 444 5555", status: "active",
+      createdAt: "2024-03-20T08:00:00.000Z", agency: "frsc",
     },
   },
   {
     pin: "5678",
     user: {
-      id: "u5",
-      name: "Fatima Bello",
-      badgeNumber: "FO-037",
-      email: "f.bello@frsc.gov.ng",
-      role: "field_officer",
-      sector: "Kano State",
-      station: "Kano Metro Command",
-      phone: "+234 807 777 8888",
-      status: "inactive",
-      createdAt: "2024-05-01T08:00:00.000Z",
+      id: "u5", name: "Fatima Bello", badgeNumber: "FO-037",
+      email: "f.bello@frsc.gov.ng", role: "field_officer",
+      sector: "Kano State", station: "Kano Metro Command",
+      phone: "+234 807 777 8888", status: "inactive",
+      createdAt: "2024-05-01T08:00:00.000Z", agency: "frsc",
+    },
+  },
+  // ── Nigeria Police Force ────────────────────────────────
+  {
+    pin: "1234",
+    user: {
+      id: "p1", name: "Insp. Chukwuemeka Okonkwo", badgeNumber: "NPF-001",
+      email: "c.okonkwo@npf.gov.ng", role: "field_officer",
+      sector: "FCT Command", station: "Maitama Divisional HQ",
+      phone: "+234 803 222 3333", status: "active",
+      createdAt: "2023-09-01T08:00:00.000Z", agency: "police",
+    },
+  },
+  {
+    pin: "1234",
+    user: {
+      id: "p2", name: "DSP Aisha Ibrahim", badgeNumber: "NPF-042",
+      email: "a.ibrahim@npf.gov.ng", role: "supervisor",
+      sector: "Lagos State Command", station: "Area 'E' Command Festac",
+      phone: "+234 805 444 5555", status: "active",
+      createdAt: "2022-11-15T08:00:00.000Z", agency: "police",
+    },
+  },
+  {
+    pin: "1234",
+    user: {
+      id: "p3", name: "ACP Rotimi Adeyemi", badgeNumber: "NPF-CMD",
+      email: "r.adeyemi@npf.gov.ng", role: "commander",
+      sector: "South West Zone", station: "Zonal HQ Onikan",
+      phone: "+234 809 666 7777", status: "active",
+      createdAt: "2021-06-01T08:00:00.000Z", agency: "police",
+    },
+  },
+  // ── Vehicle Inspection Officers ─────────────────────────
+  {
+    pin: "1234",
+    user: {
+      id: "v1", name: "Officer Grace Okafor", badgeNumber: "VIO-001",
+      email: "g.okafor@vio.gov.ng", role: "field_officer",
+      sector: "FCT VIO", station: "Abuja VIO Centre",
+      phone: "+234 803 888 9999", status: "active",
+      createdAt: "2024-02-01T08:00:00.000Z", agency: "vio",
+    },
+  },
+  {
+    pin: "1234",
+    user: {
+      id: "v2", name: "Sr. Inspector Musa Danjuma", badgeNumber: "VIO-SV2",
+      email: "m.danjuma@vio.gov.ng", role: "supervisor",
+      sector: "Kano VIO", station: "Kano VIO Centre",
+      phone: "+234 805 000 1111", status: "active",
+      createdAt: "2023-03-10T08:00:00.000Z", agency: "vio",
+    },
+  },
+  {
+    pin: "1234",
+    user: {
+      id: "v3", name: "Director Ngozi Eze", badgeNumber: "VIO-CMD",
+      email: "n.eze@vio.gov.ng", role: "commander",
+      sector: "National VIO HQ", station: "FRSC National HQ",
+      phone: "+234 809 222 3333", status: "active",
+      createdAt: "2021-01-15T08:00:00.000Z", agency: "vio",
     },
   },
 ];
@@ -163,14 +203,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.getItem(AUTH_STORAGE_KEY),
         AsyncStorage.getItem(USERS_STORAGE_KEY),
       ]);
-      if (storedUser) setUser(JSON.parse(storedUser));
+      if (storedUser) {
+        const parsed: User = JSON.parse(storedUser);
+        setUser({ ...parsed, agency: parsed.agency ?? "frsc" });
+      }
       if (storedUsers) {
         const parsed: UserRecord[] = JSON.parse(storedUsers);
         const patched = parsed.map((r) => ({
           ...r,
-          user: { ...r.user, email: r.user.email ?? "" },
+          user: { ...r.user, email: r.user.email ?? "", agency: r.user.agency ?? ("frsc" as AgencyType) },
         }));
-        setRecords(patched);
+        // Merge stored users with seeds so new agency seed users are always present
+        const storedIds = new Set(patched.map((r) => r.user.id));
+        const seedsToAdd = SEED_RECORDS.filter((s) => !storedIds.has(s.user.id));
+        setRecords([...patched, ...seedsToAdd]);
       }
     } finally {
       setIsLoading(false);
@@ -182,8 +228,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(next));
   }
 
-  async function login(badgeNumber: string, pin: string): Promise<LoginResult> {
-    const entry = records.find((r) => r.user.badgeNumber.toUpperCase() === badgeNumber.toUpperCase());
+  async function login(badgeNumber: string, pin: string, agency?: AgencyType): Promise<LoginResult> {
+    const entry = records.find((r) => {
+      const badgeMatch = r.user.badgeNumber.toUpperCase() === badgeNumber.toUpperCase();
+      const agencyMatch = agency ? r.user.agency === agency : true;
+      return badgeMatch && agencyMatch;
+    });
     if (!entry || entry.pin !== pin) return "invalid";
     if (entry.user.status === "inactive") return "inactive";
     if (entry.user.status === "suspended") return "suspended";
@@ -273,7 +323,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const allUsers = records.map((r) => r.user);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, allUsers, addUser, updateUser, deleteUser, resetPin, getUserById, requestOtp, verifyOtp, resetPinWithOtp }}>
+    <AuthContext.Provider value={{
+      user, isLoading, login, logout,
+      allUsers, addUser, updateUser, deleteUser, resetPin, getUserById,
+      requestOtp, verifyOtp, resetPinWithOtp,
+    }}>
       {children}
     </AuthContext.Provider>
   );
