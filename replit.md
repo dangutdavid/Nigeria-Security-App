@@ -67,3 +67,12 @@ Backend API server.
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 
 See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+
+## User preferences
+
+- **Keep GitHub in sync**: regularly push the project to the GitHub repo
+  `dangutdavid/Nigeria-Security-App` (branch `main`) to keep it updated. Push at the
+  end of each task/turn after making changes. Use the Replit GitHub connector token
+  (see `.agents/memory/github-push-via-connector.md` for the exact push method).
+  Note: Replit's end-of-turn auto-checkpoint commits one step after the turn ends, so
+  each push may lag by one checkpoint and catches up on the next push.
