@@ -20,6 +20,7 @@ import { useColors } from "@/hooks/useColors";
 const PUBLIC_ACTIONS = [
   { icon: "alert-triangle" as const, label: "Report Stolen Vehicle", route: "/report-theft", color: "#C0392B" },
   { icon: "radio" as const, label: "View Nearby Alerts", route: "/theft-alerts", color: "#8B4513" },
+  { icon: "clipboard" as const, label: "MVP Audit Blueprint", route: "/audit-blueprint", color: "#0E7490" },
 ];
 
 export default function AgencySelectScreen() {
