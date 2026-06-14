@@ -29,6 +29,9 @@ const STATUS_FLOW: Record<CitizenIncidentStatus, CitizenIncidentStatus | null> =
 type StatusFilter = "all" | CitizenIncidentStatus;
 type EmergencyFilter = "all" | "low" | "medium" | "high" | "critical";
 
+const STATUS_FILTERS: StatusFilter[] = ["all", "submitted", "triaged", "assigned", "in_progress", "resolved", "closed"];
+const EMERGENCY_FILTERS: EmergencyFilter[] = ["all", "low", "medium", "high", "critical"];
+
 export default function CivilDefenceIncidentsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -97,20 +100,22 @@ export default function CivilDefenceIncidentsScreen() {
         <Feather name="search" size={16} color={colors.mutedForeground} />
         <TextInput value={query} onChangeText={setQuery} placeholder="Search reference, location, vehicle..." placeholderTextColor={colors.mutedForeground} style={[styles.searchInput, { color: colors.text }]} />
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-        {(["all", "submitted", "triaged", "assigned", "in_progress", "resolved", "closed"] as StatusFilter[]).map((item) => (
-          <TouchableOpacity key={item} onPress={() => setStatus(item)} style={[styles.filterChip, { backgroundColor: status === item ? "#234E2A" : colors.card, borderColor: status === item ? "#234E2A" : colors.border }]}>
-            <Text style={[styles.filterText, { color: status === item ? "#fff" : colors.text }]}>{item === "all" ? "All" : formatCitizenIncidentStatus(item)}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-        {(["all", "low", "medium", "high", "critical"] as EmergencyFilter[]).map((item) => (
-          <TouchableOpacity key={item} onPress={() => setEmergency(item)} style={[styles.filterChip, { backgroundColor: emergency === item ? "#C8960C" : colors.card, borderColor: emergency === item ? "#C8960C" : colors.border }]}>
-            <Text style={[styles.filterText, { color: emergency === item ? "#fff" : colors.text }]}>{item === "all" ? "Any level" : item.toUpperCase()}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <View style={styles.filterPanel}>
+        <View style={styles.filterGroup}>
+          {STATUS_FILTERS.map((item) => (
+            <TouchableOpacity key={item} onPress={() => setStatus(item)} style={[styles.filterChip, { backgroundColor: status === item ? "#234E2A" : colors.card, borderColor: status === item ? "#234E2A" : colors.border }]}>
+              <Text style={[styles.filterText, { color: status === item ? "#fff" : colors.text }]}>{item === "all" ? "All" : formatCitizenIncidentStatus(item)}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={styles.filterGroup}>
+          {EMERGENCY_FILTERS.map((item) => (
+            <TouchableOpacity key={item} onPress={() => setEmergency(item)} style={[styles.filterChip, { backgroundColor: emergency === item ? "#C8960C" : colors.card, borderColor: emergency === item ? "#C8960C" : colors.border }]}>
+              <Text style={[styles.filterText, { color: emergency === item ? "#fff" : colors.text }]}>{item === "all" ? "Any" : item.toUpperCase()}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
 
       <ScrollView contentContainerStyle={styles.list} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#234E2A" />}>
         {filtered.map((report) => (
@@ -120,9 +125,9 @@ export default function CivilDefenceIncidentsScreen() {
               <Text style={[styles.statusText, { color: statusColor(report.status) }]}>{formatCitizenIncidentStatus(report.status)}</Text>
             </View>
             <Text style={[styles.title, { color: colors.text }]}>{report.reference}</Text>
-            <Text style={[styles.meta, { color: colors.mutedForeground }]}>{report.incidentType.replaceAll("_", " ")} · {report.emergencyLevel.toUpperCase()} · {new Date(report.submittedAt).toLocaleString()}</Text>
+            <Text style={[styles.meta, { color: colors.mutedForeground }]} numberOfLines={1}>{formatIncidentType(report.incidentType)} · {report.emergencyLevel.toUpperCase()}</Text>
             <Text style={[styles.desc, { color: colors.text }]} numberOfLines={2}>{report.description}</Text>
-            <Text style={[styles.meta, { color: colors.mutedForeground }]}>Routed agency: {formatCitizenAgencyLabel(report.suggestedAgency)}</Text>
+            <Text style={[styles.meta, { color: colors.mutedForeground }]} numberOfLines={1}>Routed: {formatCitizenAgencyLabel(report.suggestedAgency)} · {formatSubmittedAt(report.submittedAt)}</Text>
           </TouchableOpacity>
         ))}
         {filtered.length === 0 && <Text style={[styles.empty, { color: colors.mutedForeground }]}>No NSCDC reports found.</Text>}
@@ -184,17 +189,31 @@ function statusColor(status: CitizenIncidentStatus) {
   return "#27AE60";
 }
 
+function formatIncidentType(type: string) {
+  return type.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatSubmittedAt(value: string) {
+  return new Date(value).toLocaleString([], {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { padding: 18, paddingTop: 22 },
   headerTitle: { color: "#fff", fontSize: 24, fontFamily: "Inter_700Bold" },
   headerSub: { color: "rgba(255,255,255,0.8)", fontSize: 13, fontFamily: "Inter_500Medium", marginTop: 4 },
-  searchWrap: { margin: 16, marginBottom: 8, borderWidth: 1, borderRadius: 14, height: 46, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12 },
+  searchWrap: { marginHorizontal: 16, marginTop: 14, marginBottom: 10, borderWidth: 1, borderRadius: 14, height: 46, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12 },
   searchInput: { flex: 1, fontFamily: "Inter_500Medium", fontSize: 14 },
-  filterRow: { paddingHorizontal: 16, gap: 8, paddingBottom: 8 },
-  filterChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, marginRight: 8 },
-  filterText: { fontSize: 12, fontFamily: "Inter_700Bold" },
-  list: { padding: 16, paddingTop: 8 },
+  filterPanel: { paddingHorizontal: 16, paddingBottom: 10, gap: 8 },
+  filterGroup: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  filterChip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7, minHeight: 32 },
+  filterText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  list: { paddingHorizontal: 16, paddingTop: 2, paddingBottom: 12 },
   card: { borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 10 },
   cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   sourcePill: { backgroundColor: "#234E2A18", borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
