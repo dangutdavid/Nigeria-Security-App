@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, RefreshControl } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useIncidents } from "@/context/IncidentContext";
@@ -9,6 +9,10 @@ import { usePatrol } from "@/context/PatrolContext";
 import { useAuth } from "@/context/AuthContext";
 import { IncidentCard } from "@/components/IncidentCard";
 import { formatMinutesAgo, useTheftReports } from "@/context/TheftReportContext";
+import {
+  CitizenIncidentReceipt,
+  listFrscCitizenIncidentReports,
+} from "@/services/citizenIncidentApi";
 
 function formatElapsed(startTime: string): string {
   const diff = Math.max(0, Date.now() - new Date(startTime).getTime());
@@ -36,12 +40,22 @@ export default function HomeScreen() {
   const { isOnDuty, activeSession, sessions } = usePatrol();
   const { user } = useAuth();
   const { nearbyAlerts, reports: theftReports, locationPermission, requestLocationPermission } = useTheftReports();
+  const [citizenReports, setCitizenReports] = useState<CitizenIncidentReceipt[]>([]);
   const [elapsed, setElapsed] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const loadCitizenReports = useCallback(async () => {
+    setCitizenReports(await listFrscCitizenIncidentReports());
+  }, []);
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 800);
-  }, []);
+    void loadCitizenReports().finally(() => setTimeout(() => setRefreshing(false), 500));
+  }, [loadCitizenReports]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadCitizenReports();
+    }, [loadCitizenReports]),
+  );
 
   useEffect(() => {
     if (!isOnDuty || !activeSession) { setElapsed(""); return; }
@@ -62,7 +76,7 @@ export default function HomeScreen() {
     () => incidents.filter((i) => i.assignedTo === user?.id && i.status !== "closed"),
     [incidents, user?.id],
   );
-  const isFieldOfficer = user?.role === "field_officer";
+  const isFieldOfficer = user?.role === "officer";
   const myDrafts = useMemo(
     () => incidents.filter((i) => i.reportedBy === user?.id && i.status === "draft"),
     [incidents, user?.id],
@@ -82,6 +96,19 @@ export default function HomeScreen() {
   }, [sessions, user?.id]);
   const unassignedCount = incidents.filter((i) => i.status === "submitted").length;
   const fatalOpenCount = incidents.filter((i) => i.severity === "fatal" && i.status !== "closed").length;
+  const citizenMetrics = useMemo(() => {
+    const highEmergency = citizenReports.filter((r) => r.emergencyLevel === "high" || r.emergencyLevel === "critical").length;
+    const assignedOrProgress = citizenReports.filter((r) => r.status === "assigned" || r.status === "in_progress").length;
+    const resolved = citizenReports.filter((r) => r.status === "resolved" || r.status === "closed").length;
+    const pendingTriage = citizenReports.filter((r) => r.status === "submitted").length;
+    return {
+      newReports: citizenReports.length,
+      highEmergency,
+      assignedOrProgress,
+      resolved,
+      pendingTriage,
+    };
+  }, [citizenReports]);
 
   const sparkline = useMemo(() => {
     const result: number[] = [];
@@ -151,11 +178,11 @@ export default function HomeScreen() {
           </TouchableOpacity>
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{openCount}</Text>
+              <Text style={styles.statValue}>{openCount + citizenReports.filter((r) => r.status !== "resolved" && r.status !== "closed").length}</Text>
               <Text style={styles.statLabel}>Open cases</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{fatalCount}</Text>
+              <Text style={styles.statValue}>{fatalCount + citizenMetrics.highEmergency}</Text>
               <Text style={styles.statLabel}>Critical</Text>
             </View>
             <View style={styles.statCard}>
@@ -233,6 +260,24 @@ export default function HomeScreen() {
             >
               <Text style={styles.urgentBtnText}>Review</Text>
             </TouchableOpacity>
+          </View>
+        )}
+
+        {citizenReports.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>CITIZEN REPORTS</Text>
+              <TouchableOpacity onPress={() => router.push("/(tabs)/cases" as any)}>
+                <Text style={[styles.seeAll, { color: colors.primary }]}>Open case list</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.citizenMetricGrid}>
+              <CitizenMetricCard label="New citizen reports" value={citizenMetrics.newReports} icon="inbox" color={colors.primary} />
+              <CitizenMetricCard label="High emergency" value={citizenMetrics.highEmergency} icon="alert-octagon" color={colors.fatal} />
+              <CitizenMetricCard label="Assigned / in progress" value={citizenMetrics.assignedOrProgress} icon="user-check" color={colors.secondary} />
+              <CitizenMetricCard label="Resolved" value={citizenMetrics.resolved} icon="check-circle" color={colors.success} />
+              <CitizenMetricCard label="Pending triage" value={citizenMetrics.pendingTriage} icon="clock" color={colors.warning} />
+            </View>
           </View>
         )}
 
@@ -703,6 +748,28 @@ export default function HomeScreen() {
   );
 }
 
+function CitizenMetricCard({
+  label,
+  value,
+  icon,
+  color,
+}: {
+  label: string;
+  value: number;
+  icon: keyof typeof Feather.glyphMap;
+  color: string;
+}) {
+  return (
+    <View style={[styles.citizenMetricCard, { borderColor: color + "35", backgroundColor: color + "10" }]}>
+      <View style={[styles.citizenMetricIcon, { backgroundColor: color + "18" }]}>
+        <Feather name={icon} size={16} color={color} />
+      </View>
+      <Text style={[styles.citizenMetricValue, { color }]}>{value}</Text>
+      <Text style={styles.citizenMetricLabel}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 },
@@ -769,6 +836,11 @@ const styles = StyleSheet.create({
   statusDot: { width: 10, height: 10, borderRadius: 5 },
   statusLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   statusValue: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  citizenMetricGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  citizenMetricCard: { width: "48%", borderWidth: 1, borderRadius: 16, padding: 12 },
+  citizenMetricIcon: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center", marginBottom: 8 },
+  citizenMetricValue: { fontSize: 22, fontFamily: "Inter_700Bold", lineHeight: 24 },
+  citizenMetricLabel: { color: "#4B5563", fontSize: 11, fontFamily: "Inter_600SemiBold", marginTop: 4, lineHeight: 15 },
   sparkRow: { flexDirection: "row", alignItems: "flex-end", gap: 3, marginTop: 14, height: 28 },
   sparkCol: { flex: 1, justifyContent: "flex-end", alignItems: "center" },
   sparkBar: { width: "100%", borderRadius: 2 },

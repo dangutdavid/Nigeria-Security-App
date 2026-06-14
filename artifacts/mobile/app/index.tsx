@@ -12,12 +12,24 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuth } from "@/context/AuthContext";
+import { routeForUser, useAuth } from "@/context/AuthContext";
 import { AGENCIES, useAgency } from "@/context/AgencyContext";
 import { AgencyEmblem, AgencyEmblemId } from "@/components/AgencyEmblem";
 import { useColors } from "@/hooks/useColors";
 
 const PUBLIC_ACTIONS = [
+  {
+    icon: "edit-3" as const,
+    label: "Report Incident",
+    route: "/report-incident",
+    color: "#0F4C81",
+  },
+  {
+    icon: "search" as const,
+    label: "Track Report",
+    route: "/track-report",
+    color: "#2E7D52",
+  },
   {
     icon: "alert-triangle" as const,
     label: "Report Stolen Vehicle",
@@ -49,9 +61,7 @@ export default function AgencySelectScreen() {
 
   // Redirect logged-in users straight to their agency interface
   if (user) {
-    if (user.agency === "police") return <Redirect href="/(police)" />;
-    if (user.agency === "vio") return <Redirect href="/(vio)" />;
-    return <Redirect href="/(tabs)" />;
+    return <Redirect href={routeForUser(user) as any} />;
   }
 
   async function handleAgency(id: string) {

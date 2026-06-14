@@ -7,7 +7,7 @@ import { Feather } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useColors } from "@/hooks/useColors";
-import { useAuth } from "@/context/AuthContext";
+import { routeForUser, useAuth } from "@/context/AuthContext";
 import { useIncidents } from "@/context/IncidentContext";
 
 function NativeTabLayout() {
@@ -160,8 +160,7 @@ export default function TabLayout() {
 
   if (isLoading) return null;
   if (!user) return <Redirect href="/" />;
-  if (user.agency === "police") return <Redirect href="/(police)" />;
-  if (user.agency === "vio") return <Redirect href="/(vio)" />;
+  if (user.agency !== "frsc") return <Redirect href={routeForUser(user) as any} />;
 
   if (isLiquidGlassAvailable()) {
     return <NativeTabLayout />;

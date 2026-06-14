@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
-import React, { useMemo } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -13,6 +13,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useInspections } from "@/context/InspectionContext";
 import { useColors } from "@/hooks/useColors";
+import {
+  CitizenIncidentReceipt,
+  formatCitizenIncidentStatus,
+  listVioCitizenIncidentReports,
+} from "@/services/citizenIncidentApi";
 
 const PRIMARY = "#7B3F00";
 
@@ -21,6 +26,19 @@ const RESULT_COLORS: Record<string, string> = {
   fail: "#E53935",
   conditional: "#F57C00",
 };
+
+const CITIZEN_STATUS_COLORS: Record<string, string> = {
+  submitted: "#E53935",
+  triaged: "#F57C00",
+  assigned: PRIMARY,
+  in_progress: "#1565C0",
+  resolved: "#388E3C",
+  closed: "#9E9E9E",
+};
+
+function formatIncidentType(type: string) {
+  return type.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -36,22 +54,35 @@ export default function VIOHome() {
   const router = useRouter();
   const { user } = useAuth();
   const { inspections } = useInspections();
+  const [citizenReports, setCitizenReports] = useState<CitizenIncidentReceipt[]>([]);
+
+  const loadCitizenReports = useCallback(async () => {
+    setCitizenReports(await listVioCitizenIncidentReports());
+  }, []);
+
+  useFocusEffect(useCallback(() => { void loadCitizenReports(); }, [loadCitizenReports]));
 
   const today = new Date().toDateString();
   const todayInspections = inspections.filter((i) => new Date(i.inspectedAt).toDateString() === today);
 
   const stats = useMemo(() => ({
-    today: todayInspections.length,
+    today: todayInspections.length + citizenReports.filter((r) => new Date(r.submittedAt).toDateString() === today).length,
     pass: inspections.filter((i) => i.result === "pass").length,
-    fail: inspections.filter((i) => i.result === "fail").length,
-    conditional: inspections.filter((i) => i.result === "conditional").length,
-    total: inspections.length,
+    fail: inspections.filter((i) => i.result === "fail").length + citizenReports.filter((r) => (r.emergencyLevel === "high" || r.emergencyLevel === "critical") && r.status !== "resolved" && r.status !== "closed").length,
+    conditional: inspections.filter((i) => i.result === "conditional").length + citizenReports.filter((r) => r.status === "triaged" || r.status === "assigned").length,
+    total: inspections.length + citizenReports.length,
     passRate: inspections.length > 0 ? Math.round((inspections.filter((i) => i.result === "pass").length / inspections.length) * 100) : 0,
-  }), [inspections, todayInspections]);
+    citizen: citizenReports.length,
+  }), [inspections, todayInspections, citizenReports, today]);
 
   const recent = useMemo(() =>
     [...inspections].sort((a, b) => new Date(b.inspectedAt).getTime() - new Date(a.inspectedAt).getTime()).slice(0, 3),
     [inspections]
+  );
+
+  const recentCitizenReports = useMemo(
+    () => [...citizenReports].sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()).slice(0, 3),
+    [citizenReports],
   );
 
   const quickActions = [
@@ -109,6 +140,46 @@ export default function VIOHome() {
             <Text style={styles.alertText}>
               {stats.fail} vehicle{stats.fail !== 1 ? "s" : ""} failed inspection — follow-up required
             </Text>
+          </View>
+        )}
+
+        {stats.citizen > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionRow}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Citizen Vehicle Reports</Text>
+              <TouchableOpacity onPress={() => router.push("/(vio)/inspections" as any)}>
+                <Text style={[styles.seeAll, { color: PRIMARY }]}>Review</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ gap: 10 }}>
+              {recentCitizenReports.map((report) => (
+                <TouchableOpacity
+                  key={report.reference}
+                  style={[styles.inspectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={() => router.push("/(vio)/inspections" as any)}
+                  activeOpacity={0.85}
+                >
+                  <View style={[styles.resultDot, { backgroundColor: CITIZEN_STATUS_COLORS[report.status] ?? PRIMARY }]} />
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+                      <View style={[styles.plateBadge, { backgroundColor: "#FFF8DC", borderColor: "#DAA520" }]}>
+                        <Text style={styles.plateText}>{report.vehicleRegistration ?? report.reference}</Text>
+                      </View>
+                      <Text style={[styles.cardTime, { color: colors.mutedForeground }]}>{timeAgo(report.submittedAt)}</Text>
+                    </View>
+                    <Text style={[styles.vehicleDesc, { color: colors.text }]}>{formatIncidentType(report.incidentType)}</Text>
+                    <View style={styles.cardBottom}>
+                      <View style={[styles.resultBadge, { backgroundColor: (CITIZEN_STATUS_COLORS[report.status] ?? PRIMARY) + "22" }]}>
+                        <Text style={[styles.resultText, { color: CITIZEN_STATUS_COLORS[report.status] ?? PRIMARY }]}>
+                          {formatCitizenIncidentStatus(report.status)}
+                        </Text>
+                      </View>
+                      <Text style={[styles.certNum, { color: colors.mutedForeground }]}>Citizen Report</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
 

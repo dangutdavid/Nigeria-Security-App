@@ -20,9 +20,11 @@ import { useColors } from "@/hooks/useColors";
 import { assignableRoles } from "@/lib/permissions";
 
 const ROLE_OPTIONS: { label: string; value: UserRole; color: string }[] = [
-  { label: "Field Officer", value: "field_officer", color: "#2C7BE5" },
+  { label: "Officer", value: "officer", color: "#2C7BE5" },
   { label: "Supervisor", value: "supervisor", color: "#C8960C" },
   { label: "Commander", value: "commander", color: "#1B5E3B" },
+  { label: "Admin", value: "admin", color: "#5C6BC0" },
+  { label: "Super Admin", value: "super_admin", color: "#7B2CBF" },
 ];
 
 const STATUS_OPTIONS: { label: string; value: UserStatus; color: string }[] = [
@@ -48,7 +50,7 @@ const EMPTY_FORM: FormState = {
   name: "",
   badgeNumber: "",
   email: "",
-  role: "field_officer",
+  role: "officer",
   sector: "",
   station: "",
   phone: "",
@@ -73,7 +75,7 @@ export default function UserFormScreen() {
     (currentUser ? getAgencyById(currentUser.agency)?.primaryColor : undefined) ?? colors.primary;
 
   // Roles this user is allowed to assign (centralized RBAC rule:
-  // commanders → any role, supervisors → field officers only).
+  // commanders → agency roles, supervisors → officers only, admins → platform roles.
   const allowedRoles: UserRole[] = assignableRoles(currentUser);
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);

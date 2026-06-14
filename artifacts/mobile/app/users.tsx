@@ -20,15 +20,21 @@ import { useColors } from "@/hooks/useColors";
 import { scopeToAgency, usePermissions } from "@/lib/permissions";
 
 const ROLE_LABEL: Record<UserRole, string> = {
-  field_officer: "Field Officer",
+  citizen: "Citizen",
+  officer: "Officer",
   supervisor: "Supervisor",
   commander: "Commander",
+  admin: "Admin",
+  super_admin: "Super Admin",
 };
 
 const ROLE_COLOR: Record<UserRole, string> = {
-  field_officer: "#2C7BE5",
+  citizen: "#6B7A8A",
+  officer: "#2C7BE5",
   supervisor: "#C8960C",
   commander: "#1B5E3B",
+  admin: "#5C6BC0",
+  super_admin: "#7B2CBF",
 };
 
 const STATUS_COLOR: Record<UserStatus, string> = {
@@ -41,9 +47,10 @@ type RoleFilter = "all" | UserRole;
 
 const FILTER_TABS: { label: string; value: RoleFilter }[] = [
   { label: "All", value: "all" },
-  { label: "Officers", value: "field_officer" },
+  { label: "Officers", value: "officer" },
   { label: "Supervisors", value: "supervisor" },
   { label: "Commanders", value: "commander" },
+  { label: "Admins", value: "admin" },
 ];
 
 export default function UsersScreen() {
@@ -96,7 +103,7 @@ export default function UsersScreen() {
       return list.sort((a, b) => a.name.localeCompare(b.name));
     } else {
       return list.sort((a, b) => {
-        const order: UserRole[] = ["commander", "supervisor", "field_officer"];
+        const order: UserRole[] = ["super_admin", "admin", "commander", "supervisor", "officer", "citizen"];
         return order.indexOf(a.role) - order.indexOf(b.role);
       });
     }
@@ -105,7 +112,7 @@ export default function UsersScreen() {
   const stats = useMemo(() => {
     const active = agencyUsers.filter((u) => u.status === "active").length;
     const inactive = agencyUsers.filter((u) => u.status !== "active").length;
-    const officers = agencyUsers.filter((u) => u.role === "field_officer").length;
+    const officers = agencyUsers.filter((u) => u.role === "officer").length;
     return { active, inactive, officers, total: agencyUsers.length };
   }, [agencyUsers]);
 

@@ -1,7 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import type { AgencyType } from "@/context/AuthContext";
 
-export type AgencyId = "frsc" | "police" | "vio" | string;
+export type AgencyId = AgencyType | string;
 
 export interface AgencyConfig {
   id: AgencyId;
@@ -52,6 +53,30 @@ export const AGENCIES: AgencyConfig[] = [
     description: "Vehicle roadworthiness inspection & certification",
     icon: "clipboard",
     tabRoute: "/(vio)",
+  },
+  {
+    id: "civil_defence",
+    name: "Civil Defence",
+    shortName: "NSCDC",
+    fullName: "Nigeria Security and Civil Defence Corps",
+    primaryColor: "#234E2A",
+    secondaryColor: "#3F7D3A",
+    badgePrefix: "NSCDC",
+    description: "Civil protection, rescue support & infrastructure security",
+    icon: "shield",
+    tabRoute: "/(civil-defence)",
+  },
+  {
+    id: "admin",
+    name: "Admin",
+    shortName: "ADMIN",
+    fullName: "Security Platform Administration",
+    primaryColor: "#344054",
+    secondaryColor: "#667085",
+    badgePrefix: "ADMIN",
+    description: "Cross-agency oversight, users & system operations",
+    icon: "settings",
+    tabRoute: "/(admin)",
   },
 ];
 

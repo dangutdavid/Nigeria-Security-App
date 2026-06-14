@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import * as Haptics from "expo-haptics";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   FlatList,
   ScrollView,
@@ -11,8 +12,16 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuth } from "@/context/AuthContext";
 import { InspectionReport, InspectionResult, useInspections } from "@/context/InspectionContext";
 import { useColors } from "@/hooks/useColors";
+import {
+  CitizenIncidentReceipt,
+  CitizenIncidentStatus,
+  formatCitizenIncidentStatus,
+  listVioCitizenIncidentReports,
+  updateCitizenIncidentStatusMock,
+} from "@/services/citizenIncidentApi";
 
 const PRIMARY = "#7B3F00";
 
@@ -29,6 +38,28 @@ const FILTER_TABS: { id: InspectionResult | "all"; label: string }[] = [
   { id: "conditional", label: "Conditional" },
 ];
 
+const CITIZEN_STATUS_FLOW: Record<CitizenIncidentStatus, CitizenIncidentStatus | null> = {
+  submitted: "triaged",
+  triaged: "assigned",
+  assigned: "in_progress",
+  in_progress: "resolved",
+  resolved: "closed",
+  closed: null,
+};
+
+const CITIZEN_STATUS_COLORS: Record<CitizenIncidentStatus, string> = {
+  submitted: "#E53935",
+  triaged: "#F57C00",
+  assigned: PRIMARY,
+  in_progress: "#1565C0",
+  resolved: "#388E3C",
+  closed: "#9E9E9E",
+};
+
+function formatIncidentType(type: string) {
+  return type.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const h = Math.floor(diff / 3600000);
@@ -40,9 +71,17 @@ export default function InspectionsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
   const { inspections } = useInspections();
+  const [citizenReports, setCitizenReports] = useState<CitizenIncidentReceipt[]>([]);
   const [filter, setFilter] = useState<InspectionResult | "all">("all");
   const [search, setSearch] = useState("");
+
+  const loadCitizenReports = useCallback(async () => {
+    setCitizenReports(await listVioCitizenIncidentReports());
+  }, []);
+
+  useFocusEffect(useCallback(() => { void loadCitizenReports(); }, [loadCitizenReports]));
 
   const filtered = useMemo(() => {
     let r = inspections;
@@ -58,6 +97,69 @@ export default function InspectionsScreen() {
     }
     return [...r].sort((a, b) => new Date(b.inspectedAt).getTime() - new Date(a.inspectedAt).getTime());
   }, [inspections, filter, search]);
+
+  const filteredCitizenReports = useMemo(() => {
+    let r = citizenReports;
+    if (filter === "pass") r = r.filter((x) => x.status === "resolved" || x.status === "closed");
+    if (filter === "conditional") r = r.filter((x) => x.status === "triaged" || x.status === "assigned");
+    if (filter === "fail") r = r.filter((x) => x.status === "submitted" || x.status === "in_progress");
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      r = r.filter((x) =>
+        x.reference.toLowerCase().includes(q) ||
+        x.location.toLowerCase().includes(q) ||
+        x.description.toLowerCase().includes(q) ||
+        (x.vehicleRegistration ?? "").toLowerCase().includes(q)
+      );
+    }
+    return [...r].sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+  }, [citizenReports, filter, search]);
+
+  async function advanceCitizenReport(report: CitizenIncidentReceipt) {
+    const next = CITIZEN_STATUS_FLOW[report.status];
+    if (!next) return;
+    await updateCitizenIncidentStatusMock({
+      reference: report.reference,
+      status: next,
+      actorName: user?.name ?? "VIO",
+      actorAgencyLabel: "VIO",
+    });
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await loadCitizenReports();
+  }
+
+  function renderCitizenReport(report: CitizenIncidentReceipt) {
+    const next = CITIZEN_STATUS_FLOW[report.status];
+    return (
+      <View key={report.reference} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.resultBar, { backgroundColor: CITIZEN_STATUS_COLORS[report.status] }]} />
+        <View style={{ flex: 1, gap: 5 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <View style={[styles.plateBadge, { backgroundColor: "#FFF8DC", borderColor: "#DAA520" }]}>
+              <Text style={styles.plateText}>{report.vehicleRegistration ?? report.reference}</Text>
+            </View>
+            <View style={[styles.resultChip, { backgroundColor: PRIMARY + "18" }]}>
+              <Text style={[styles.resultChipText, { color: PRIMARY }]}>Citizen Report</Text>
+            </View>
+            <Text style={[styles.cardTime, { color: colors.mutedForeground, marginLeft: "auto" }]}>{timeAgo(report.submittedAt)}</Text>
+          </View>
+          <Text style={[styles.vehicleDesc, { color: colors.text }]}>{formatIncidentType(report.incidentType)} · {report.location}</Text>
+          <Text style={[styles.ownerText, { color: colors.mutedForeground }]} numberOfLines={2}>{report.description}</Text>
+          <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+            <Text style={[styles.certNum, { color: PRIMARY }]}>{report.reference}</Text>
+            <Text style={[styles.failCount, { color: CITIZEN_STATUS_COLORS[report.status] }]}>{formatCitizenIncidentStatus(report.status)}</Text>
+            <Text style={[styles.failCount, { color: colors.mutedForeground }]}>{report.emergencyLevel.toUpperCase()}</Text>
+          </View>
+          {next && (
+            <TouchableOpacity style={[styles.advanceBtn, { borderColor: PRIMARY, backgroundColor: PRIMARY + "12" }]} onPress={() => advanceCitizenReport(report)}>
+              <Feather name="arrow-right-circle" size={14} color={PRIMARY} />
+              <Text style={[styles.advanceText, { color: PRIMARY }]}>Mark {formatCitizenIncidentStatus(next)}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   function renderItem({ item: r }: { item: InspectionReport }) {
     const failCount = r.items.filter((i) => i.status === "fail").length;
@@ -127,11 +229,22 @@ export default function InspectionsScreen() {
         keyExtractor={(r) => r.id}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          filteredCitizenReports.length > 0 ? (
+            <View style={{ gap: 10, marginBottom: 8 }}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Citizen Vehicle Reports</Text>
+              {filteredCitizenReports.map(renderCitizenReport)}
+              {filtered.length > 0 && <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 6 }]}>Inspection Records</Text>}
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Feather name="clipboard" size={40} color={colors.mutedForeground} />
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No inspections found</Text>
-          </View>
+          filteredCitizenReports.length === 0 ? (
+            <View style={styles.empty}>
+              <Feather name="clipboard" size={40} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No inspections found</Text>
+            </View>
+          ) : null
         }
       />
     </View>
@@ -160,6 +273,9 @@ const styles = StyleSheet.create({
   ownerText: { fontSize: 12, fontFamily: "Inter_400Regular" },
   certNum: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   failCount: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  advanceBtn: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, marginTop: 4 },
+  advanceText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  sectionTitle: { fontSize: 13, fontFamily: "Inter_700Bold" },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
   emptyText: { fontSize: 15, fontFamily: "Inter_400Regular" },
 });

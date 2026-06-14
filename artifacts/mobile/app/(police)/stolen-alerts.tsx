@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -11,6 +11,13 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheftReports, formatMinutesAgo, getAlertRadiusMiles } from "@/context/TheftReportContext";
 import { useColors } from "@/hooks/useColors";
+import {
+  CitizenIncidentReceipt,
+  formatCitizenIncidentStatus,
+  listPoliceCitizenIncidentReports,
+  updateCitizenIncidentStatusMock,
+} from "@/services/citizenIncidentApi";
+import { useAuth } from "@/context/AuthContext";
 
 const PRIMARY = "#1A3A6C";
 
@@ -18,17 +25,42 @@ export default function PoliceStolenAlertsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
   const { reports: theftReports, updateReportStatus } = useTheftReports();
+  const [citizenAlerts, setCitizenAlerts] = useState<CitizenIncidentReceipt[]>([]);
+
+  const loadCitizenAlerts = useCallback(async () => {
+    const reports = await listPoliceCitizenIncidentReports();
+    setCitizenAlerts(reports.filter((r) => r.incidentType === "vehicle_theft" || r.incidentType === "missing_vehicle_alert"));
+  }, []);
+
+  useFocusEffect(useCallback(() => { void loadCitizenAlerts(); }, [loadCitizenAlerts]));
 
   const active = [...theftReports]
     .filter((r) => r.status === "active")
     .sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime());
 
+  const activeCitizenAlerts = useMemo(
+    () => citizenAlerts.filter((r) => r.status !== "resolved" && r.status !== "closed").sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()),
+    [citizenAlerts],
+  );
+
+  async function triageCitizenAlert(report: CitizenIncidentReceipt) {
+    if (report.status !== "submitted") return;
+    await updateCitizenIncidentStatusMock({
+      reference: report.reference,
+      status: "triaged",
+      actorName: user?.name ?? "Police",
+      actorAgencyLabel: "Police",
+    });
+    await loadCitizenAlerts();
+  }
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: insets.top + 12, backgroundColor: PRIMARY }]}>
         <Text style={styles.headerTitle}>Stolen Vehicle Alerts</Text>
-        <Text style={styles.headerSub}>{active.length} active report{active.length !== 1 ? "s" : ""} — nationwide</Text>
+        <Text style={styles.headerSub}>{active.length + activeCitizenAlerts.length} active report{active.length + activeCitizenAlerts.length !== 1 ? "s" : ""} — nationwide</Text>
       </View>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false}>
@@ -42,7 +74,38 @@ export default function PoliceStolenAlertsScreen() {
           <Feather name="arrow-right" size={14} color="#C0392B" />
         </TouchableOpacity>
 
-        {active.length === 0 ? (
+        {activeCitizenAlerts.map((report) => (
+          <View key={report.reference} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.cardHeader}>
+              <View style={[styles.plateBadge, { backgroundColor: "#FFF8DC", borderColor: "#DAA520" }]}>
+                <Text style={styles.plateText}>{report.vehicleRegistration ?? "NO PLATE"}</Text>
+              </View>
+              <View style={[styles.radiusBadge, { backgroundColor: PRIMARY + "18" }]}>
+                <Feather name="user" size={12} color={PRIMARY} />
+                <Text style={[styles.radiusText, { color: PRIMARY }]}>Citizen Report</Text>
+              </View>
+              <Text style={[styles.timeText, { color: colors.mutedForeground }]}>{formatMinutesAgo(report.submittedAt)}</Text>
+            </View>
+            <Text style={[styles.vehicleDesc, { color: colors.text }]}>{report.reference} · {formatCitizenIncidentStatus(report.status)}</Text>
+            <Text style={[styles.locationText, { color: colors.mutedForeground }]}>
+              <Feather name="map-pin" size={12} color={colors.mutedForeground} /> {report.location}
+            </Text>
+            <Text style={[styles.descText, { color: colors.mutedForeground }]} numberOfLines={2}>{report.description}</Text>
+            {report.status === "submitted" && (
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: PRIMARY + "12", borderColor: PRIMARY + "33" }]}
+                  onPress={() => triageCitizenAlert(report)}
+                >
+                  <Feather name="check" size={14} color={PRIMARY} />
+                  <Text style={[styles.actionText, { color: PRIMARY }]}>Mark Triaged</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        ))}
+
+        {active.length === 0 && activeCitizenAlerts.length === 0 ? (
           <View style={styles.empty}>
             <Feather name="check-circle" size={40} color={colors.mutedForeground} />
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No active stolen vehicle reports</Text>

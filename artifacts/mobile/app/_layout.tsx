@@ -36,6 +36,8 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="(police)" options={{ headerShown: false }} />
       <Stack.Screen name="(vio)" options={{ headerShown: false }} />
+      <Stack.Screen name="(civil-defence)" options={{ headerShown: false }} />
+      <Stack.Screen name="(admin)" options={{ headerShown: false }} />
       <Stack.Screen
         name="report"
         options={{ headerShown: false, presentation: "modal" }}
@@ -55,11 +57,17 @@ function RootLayoutNav() {
         name="report-theft"
         options={{ headerShown: false, presentation: "modal" }}
       />
+      <Stack.Screen
+        name="report-incident"
+        options={{ headerShown: false, presentation: "modal" }}
+      />
+      <Stack.Screen name="track-report" options={{ headerShown: false }} />
       <Stack.Screen name="theft-alerts" options={{ headerShown: false }} />
       <Stack.Screen name="crime/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="inspection/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="referrals" options={{ headerShown: false }} />
       <Stack.Screen name="emergency" options={{ headerShown: false }} />
+      <Stack.Screen name="unauthorized" options={{ headerShown: false }} />
       <Stack.Screen name="analytics-police" options={{ headerShown: false }} />
       <Stack.Screen name="analytics-vio" options={{ headerShown: false }} />
     </Stack>

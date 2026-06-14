@@ -53,7 +53,7 @@ function buildAlerts(
     }
   }
 
-  if (role === "field_officer" && userId) {
+  if (role === "officer" && userId) {
     const assignedToMe = incidents.filter(
       (i) => i.assignedTo === userId && i.status !== "closed",
     );
@@ -204,7 +204,7 @@ export default function AlertsScreen() {
   }, []);
 
   const allAlerts = useMemo(
-    () => buildAlerts(incidents, user?.role || "field_officer", user?.id),
+    () => buildAlerts(incidents, user?.role || "officer", user?.id),
     [incidents, user?.role, user?.id],
   );
 

@@ -1,14 +1,15 @@
-import { BlurView } from "expo-blur";
 import { Feather } from "@expo/vector-icons";
 import { Redirect, Tabs } from "expo-router";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
-import { useColors } from "@/hooks/useColors";
+import { BlurView } from "expo-blur";
+
 import { useAuth } from "@/context/AuthContext";
+import { useColors } from "@/hooks/useColors";
 
-const PRIMARY = "#1A3A6C";
+const PRIMARY = "#234E2A";
 
-export default function PoliceTabLayout() {
+export default function CivilDefenceLayout() {
   const { user, isLoading } = useAuth();
   const colors = useColors();
   const colorScheme = useColorScheme();
@@ -18,14 +19,14 @@ export default function PoliceTabLayout() {
 
   if (isLoading) return null;
   if (!user) return <Redirect href="/" />;
-  if (user.agency !== "police") return <Redirect href="/unauthorized" />;
+  if (user.agency !== "civil_defence") return <Redirect href="/unauthorized" />;
 
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
         tabBarActiveTintColor: PRIMARY,
         tabBarInactiveTintColor: colors.mutedForeground,
-        headerShown: false,
         tabBarStyle: {
           position: "absolute",
           backgroundColor: isIOS ? "transparent" : colors.card,
@@ -43,41 +44,11 @@ export default function PoliceTabLayout() {
         tabBarLabelStyle: { fontSize: 10, fontFamily: "Inter_600SemiBold", marginBottom: 2 },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Home",
-          tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="crime-reports"
-        options={{
-          title: "Cases",
-          tabBarIcon: ({ color }) => <Feather name="file-text" size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="vehicle-check"
-        options={{
-          title: "Vehicles",
-          tabBarIcon: ({ color }) => <Feather name="truck" size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="stolen-alerts"
-        options={{
-          title: "Alerts",
-          tabBarIcon: ({ color }) => <Feather name="alert-triangle" size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profile",
-          tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} />,
-        }}
-      />
+      <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} /> }} />
+      <Tabs.Screen name="incidents" options={{ title: "Incidents", tabBarIcon: ({ color }) => <Feather name="shield" size={22} color={color} /> }} />
+      <Tabs.Screen name="map" options={{ title: "Map", tabBarIcon: ({ color }) => <Feather name="map" size={22} color={color} /> }} />
+      <Tabs.Screen name="alerts" options={{ title: "Alerts", tabBarIcon: ({ color }) => <Feather name="bell" size={22} color={color} /> }} />
+      <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} /> }} />
     </Tabs>
   );
 }

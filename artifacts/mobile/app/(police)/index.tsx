@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
-import React, { useMemo } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Platform,
   ScrollView,
@@ -15,6 +15,11 @@ import { useAuth } from "@/context/AuthContext";
 import { useCrimeReports, CRIME_TYPE_LABELS, CrimeType } from "@/context/CrimeReportContext";
 import { useTheftReports } from "@/context/TheftReportContext";
 import { useColors } from "@/hooks/useColors";
+import {
+  CitizenIncidentReceipt,
+  formatCitizenIncidentStatus,
+  listPoliceCitizenIncidentReports,
+} from "@/services/citizenIncidentApi";
 
 const PRIMARY = "#1A3A6C";
 
@@ -41,6 +46,19 @@ const SEV_COLORS: Record<string, string> = {
   critical: "#880E4F",
 };
 
+const CITIZEN_STATUS_COLORS: Record<string, string> = {
+  submitted: "#E53935",
+  triaged: "#F57C00",
+  assigned: "#1A3A6C",
+  in_progress: "#1565C0",
+  resolved: "#388E3C",
+  closed: "#9E9E9E",
+};
+
+function formatIncidentType(type: string) {
+  return type.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export default function PoliceHome() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -48,21 +66,34 @@ export default function PoliceHome() {
   const { user } = useAuth();
   const { reports } = useCrimeReports();
   const { reports: theftReports } = useTheftReports();
+  const [citizenReports, setCitizenReports] = useState<CitizenIncidentReceipt[]>([]);
+
+  const loadCitizenReports = useCallback(async () => {
+    setCitizenReports(await listPoliceCitizenIncidentReports());
+  }, []);
+
+  useFocusEffect(useCallback(() => { void loadCitizenReports(); }, [loadCitizenReports]));
 
   const isSupervisor = user?.role === "supervisor" || user?.role === "commander";
 
   const stats = useMemo(() => ({
-    open: reports.filter((r) => r.status === "open").length,
-    investigating: reports.filter((r) => r.status === "investigating").length,
+    open: reports.filter((r) => r.status === "open").length + citizenReports.filter((r) => r.status === "submitted" || r.status === "triaged").length,
+    investigating: reports.filter((r) => r.status === "investigating").length + citizenReports.filter((r) => r.status === "assigned" || r.status === "in_progress").length,
     arrested: reports.filter((r) => r.status === "arrested").length,
-    closed: reports.filter((r) => r.status === "closed").length,
-    stolen: theftReports.filter((r: { status: string }) => r.status === "active").length,
-    critical: reports.filter((r) => r.severity === "critical" && r.status !== "closed").length,
-  }), [reports, theftReports]);
+    closed: reports.filter((r) => r.status === "closed").length + citizenReports.filter((r) => r.status === "resolved" || r.status === "closed").length,
+    stolen: theftReports.filter((r: { status: string }) => r.status === "active").length + citizenReports.filter((r) => r.incidentType === "vehicle_theft" || r.incidentType === "missing_vehicle_alert").length,
+    critical: reports.filter((r) => r.severity === "critical" && r.status !== "closed").length + citizenReports.filter((r) => (r.emergencyLevel === "critical" || r.emergencyLevel === "high") && r.status !== "closed" && r.status !== "resolved").length,
+    citizen: citizenReports.length,
+  }), [reports, theftReports, citizenReports]);
 
   const recent = useMemo(() =>
     [...reports].sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime()).slice(0, 3),
     [reports]
+  );
+
+  const recentCitizenReports = useMemo(
+    () => [...citizenReports].sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()).slice(0, 3),
+    [citizenReports],
   );
 
   const quickActions = [
@@ -120,6 +151,43 @@ export default function PoliceHome() {
             <Text style={[styles.criticalText, { color: "#880E4F" }]}>
               {stats.critical} critical case{stats.critical !== 1 ? "s" : ""} requiring immediate attention
             </Text>
+          </View>
+        )}
+
+        {stats.citizen > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionRow}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Citizen Reports</Text>
+              <TouchableOpacity onPress={() => router.push("/(police)/crime-reports" as any)}>
+                <Text style={[styles.seeAll, { color: PRIMARY }]}>Review</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ gap: 10 }}>
+              {recentCitizenReports.map((report) => (
+                <TouchableOpacity
+                  key={report.reference}
+                  style={[styles.reportCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={() => router.push("/(police)/crime-reports" as any)}
+                  activeOpacity={0.85}
+                >
+                  <View style={[styles.sevDot, { backgroundColor: CITIZEN_STATUS_COLORS[report.status] ?? PRIMARY }]} />
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <View style={styles.reportCardTop}>
+                      <Text style={[styles.reportTitle, { color: colors.text }]} numberOfLines={1}>{report.reference}</Text>
+                      <Text style={[styles.reportTime, { color: colors.mutedForeground }]}>{timeAgo(report.submittedAt)}</Text>
+                    </View>
+                    <Text style={[styles.reportType, { color: colors.mutedForeground }]}>
+                      Citizen Report · {formatIncidentType(report.incidentType)} · {report.location}
+                    </Text>
+                    <View style={[styles.statusBadge, { backgroundColor: (CITIZEN_STATUS_COLORS[report.status] ?? PRIMARY) + "22" }]}>
+                      <Text style={[styles.statusText, { color: CITIZEN_STATUS_COLORS[report.status] ?? PRIMARY }]}>
+                        {formatCitizenIncidentStatus(report.status)}
+                      </Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
 

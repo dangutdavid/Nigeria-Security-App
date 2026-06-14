@@ -1,9 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-export type UserRole = "field_officer" | "supervisor" | "commander";
+export type UserRole = "citizen" | "officer" | "supervisor" | "commander" | "admin" | "super_admin";
 export type UserStatus = "active" | "inactive" | "suspended";
-export type AgencyType = "frsc" | "police" | "vio";
+export type AgencyType = "frsc" | "police" | "vio" | "civil_defence" | "admin" | "citizen" | "public";
 
 export interface User {
   id: string;
@@ -33,6 +33,13 @@ interface PendingOtp {
   code: string;
   expiresAt: number;
 }
+
+type StoredUser = Omit<User, "role" | "agency"> & {
+  role: UserRole | "field_officer";
+  agency?: AgencyType;
+};
+
+type StoredUserRecord = Omit<UserRecord, "user"> & { user: StoredUser };
 
 interface AuthContextType {
   user: User | null;
@@ -72,7 +79,7 @@ const SEED_RECORDS: UserRecord[] = [
     pin: "1234",
     user: {
       id: "u1", name: "Okafor Emmanuel", badgeNumber: "FO-001",
-      email: "o.emmanuel@frsc.gov.ng", role: "field_officer",
+      email: "o.emmanuel@frsc.gov.ng", role: "officer",
       sector: "Abuja FCT", station: "Kubwa Outpost",
       phone: "+234 803 111 2222", status: "active",
       createdAt: "2024-01-15T08:00:00.000Z", agency: "frsc",
@@ -102,7 +109,7 @@ const SEED_RECORDS: UserRecord[] = [
     pin: "5678",
     user: {
       id: "u4", name: "Chukwudi Eze", badgeNumber: "FO-022",
-      email: "c.eze@frsc.gov.ng", role: "field_officer",
+      email: "c.eze@frsc.gov.ng", role: "officer",
       sector: "Lagos State", station: "Ikeja Checkpoint",
       phone: "+234 802 444 5555", status: "active",
       createdAt: "2024-03-20T08:00:00.000Z", agency: "frsc",
@@ -112,7 +119,7 @@ const SEED_RECORDS: UserRecord[] = [
     pin: "5678",
     user: {
       id: "u5", name: "Fatima Bello", badgeNumber: "FO-037",
-      email: "f.bello@frsc.gov.ng", role: "field_officer",
+      email: "f.bello@frsc.gov.ng", role: "officer",
       sector: "Kano State", station: "Kano Metro Command",
       phone: "+234 807 777 8888", status: "inactive",
       createdAt: "2024-05-01T08:00:00.000Z", agency: "frsc",
@@ -123,7 +130,7 @@ const SEED_RECORDS: UserRecord[] = [
     pin: "1234",
     user: {
       id: "p1", name: "Insp. Chukwuemeka Okonkwo", badgeNumber: "NPF-001",
-      email: "c.okonkwo@npf.gov.ng", role: "field_officer",
+      email: "c.okonkwo@npf.gov.ng", role: "officer",
       sector: "FCT Command", station: "Maitama Divisional HQ",
       phone: "+234 803 222 3333", status: "active",
       createdAt: "2023-09-01T08:00:00.000Z", agency: "police",
@@ -154,7 +161,7 @@ const SEED_RECORDS: UserRecord[] = [
     pin: "1234",
     user: {
       id: "v1", name: "Officer Grace Okafor", badgeNumber: "VIO-001",
-      email: "g.okafor@vio.gov.ng", role: "field_officer",
+      email: "g.okafor@vio.gov.ng", role: "officer",
       sector: "FCT VIO", station: "Abuja VIO Centre",
       phone: "+234 803 888 9999", status: "active",
       createdAt: "2024-02-01T08:00:00.000Z", agency: "vio",
@@ -180,6 +187,58 @@ const SEED_RECORDS: UserRecord[] = [
       createdAt: "2021-01-15T08:00:00.000Z", agency: "vio",
     },
   },
+  // ── Civil Defence / NSCDC ───────────────────────────────
+  {
+    pin: "1234",
+    user: {
+      id: "c1", name: "Officer Daniel Musa", badgeNumber: "NSCDC-001",
+      email: "d.musa@nscdc.gov.ng", role: "officer",
+      sector: "FCT Command", station: "Wuse Response Unit",
+      phone: "+234 803 555 1212", status: "active",
+      createdAt: "2024-04-01T08:00:00.000Z", agency: "civil_defence",
+    },
+  },
+  {
+    pin: "1234",
+    user: {
+      id: "c2", name: "ASC Halima Yusuf", badgeNumber: "NSCDC-SV",
+      email: "h.yusuf@nscdc.gov.ng", role: "supervisor",
+      sector: "Lagos Command", station: "Ikeja Civil Defence Office",
+      phone: "+234 805 555 3434", status: "active",
+      createdAt: "2023-08-10T08:00:00.000Z", agency: "civil_defence",
+    },
+  },
+  {
+    pin: "1234",
+    user: {
+      id: "c3", name: "Commandant Peter Ade", badgeNumber: "NSCDC-CMD",
+      email: "p.ade@nscdc.gov.ng", role: "commander",
+      sector: "National Command", station: "NSCDC Headquarters",
+      phone: "+234 809 555 5656", status: "active",
+      createdAt: "2021-05-20T08:00:00.000Z", agency: "civil_defence",
+    },
+  },
+  // ── Platform Administration ─────────────────────────────
+  {
+    pin: "1234",
+    user: {
+      id: "a1", name: "Admin Miriam Bello", badgeNumber: "ADMIN-001",
+      email: "m.bello@security.gov.ng", role: "admin",
+      sector: "Platform Operations", station: "Operations Centre",
+      phone: "+234 803 555 7878", status: "active",
+      createdAt: "2022-01-15T08:00:00.000Z", agency: "admin",
+    },
+  },
+  {
+    pin: "1234",
+    user: {
+      id: "a2", name: "Super Admin Tunde Lawal", badgeNumber: "SUPER-001",
+      email: "t.lawal@security.gov.ng", role: "super_admin",
+      sector: "National Platform Administration", station: "System Control",
+      phone: "+234 809 555 9090", status: "active",
+      createdAt: "2021-01-01T08:00:00.000Z", agency: "admin",
+    },
+  },
 ];
 
 const AUTH_STORAGE_KEY = "@frsc_auth_user";
@@ -187,6 +246,33 @@ const USERS_STORAGE_KEY = "@frsc_users";
 const OTP_STORAGE_KEY = "@frsc_pending_otp";
 const OTP_VERIFIED_KEY = "@frsc_otp_verified";
 const OTP_TTL_MS = 10 * 60 * 1000;
+
+export function normalizeRole(role: UserRole | "field_officer" | undefined): UserRole {
+  if (role === "field_officer") return "officer";
+  return role ?? "officer";
+}
+
+function normalizeAgency(agency: AgencyType | undefined): AgencyType {
+  return agency ?? "frsc";
+}
+
+function normalizeUser(user: StoredUser | User): User {
+  return {
+    ...user,
+    role: normalizeRole(user.role),
+    agency: normalizeAgency(user.agency),
+  };
+}
+
+export function routeForUser(user: User | null | undefined): string {
+  if (!user) return "/";
+  if (user.role === "admin" || user.role === "super_admin" || user.agency === "admin") return "/(admin)";
+  if (user.agency === "police") return "/(police)";
+  if (user.agency === "vio") return "/(vio)";
+  if (user.agency === "civil_defence") return "/(civil-defence)";
+  if (user.agency === "frsc") return "/(tabs)";
+  return "/";
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -204,14 +290,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.getItem(USERS_STORAGE_KEY),
       ]);
       if (storedUser) {
-        const parsed: User = JSON.parse(storedUser);
-        setUser({ ...parsed, agency: parsed.agency ?? "frsc" });
+        const parsed: StoredUser = JSON.parse(storedUser);
+        setUser(normalizeUser(parsed));
       }
       if (storedUsers) {
-        const parsed: UserRecord[] = JSON.parse(storedUsers);
-        const patched = parsed.map((r) => ({
+        const parsed: StoredUserRecord[] = JSON.parse(storedUsers);
+        const patched: UserRecord[] = parsed.map((r) => ({
           ...r,
-          user: { ...r.user, email: r.user.email ?? "", agency: r.user.agency ?? ("frsc" as AgencyType) },
+          user: normalizeUser({ ...r.user, email: r.user.email ?? "" }),
         }));
         // Merge stored users with seeds so new agency seed users are always present
         const storedIds = new Set(patched.map((r) => r.user.id));

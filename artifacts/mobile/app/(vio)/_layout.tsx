@@ -18,7 +18,7 @@ export default function VIOTabLayout() {
 
   if (isLoading) return null;
   if (!user) return <Redirect href="/" />;
-  if (user.agency !== "vio") return <Redirect href="/" />;
+  if (user.agency !== "vio") return <Redirect href="/unauthorized" />;
 
   return (
     <Tabs
