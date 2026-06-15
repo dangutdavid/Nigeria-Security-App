@@ -203,6 +203,15 @@ export type CitizenIncidentStatus = z.infer<typeof CitizenIncidentStatusSchema>;
 export type CitizenReportSubmission = z.infer<typeof CitizenReportSubmissionSchema>;
 export type CitizenReportTimelineEntry = z.infer<typeof CitizenReportTimelineEntrySchema>;
 
+// ---- Auth ----
+// Demo login: badge + PIN, with optional agency id (also accepts dynamic agency ids).
+export const AuthLoginSchema = z.object({
+  badgeNumber: z.string().min(1),
+  pin: z.string().min(1),
+  agency: z.string().optional(),
+});
+export type AuthLogin = z.infer<typeof AuthLoginSchema>;
+
 // ---- Agency workflow requests (status update, reassignment, timeline) ----
 // Report status includes "rejected" in addition to the citizen-facing statuses.
 export const ReportStatusSchema = z.enum([

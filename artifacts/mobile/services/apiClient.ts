@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getMobileApiConfig, shouldUseApi } from "@/services/apiConfig";
 
 export type ApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -34,6 +35,39 @@ export function setMobileAuthTokenGetter(getter: AuthTokenGetter | null) {
   authTokenGetter = getter;
 }
 
+// Bearer token persistence.
+// NOTE: AsyncStorage is used for now. For production, migrate this to
+// expo-secure-store (install `expo-secure-store`) so the session token is kept
+// in the device keychain/keystore rather than plain AsyncStorage.
+const AUTH_TOKEN_KEY = "@security_api_auth_token_v1";
+let cachedToken: string | null = null;
+let tokenLoaded = false;
+
+/** Store (or clear) the bearer token and persist it for the next launch. */
+export async function setMobileApiToken(token: string | null): Promise<void> {
+  cachedToken = token;
+  tokenLoaded = true;
+  try {
+    if (token) await AsyncStorage.setItem(AUTH_TOKEN_KEY, token);
+    else await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
+  } catch {
+    // Non-fatal: token still held in memory for this session.
+  }
+}
+
+/** Read the bearer token, lazily restoring it from storage on first use. */
+export async function getMobileApiToken(): Promise<string | null> {
+  if (!tokenLoaded) {
+    try {
+      cachedToken = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+    } catch {
+      cachedToken = null;
+    }
+    tokenLoaded = true;
+  }
+  return cachedToken;
+}
+
 export async function mobileApiFetch<TResponse, TBody = unknown>(
   options: ApiRequestOptions<TBody>,
 ): Promise<ApiResult<TResponse>> {
@@ -46,7 +80,11 @@ export async function mobileApiFetch<TResponse, TBody = unknown>(
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? config.timeoutMs);
 
   try {
-    const token = options.requireAuth ? await authTokenGetter?.() : null;
+    let token: string | null = null;
+    if (options.requireAuth) {
+      token = await getMobileApiToken();
+      if (!token && authTokenGetter) token = (await authTokenGetter()) ?? null;
+    }
     const headers: Record<string, string> = {
       Accept: "application/json",
       ...options.headers,

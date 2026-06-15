@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 import { createAuditEvent } from "@/services/auditLogService";
+import { clearApiSession, establishApiSession } from "@/services/authRepository";
 
 export type UserRole = "citizen" | "officer" | "supervisor" | "commander" | "admin" | "super_admin";
 export type UserStatus = "active" | "inactive" | "suspended";
@@ -353,6 +354,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(entry.user));
     setUser(entry.user);
+    // Best-effort: in API mode, obtain a backend session token so protected
+    // report/agency calls authenticate. Fire-and-forget so local login is never
+    // blocked or failed by backend availability.
+    void establishApiSession(badgeNumber, pin, entry.user.agency);
     await createAuditEvent({
       type: "auth.login",
       title: "User signed in",
@@ -367,6 +372,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function logout() {
     const previousUser = user;
     await AsyncStorage.multiRemove([AUTH_STORAGE_KEY, OTP_STORAGE_KEY, OTP_VERIFIED_KEY]);
+    void clearApiSession();
     setUser(null);
     if (previousUser) {
       await createAuditEvent({

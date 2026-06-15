@@ -5,7 +5,8 @@ import type {
   OtpVerifyResult,
   User,
 } from "@/context/AuthContext";
-import { mobileApiFetch, setMobileAuthTokenGetter } from "@/services/apiClient";
+import { mobileApiFetch, setMobileApiToken } from "@/services/apiClient";
+import { shouldUseApi } from "@/services/apiConfig";
 
 export interface AuthRepositoryLocalAdapter {
   login?: (badgeNumber: string, pin: string, agency?: AgencyType) => Promise<LoginResult>;
@@ -21,9 +22,37 @@ interface LoginResponse {
   token?: string;
 }
 
-let cachedToken: string | null = null;
+/**
+ * Best-effort backend session: in API mode, log in against the backend and
+ * persist the returned bearer token (so protected report/agency calls
+ * authenticate). Returns false when API mode is off or login fails — the caller
+ * keeps using local AuthContext, so demo/offline login is never blocked.
+ */
+export async function establishApiSession(
+  badgeNumber: string,
+  pin: string,
+  agency?: AgencyType,
+): Promise<boolean> {
+  if (!shouldUseApi()) return false;
+  const api = await mobileApiFetch<LoginResponse, { badgeNumber: string; pin: string; agency?: AgencyType }>({
+    method: "POST",
+    path: "/auth/login",
+    body: { badgeNumber, pin, agency },
+  });
+  if (api.ok && api.data.token) {
+    await setMobileApiToken(api.data.token);
+    return true;
+  }
+  return false;
+}
 
-setMobileAuthTokenGetter(() => cachedToken);
+/** Clear the persisted backend session (best-effort logout + token wipe). */
+export async function clearApiSession(): Promise<void> {
+  if (shouldUseApi()) {
+    await mobileApiFetch<{ ok: boolean }>({ method: "POST", path: "/auth/logout", requireAuth: true });
+  }
+  await setMobileApiToken(null);
+}
 
 export function createAuthRepository(local: AuthRepositoryLocalAdapter = {}) {
   return {
@@ -49,7 +78,7 @@ export async function login(
   });
 
   if (api.ok && api.data.user) {
-    cachedToken = api.data.token ?? null;
+    await setMobileApiToken(api.data.token ?? null);
     return "ok";
   }
 
@@ -58,7 +87,7 @@ export async function login(
 
 export async function logout(local: AuthRepositoryLocalAdapter = {}): Promise<void> {
   await mobileApiFetch<{ ok: boolean }>({ method: "POST", path: "/auth/logout", requireAuth: true });
-  cachedToken = null;
+  await setMobileApiToken(null);
   await local.logout?.();
 }
 

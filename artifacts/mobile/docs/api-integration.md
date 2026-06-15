@@ -278,6 +278,73 @@ pnpm --filter @workspace/api-server run dev
 - Mobile AsyncStorage fallback is independent and always available regardless of
   backend store.
 
+## Authentication & RBAC (Phase 5)
+
+The backend now has a token-based auth foundation with server-enforced
+role-based access control. The mobile app keeps **local/mock login** as the
+source of truth for the demo and acquires a backend session token best-effort
+when API mode is on.
+
+### Auth endpoints
+
+| Method | Endpoint           | Notes                                                              |
+| ------ | ------------------ | ------------------------------------------------------------------ |
+| POST   | `/api/auth/login`  | `{ badgeNumber, pin, agency? }` → `{ token, user, agency, role, capabilities }`. PINs are never returned. |
+| POST   | `/api/auth/logout` | Stateless — the client discards its token. Returns `{ ok: true }`. |
+| GET    | `/api/auth/me`     | Requires `Authorization: Bearer <token>`; returns the user from the token. |
+
+OTP / PIN-reset endpoints are not implemented server-side yet (the mobile
+`authRepository` calls fall back to the local OTP flow).
+
+### Token / session approach
+
+- **Stateless HMAC token** (no session store): `base64url(claims).hmacSHA256`,
+  signed with `AUTH_SECRET` (set it in production — a dev default is used and a
+  warning logged otherwise). Claims carry `sub`, `badgeNumber`, `agency`, `role`,
+  `exp` (12h). Tokens remain valid across server restarts while the secret is stable.
+- Backend user resolution uses a **demo user repository** (in-memory) behind an
+  `authenticate()` abstraction — a DB-backed implementation can replace it once
+  users are seeded in the flat agency/role/pin model. Demo credentials (all PIN
+  `1234`): `ADMIN-001` (admin), `SUPER-001` (super_admin), `FO-001` (FRSC),
+  `NPF-001` (police), `VIO-001` (vio), `NSCDC-001` (NSCDC), and any
+  `{PREFIX}-001 | {PREFIX}-SV | {PREFIX}-CMD` for a given agency (covers dynamic
+  DSS / Fire Service / custom agencies → officer / supervisor / commander).
+
+### RBAC (server-enforced — never trusts client agency/role headers)
+
+- **Public** (no token): health check, `POST /citizen-reports`,
+  `GET /citizen-reports/track/:reference`, `GET /citizen-reports/:id/timeline`.
+- **Agency users** (officer/supervisor/commander): may list / view / update
+  status / append timeline for **their own agency's** reports only.
+- **Admin / super_admin**: list all reports (`GET /reports`), reassign reports,
+  and access any agency. **Reassignment is admin-only.**
+- Cross-agency or unauthenticated access to agency/admin endpoints returns
+  `403` / `401`.
+
+### API-mode login flow & local fallback
+
+1. `AuthContext.login()` resolves the user **locally** (demo records) — this is
+   unchanged and always works offline.
+2. On success, in API mode it fires `establishApiSession(badge, pin, agency)`
+   (best-effort, non-blocking) which calls `POST /api/auth/login` and persists
+   the bearer token via `setMobileApiToken` (AsyncStorage).
+3. `apiClient.mobileApiFetch` automatically attaches `Authorization: Bearer
+   <token>` on `requireAuth` calls (agency lists, dashboards, status, reassign…).
+4. If API mode is off, the backend is unavailable, or login fails, no token is
+   stored — protected calls 401 and the report/notification repositories fall
+   back to AsyncStorage/local. Local login is never blocked.
+5. `logout()` clears the token (`clearApiSession`).
+
+### Security notes
+
+- **No API keys live in the mobile bundle.** Only a short-lived session token is
+  stored on-device, obtained from the backend after login.
+- The token is currently kept in **AsyncStorage**; migrate to
+  `expo-secure-store` (device keychain/keystore) before production — noted in
+  `apiClient.ts`.
+- `AUTH_SECRET` must be set on the server in production; the demo PIN auth is for
+  development only and should be replaced by DB-backed users + hashed PINs.
+
 ## Backend Notes
 
 The repository already has:
