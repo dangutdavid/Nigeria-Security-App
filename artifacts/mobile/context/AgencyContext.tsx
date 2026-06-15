@@ -16,10 +16,12 @@ export interface AgencyConfig {
   description: string;
   icon: string;
   tabRoute: string;
+  isActive: boolean;
 }
 
-export type NewAgencyInput = Omit<AgencyConfig, "id" | "tabRoute"> & {
+export type NewAgencyInput = Omit<AgencyConfig, "id" | "tabRoute" | "isActive"> & {
   id?: string;
+  isActive?: boolean;
 };
 
 export const DEFAULT_AGENCIES: AgencyConfig[] = [
@@ -34,6 +36,7 @@ export const DEFAULT_AGENCIES: AgencyConfig[] = [
     description: "Road traffic management, crash response & safety enforcement",
     icon: "shield",
     tabRoute: "/(tabs)",
+    isActive: true,
   },
   {
     id: "police",
@@ -46,6 +49,7 @@ export const DEFAULT_AGENCIES: AgencyConfig[] = [
     description: "Crime investigation, law enforcement & public security",
     icon: "star",
     tabRoute: "/(police)",
+    isActive: true,
   },
   {
     id: "vio",
@@ -58,6 +62,7 @@ export const DEFAULT_AGENCIES: AgencyConfig[] = [
     description: "Vehicle roadworthiness inspection & certification",
     icon: "clipboard",
     tabRoute: "/(vio)",
+    isActive: true,
   },
   {
     id: "civil_defence",
@@ -70,6 +75,7 @@ export const DEFAULT_AGENCIES: AgencyConfig[] = [
     description: "Civil protection, rescue support & infrastructure security",
     icon: "shield",
     tabRoute: "/(civil-defence)",
+    isActive: true,
   },
   {
     id: "admin",
@@ -82,6 +88,7 @@ export const DEFAULT_AGENCIES: AgencyConfig[] = [
     description: "Cross-agency oversight, users & system operations",
     icon: "settings",
     tabRoute: "/(admin)",
+    isActive: true,
   },
 ];
 
@@ -97,6 +104,7 @@ interface AgencyContextType {
   clearAgency: () => Promise<void>;
   getAgencyById: (id: AgencyId) => AgencyConfig | undefined;
   addAgency: (input: NewAgencyInput) => Promise<AgencyConfig>;
+  setAgencyActive: (id: AgencyId, isActive: boolean) => Promise<void>;
 }
 
 const AgencyContext = createContext<AgencyContextType>({
@@ -106,6 +114,7 @@ const AgencyContext = createContext<AgencyContextType>({
   clearAgency: async () => {},
   getAgencyById: () => undefined,
   addAgency: async () => DEFAULT_AGENCIES[0],
+  setAgencyActive: async () => {},
 });
 
 export function useAgency() {
@@ -126,8 +135,9 @@ export function AgencyProvider({ children }: { children: React.ReactNode }) {
       const merged = mergeAgencies(DEFAULT_AGENCIES, storedAgencies);
       setAgencies(merged);
       if (selected) {
-        const agency = merged.find((a) => a.id === selected);
+        const agency = merged.find((a) => a.id === selected && a.isActive !== false);
         if (agency) setSelectedAgency(agency);
+        else await AsyncStorage.removeItem(STORAGE_KEY);
       }
     }
 
@@ -135,9 +145,10 @@ export function AgencyProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const selectAgency = useCallback(async (id: AgencyId) => {
-    const agency = agencies.find((a) => a.id === id) ?? null;
+    const agency = agencies.find((a) => a.id === id && a.isActive !== false) ?? null;
     setSelectedAgency(agency);
     if (agency) await AsyncStorage.setItem(STORAGE_KEY, id);
+    else await AsyncStorage.removeItem(STORAGE_KEY);
   }, [agencies]);
 
   const clearAgency = useCallback(async () => {
@@ -164,12 +175,12 @@ export function AgencyProvider({ children }: { children: React.ReactNode }) {
       primaryColor: input.primaryColor || "#344054",
       secondaryColor: input.secondaryColor || "#667085",
       tabRoute: "/unauthorized",
+      isActive: input.isActive ?? true,
     };
 
     const next = [...agencies, agency];
     setAgencies(next);
-    const customAgencies = next.filter((item) => !DEFAULT_AGENCIES.some((seed) => seed.id === item.id));
-    await AsyncStorage.setItem(AGENCY_REGISTRY_KEY, JSON.stringify(customAgencies));
+    await persistAgencyOverrides(next);
     await createAuditEvent({
       type: "agency.created",
       title: "Agency registry entry created",
@@ -187,8 +198,37 @@ export function AgencyProvider({ children }: { children: React.ReactNode }) {
     return agency;
   }, [agencies]);
 
+  const setAgencyActive = useCallback(async (id: AgencyId, isActive: boolean) => {
+    const target = agencies.find((agency) => agency.id === id);
+    if (!target) throw new Error("Agency was not found.");
+    if (target.id === "admin" && !isActive) throw new Error("Admin agency cannot be deactivated.");
+
+    const next = agencies.map((agency) => (agency.id === id ? { ...agency, isActive } : agency));
+    setAgencies(next);
+    await persistAgencyOverrides(next);
+
+    if (!isActive && selectedAgency?.id === id) {
+      setSelectedAgency(null);
+      await AsyncStorage.removeItem(STORAGE_KEY);
+    }
+
+    await createAuditEvent({
+      type: "agency.updated",
+      title: isActive ? "Agency activated" : "Agency deactivated",
+      detail: `${target.shortName} was ${isActive ? "made available" : "removed"} from agency sign in.`,
+      actor: { name: "Admin", agency: "admin", role: "admin" },
+      agency: target.id,
+      targetId: target.id,
+      severity: isActive ? "info" : "warning",
+      metadata: {
+        shortName: target.shortName,
+        loginAvailable: isActive,
+      },
+    });
+  }, [agencies, selectedAgency]);
+
   return (
-    <AgencyContext.Provider value={{ agencies, selectedAgency, selectAgency, clearAgency, getAgencyById, addAgency }}>
+    <AgencyContext.Provider value={{ agencies, selectedAgency, selectAgency, clearAgency, getAgencyById, addAgency, setAgencyActive }}>
       {children}
     </AgencyContext.Provider>
   );
@@ -198,7 +238,9 @@ function parseStoredAgencies(raw: string | null): AgencyConfig[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter(isAgencyConfig) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter(isAgencyConfig).map((agency) => ({ ...agency, isActive: agency.isActive !== false }))
+      : [];
   } catch {
     return [];
   }
@@ -220,12 +262,26 @@ function isAgencyConfig(value: unknown): value is AgencyConfig {
 }
 
 function mergeAgencies(defaults: AgencyConfig[], stored: AgencyConfig[]) {
-  const seen = new Set<string>();
-  return [...defaults, ...stored].filter((agency) => {
-    if (seen.has(agency.id)) return false;
-    seen.add(agency.id);
-    return true;
+  const merged = new Map<string, AgencyConfig>();
+  defaults.forEach((agency) => merged.set(agency.id, { ...agency, isActive: agency.isActive !== false }));
+  stored.forEach((agency) => {
+    const current = merged.get(agency.id);
+    merged.set(agency.id, {
+      ...current,
+      ...agency,
+      isActive: agency.isActive !== false,
+    });
   });
+  return Array.from(merged.values());
+}
+
+async function persistAgencyOverrides(agencies: AgencyConfig[]) {
+  const overrides = agencies.filter((agency) => {
+    const seed = DEFAULT_AGENCIES.find((item) => item.id === agency.id);
+    if (!seed) return true;
+    return seed.isActive !== agency.isActive;
+  });
+  await AsyncStorage.setItem(AGENCY_REGISTRY_KEY, JSON.stringify(overrides));
 }
 
 function normalizeAgencyId(value: string) {

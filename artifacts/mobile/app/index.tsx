@@ -66,27 +66,28 @@ export default function AgencySelectScreen() {
   const [agencyQuery, setAgencyQuery] = useState("");
   const [selectedAgencyId, setSelectedAgencyId] = useState<string>("frsc");
 
+  const activeAgencies = useMemo(() => agencies.filter((agency) => agency.isActive !== false), [agencies]);
+  const filteredAgencies = useMemo(() => {
+    const q = agencyQuery.trim().toLowerCase();
+    if (!q) return activeAgencies;
+    return activeAgencies.filter((agency) =>
+      `${agency.shortName} ${agency.name} ${agency.fullName} ${agency.description} ${agency.badgePrefix}`
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [activeAgencies, agencyQuery]);
+
+  const activeAgency =
+    activeAgencies.find((agency) => agency.id === selectedAgencyId) ??
+    filteredAgencies[0] ??
+    activeAgencies[0];
+
   if (isLoading) return null;
 
   // Redirect logged-in users straight to their agency interface
   if (user) {
     return <Redirect href={routeForUser(user) as any} />;
   }
-
-  const filteredAgencies = useMemo(() => {
-    const q = agencyQuery.trim().toLowerCase();
-    if (!q) return agencies;
-    return agencies.filter((agency) =>
-      `${agency.shortName} ${agency.name} ${agency.fullName} ${agency.description} ${agency.badgePrefix}`
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [agencies, agencyQuery]);
-
-  const activeAgency =
-    agencies.find((agency) => agency.id === selectedAgencyId) ??
-    filteredAgencies[0] ??
-    agencies[0];
 
   async function handleAgencySignIn(id: string) {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -128,7 +129,7 @@ export default function AgencySelectScreen() {
         {/* Agency Login */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionLabel}>AGENCY SIGN IN</Text>
-          <Text style={styles.agencyCount}>{agencies.length} agencies</Text>
+          <Text style={styles.agencyCount}>{activeAgencies.length} active agencies</Text>
         </View>
         <View style={styles.agencySelector}>
           <View style={styles.agencySearch}>

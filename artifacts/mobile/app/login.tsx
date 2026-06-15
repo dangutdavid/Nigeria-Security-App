@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -61,7 +61,17 @@ export default function LoginScreen() {
 
   const agencyId = selectedAgency?.id ?? "frsc";
   const primaryColor = selectedAgency?.primaryColor ?? "#1B5E3B";
-  const hints = DEMO_HINTS[agencyId] ?? DEMO_HINTS.frsc;
+  const hints = useMemo(() => {
+    const dynamicHints = allUsers
+      .filter((candidate) => candidate.agency === agencyId && candidate.status === "active")
+      .slice(0, 3)
+      .map((candidate) => ({
+        badge: candidate.badgeNumber,
+        pin: "1234",
+        role: labelForRole(candidate.role),
+      }));
+    return dynamicHints.length > 0 ? dynamicHints : DEMO_HINTS[agencyId] ?? DEMO_HINTS.frsc;
+  }, [agencyId, allUsers]);
 
   async function handleLogin() {
     if (!badge.trim() || !pin.trim()) {
@@ -204,6 +214,23 @@ export default function LoginScreen() {
       </ScrollView>
     </KeyboardAvoidingView>
   );
+}
+
+function labelForRole(role: string) {
+  switch (role) {
+    case "super_admin":
+      return "Super Admin";
+    case "admin":
+      return "Admin";
+    case "commander":
+      return "Commander";
+    case "supervisor":
+      return "Supervisor";
+    case "officer":
+      return "Officer";
+    default:
+      return "User";
+  }
 }
 
 const styles = StyleSheet.create({

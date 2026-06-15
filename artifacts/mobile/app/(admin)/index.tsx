@@ -35,7 +35,7 @@ export default function AdminDashboard() {
   }, [reports]);
   async function refresh() { setRefreshing(true); await load(); setRefreshing(false); }
   return (
-    <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 110 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
+    <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 110 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
       <View style={styles.hero}><Text style={styles.kicker}>ADMIN CONTROL</Text><Text style={styles.heroTitle}>Cross-agency overview</Text><Text style={styles.heroSub}>Citizen reports, agency workload, referrals, users, and activity.</Text></View>
       <NotificationAccessCard accentColor="#344054" />
       <View style={styles.row}><MetricCard label="Total citizen reports" value={metrics.total} icon="file-text" color="#344054" bgColor="#34405418" /><MetricCard label="High emergency" value={metrics.high} icon="alert-octagon" color="#C0392B" bgColor="#FEE8E8" /></View>

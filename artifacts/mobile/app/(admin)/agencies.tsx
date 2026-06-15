@@ -1,12 +1,14 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AgencyEmblem } from "@/components/AgencyEmblem";
+import { ToolBackHeader } from "@/components/ToolBackHeader";
 import { AgencyConfig, NewAgencyInput, useAgency } from "@/context/AgencyContext";
+import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { listCitizenIncidentReports } from "@/services/citizenIncidentApi";
 
@@ -61,12 +63,27 @@ const AGENCY_TEMPLATES: AgencyTemplate[] = [
 export default function AdminAgenciesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { agencies, addAgency } = useAgency();
+  const { agencies, addAgency, setAgencyActive } = useAgency();
+  const { allUsers, ensureAgencyDemoUsers } = useAuth();
   const [reports, setReports] = useState<Awaited<ReturnType<typeof listCitizenIncidentReports>>>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState<AgencyForm>(EMPTY_FORM);
   const [error, setError] = useState("");
+  const autoSeededAgencyIds = useRef<Set<string>>(new Set());
   useFocusEffect(useCallback(() => { void listCitizenIncidentReports().then(setReports); }, []));
+
+  useEffect(() => {
+    const agenciesMissingUsers = agencies.filter((agency) => {
+      if (agency.id === "admin") return false;
+      if (autoSeededAgencyIds.current.has(agency.id)) return false;
+      return !allUsers.some((user) => user.agency === agency.id);
+    });
+
+    agenciesMissingUsers.forEach((agency) => {
+      autoSeededAgencyIds.current.add(agency.id);
+      void ensureAgencyDemoUsers(agency);
+    });
+  }, [agencies, allUsers, ensureAgencyDemoUsers]);
 
   const rows = useMemo(() => agencies.map((agency) => {
     const agencyReports = reports.filter((r) => r.suggestedAgency === agency.id);
@@ -76,8 +93,9 @@ export default function AdminAgenciesScreen() {
       open: agencyReports.filter((r) => r.status !== "resolved" && r.status !== "closed").length,
       resolved: agencyReports.filter((r) => r.status === "resolved" || r.status === "closed").length,
       high: agencyReports.filter((r) => r.emergencyLevel === "high" || r.emergencyLevel === "critical").length,
+      activeUsers: allUsers.filter((user) => user.agency === agency.id && user.status === "active").length,
     };
-  }), [agencies, reports]);
+  }), [agencies, allUsers, reports]);
 
   function set<K extends keyof AgencyForm>(key: K, value: AgencyForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -105,10 +123,11 @@ export default function AdminAgenciesScreen() {
     }
 
     try {
-      await addAgency({
+      const created = await addAgency({
         ...form,
         icon: "shield",
       });
+      await ensureAgencyDemoUsers(created);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setForm(EMPTY_FORM);
       setShowAdd(false);
@@ -119,25 +138,45 @@ export default function AdminAgenciesScreen() {
     }
   }
 
+  async function toggleAgency(agency: AgencyConfig) {
+    try {
+      await setAgencyActive(agency.id, agency.isActive === false);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setError(err instanceof Error ? err.message : "Unable to update agency status.");
+    }
+  }
+
   return (
-    <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 110 }}>
+    <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 110 }}>
+      <ToolBackHeader title="Admin Tools" />
       <View style={styles.headerRow}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={[styles.title, { color: colors.text }]}>Agency workload</Text>
           <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Manage the agency registry used by login and admin views.</Text>
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setShowAdd(true)}>
+        <TouchableOpacity style={styles.addBtn} onPress={() => setShowAdd(true)} activeOpacity={0.84} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="plus" size={16} color="#fff" />
-          <Text style={styles.addBtnText}>Add</Text>
+          <Text style={styles.addBtnText}>Add Agency</Text>
         </TouchableOpacity>
       </View>
+
+      {error && !showAdd ? <Text style={styles.errorText}>{error}</Text> : null}
 
       {rows.map((row) => (
         <View key={row.agency.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
             <AgencyEmblem agency={row.agency.id} size={42} color={row.agency.primaryColor} label={row.agency.shortName} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{row.agency.shortName}</Text>
+              <View style={styles.titleLine}>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{row.agency.shortName}</Text>
+                <View style={[styles.statusPill, { backgroundColor: row.agency.isActive === false ? "#FEE2E2" : "#DCFCE7" }]}>
+                  <Text style={[styles.statusText, { color: row.agency.isActive === false ? "#991B1B" : "#166534" }]}>
+                    {row.agency.isActive === false ? "Inactive" : "Active"}
+                  </Text>
+                </View>
+              </View>
               <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>{row.agency.fullName}</Text>
             </View>
             <View style={[styles.registryPill, { backgroundColor: row.agency.primaryColor + "18" }]}>
@@ -149,6 +188,29 @@ export default function AdminAgenciesScreen() {
             <Stat label="Open" value={row.open} />
             <Stat label="Resolved" value={row.resolved} />
             <Stat label="High priority" value={row.high} />
+            <Stat label="Demo users" value={row.activeUsers} />
+          </View>
+          <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
+            <Text style={[styles.footerNote, { color: colors.mutedForeground }]}>
+              {row.agency.isActive === false ? "Hidden from agency sign in." : "Available on agency sign in."}
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.toggleBtn,
+                {
+                  backgroundColor: row.agency.isActive === false ? row.agency.primaryColor : "#FEF3C7",
+                  opacity: row.agency.id === "admin" ? 0.45 : 1,
+                },
+              ]}
+              onPress={() => toggleAgency(row.agency)}
+              disabled={row.agency.id === "admin"}
+              activeOpacity={0.84}
+            >
+              <Feather name={row.agency.isActive === false ? "check-circle" : "slash"} size={14} color={row.agency.isActive === false ? "#fff" : "#92400E"} />
+              <Text style={[styles.toggleText, { color: row.agency.isActive === false ? "#fff" : "#92400E" }]}>
+                {row.agency.isActive === false ? "Activate" : "Deactivate"}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       ))}
@@ -235,14 +297,21 @@ const styles = StyleSheet.create({
   addBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_700Bold" },
   card: { borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 12 },
   cardHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
+  titleLine: { flexDirection: "row", alignItems: "center", gap: 8 },
   cardTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
   cardSub: { fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 2 },
   registryPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5 },
   registryText: { fontSize: 10, fontFamily: "Inter_700Bold" },
+  statusPill: { borderRadius: 999, paddingHorizontal: 7, paddingVertical: 3 },
+  statusText: { fontSize: 9, fontFamily: "Inter_700Bold", textTransform: "uppercase" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  stat: { width: "47%", backgroundColor: "#34405410", borderRadius: 12, padding: 12 },
+  stat: { width: "30.5%", backgroundColor: "#34405410", borderRadius: 12, padding: 12 },
   statValue: { color: "#344054", fontSize: 22, fontFamily: "Inter_700Bold" },
   statLabel: { color: "#667085", fontSize: 11, fontFamily: "Inter_600SemiBold", marginTop: 2 },
+  cardFooter: { borderTopWidth: 1, marginTop: 12, paddingTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
+  footerNote: { flex: 1, fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  toggleBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 8 },
+  toggleText: { fontSize: 12, fontFamily: "Inter_700Bold" },
   modalRoot: { flex: 1 },
   modalHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12, paddingBottom: 16, marginBottom: 16, borderBottomWidth: 1 },
   modalTitle: { fontSize: 22, fontFamily: "Inter_700Bold" },

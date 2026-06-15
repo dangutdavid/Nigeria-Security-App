@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import {
@@ -60,6 +61,7 @@ export function CitizenReportMapFallback({
 }) {
   const colors = useColors();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [status, setStatus] = useState<StatusFilter>("all");
   const [emergency, setEmergency] = useState<EmergencyFilter>("all");
   const [agency, setAgency] = useState<AgencyFilter>("all");
@@ -92,7 +94,7 @@ export function CitizenReportMapFallback({
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: bottomPadding }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: insets.top + 16, paddingBottom: bottomPadding }} showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, { backgroundColor: accentColor }]}>
           <Feather name="map" size={32} color="#fff" />
           <Text style={styles.title}>{title}</Text>

@@ -2,6 +2,7 @@ import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ToolBackHeader } from "@/components/ToolBackHeader";
 import { REFERRAL_STATUS_LABELS, useReferrals } from "@/context/ReferralContext";
 import { useColors } from "@/hooks/useColors";
 
@@ -10,7 +11,8 @@ export default function AdminReferralsScreen() {
   const insets = useSafeAreaInsets();
   const { referrals } = useReferrals();
   return (
-    <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 110 }}>
+    <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 110 }}>
+      <ToolBackHeader title="Admin Tools" />
       <Text style={[styles.title, { color: colors.text }]}>Referrals</Text>
       {referrals.map((r) => (
         <View key={r.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>

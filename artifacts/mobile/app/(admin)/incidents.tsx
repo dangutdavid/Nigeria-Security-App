@@ -73,7 +73,7 @@ export default function AdminIncidentsScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingBottom: insets.bottom + 90 }]}>
-      <View style={styles.header}><Text style={styles.headerTitle}>All Incidents</Text><Text style={styles.headerSub}>Cross-agency citizen report management</Text></View>
+      <View style={[styles.header, { paddingTop: insets.top + 18 }]}><Text style={styles.headerTitle}>All Incidents</Text><Text style={styles.headerSub}>Cross-agency citizen report management</Text></View>
       <View style={[styles.search, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="search" size={16} color={colors.mutedForeground} /><TextInput value={query} onChangeText={setQuery} placeholder="Search reference, location, vehicle..." placeholderTextColor={colors.mutedForeground} style={[styles.searchInput, { color: colors.text }]} /></View>
       <FilterRow values={AGENCIES} active={agency} setActive={(v) => setAgency(v as CitizenAgencyRoute | "all")} label={(v) => v === "all" ? "All agencies" : formatCitizenAgencyLabel(v as CitizenAgencyRoute)} colors={colors} />
       <FilterRow values={STATUSES} active={status} setActive={(v) => setStatus(v as CitizenIncidentStatus | "all")} label={(v) => v === "all" ? "All status" : formatCitizenIncidentStatus(v as CitizenIncidentStatus)} colors={colors} />

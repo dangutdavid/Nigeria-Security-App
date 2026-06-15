@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AgencyEmblem } from "@/components/AgencyEmblem";
+import { ToolBackHeader } from "@/components/ToolBackHeader";
 import { useAgency } from "@/context/AgencyContext";
 import { User, useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -26,7 +27,8 @@ export default function AdminUsersScreen() {
   }
 
   return (
-    <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 110 }}>
+    <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 110 }}>
+      <ToolBackHeader title="Admin Tools" />
       <Text style={[styles.title, { color: colors.text }]}>Users</Text>
       {grouped.map((group) => (
         <View key={group.agency.id} style={styles.section}>

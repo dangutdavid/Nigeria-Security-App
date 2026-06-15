@@ -42,11 +42,12 @@ export default function AdminLayout() {
       <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: ({ color }) => <Feather name="grid" size={22} color={color} /> }} />
       <Tabs.Screen name="incidents" options={{ title: "Incidents", tabBarIcon: ({ color }) => <Feather name="file-text" size={22} color={color} /> }} />
       <Tabs.Screen name="map" options={{ title: "Map", tabBarIcon: ({ color }) => <Feather name="map" size={22} color={color} /> }} />
-      <Tabs.Screen name="agencies" options={{ title: "Agencies", tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={22} color={color} /> }} />
-      <Tabs.Screen name="users" options={{ title: "Users", tabBarIcon: ({ color }) => <Feather name="users" size={22} color={color} /> }} />
-      <Tabs.Screen name="referrals" options={{ title: "Referrals", tabBarIcon: ({ color }) => <Feather name="git-pull-request" size={22} color={color} /> }} />
-      <Tabs.Screen name="audit" options={{ title: "Audit", tabBarIcon: ({ color }) => <Feather name="activity" size={22} color={color} /> }} />
       <Tabs.Screen name="profile" options={{ title: "Profile", tabBarIcon: ({ color }) => <Feather name="user" size={22} color={color} /> }} />
+      {/* Admin tools — reachable from the Profile › Admin Tools section, hidden from the tab bar to keep it usable on iPhone */}
+      <Tabs.Screen name="agencies" options={{ href: null }} />
+      <Tabs.Screen name="users" options={{ href: null }} />
+      <Tabs.Screen name="referrals" options={{ href: null }} />
+      <Tabs.Screen name="audit" options={{ href: null }} />
     </Tabs>
   );
 }

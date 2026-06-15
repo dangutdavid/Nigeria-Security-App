@@ -11,6 +11,7 @@ export type AuditEventType =
   | "user.deleted"
   | "user.pin_reset"
   | "agency.created"
+  | "agency.updated"
   | "report.submitted"
   | "report.status_changed"
   | "report.reassigned"

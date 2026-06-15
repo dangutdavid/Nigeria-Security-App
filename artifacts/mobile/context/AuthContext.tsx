@@ -26,6 +26,13 @@ export interface UserRecord {
   pin: string;
 }
 
+export interface AgencyDemoSeedInput {
+  id: AgencyType;
+  shortName: string;
+  fullName: string;
+  badgePrefix: string;
+}
+
 export type LoginResult = "ok" | "invalid" | "inactive" | "suspended";
 export type OtpResult = "sent" | "not_found" | "email_mismatch";
 export type OtpVerifyResult = "ok" | "invalid" | "expired";
@@ -54,6 +61,7 @@ interface AuthContextType {
   deleteUser: (id: string) => Promise<void>;
   resetPin: (id: string, newPin: string) => Promise<void>;
   getUserById: (id: string) => User | undefined;
+  ensureAgencyDemoUsers: (agency: AgencyDemoSeedInput) => Promise<User[]>;
   requestOtp: (badgeNumber: string, email: string) => Promise<{ result: OtpResult; code?: string }>;
   verifyOtp: (badgeNumber: string, code: string) => Promise<OtpVerifyResult>;
   resetPinWithOtp: (badgeNumber: string, newPin: string) => Promise<boolean>;
@@ -70,6 +78,7 @@ const AuthContext = createContext<AuthContextType>({
   deleteUser: async () => {},
   resetPin: async () => {},
   getUserById: () => undefined,
+  ensureAgencyDemoUsers: async () => [],
   requestOtp: async () => ({ result: "not_found" }),
   verifyOtp: async () => "invalid",
   resetPinWithOtp: async () => false,
@@ -461,6 +470,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return records.find((r) => r.user.id === id)?.user;
   }
 
+  async function ensureAgencyDemoUsers(agency: AgencyDemoSeedInput): Promise<User[]> {
+    const currentRecords = await readStoredUserRecords(records);
+    const agencyId = agency.id;
+    const existing = currentRecords.filter((r) => r.user.agency === agencyId);
+    if (existing.length > 0) return existing.map((r) => r.user);
+
+    const createdAt = new Date().toISOString();
+    const badgePrefix = makeBadgePrefix(agency.badgePrefix || agency.shortName);
+    const slug = agencyId.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+    const seedRecords: UserRecord[] = [
+      makeAgencyDemoRecord({
+        id: `${slug}-officer`,
+        name: `${agency.shortName} Field Officer`,
+        badgeNumber: `${badgePrefix}-001`,
+        email: `officer@${slug}.demo`,
+        role: "officer",
+        sector: `${agency.fullName} Operations`,
+        station: `${agency.shortName} Field Unit`,
+        phone: "+234 800 000 1001",
+        createdAt,
+        agency: agencyId,
+      }),
+      makeAgencyDemoRecord({
+        id: `${slug}-supervisor`,
+        name: `${agency.shortName} Supervisor`,
+        badgeNumber: `${badgePrefix}-SV`,
+        email: `supervisor@${slug}.demo`,
+        role: "supervisor",
+        sector: `${agency.fullName} Command`,
+        station: `${agency.shortName} Area Office`,
+        phone: "+234 800 000 1002",
+        createdAt,
+        agency: agencyId,
+      }),
+      makeAgencyDemoRecord({
+        id: `${slug}-commander`,
+        name: `${agency.shortName} Commander`,
+        badgeNumber: `${badgePrefix}-CMD`,
+        email: `commander@${slug}.demo`,
+        role: "commander",
+        sector: `${agency.fullName} National Operations`,
+        station: `${agency.shortName} Headquarters`,
+        phone: "+234 800 000 1003",
+        createdAt,
+        agency: agencyId,
+      }),
+    ];
+
+    await persistRecords([...currentRecords, ...seedRecords]);
+    await createAuditEvent({
+      type: "user.created",
+      title: "Agency demo users seeded",
+      detail: `Demo users were created for ${agency.shortName}.`,
+      actor: auditActor(user),
+      agency: agencyId,
+      targetId: agencyId,
+      severity: "info",
+      metadata: {
+        count: seedRecords.length,
+        badges: seedRecords.map((record) => record.user.badgeNumber).join(", "),
+      },
+    });
+    return seedRecords.map((record) => record.user);
+  }
+
   async function requestOtp(badgeNumber: string, email: string): Promise<{ result: OtpResult; code?: string }> {
     const entry = records.find((r) => r.user.badgeNumber.toUpperCase() === badgeNumber.toUpperCase());
     if (!entry) return { result: "not_found" };
@@ -502,7 +576,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{
       user, isLoading, login, logout,
       allUsers, addUser, updateUser, deleteUser, resetPin, getUserById,
-      requestOtp, verifyOtp, resetPinWithOtp,
+      ensureAgencyDemoUsers, requestOtp, verifyOtp, resetPinWithOtp,
     }}>
       {children}
     </AuthContext.Provider>
@@ -530,4 +604,37 @@ async function auditAuthBlocked(user: User, reason: "inactive" | "suspended") {
     severity: "warning",
     metadata: { reason },
   });
+}
+
+function makeAgencyDemoRecord(user: Omit<User, "status">): UserRecord {
+  return {
+    pin: "1234",
+    user: {
+      ...user,
+      status: "active",
+    },
+  };
+}
+
+function makeBadgePrefix(value: string) {
+  const first = value.split("/")[0]?.trim() || value.trim();
+  const normalized = first.toUpperCase().replace(/[^A-Z0-9]+/g, "");
+  return normalized || "AGY";
+}
+
+async function readStoredUserRecords(fallback: UserRecord[]) {
+  const storedUsers = await AsyncStorage.getItem(USERS_STORAGE_KEY);
+  if (!storedUsers) return fallback;
+  try {
+    const parsed: StoredUserRecord[] = JSON.parse(storedUsers);
+    const patched: UserRecord[] = parsed.map((r) => ({
+      ...r,
+      user: normalizeUser({ ...r.user, email: r.user.email ?? "" }),
+    }));
+    const storedIds = new Set(patched.map((r) => r.user.id));
+    const seedsToAdd = SEED_RECORDS.filter((s) => !storedIds.has(s.user.id));
+    return [...patched, ...seedsToAdd];
+  } catch {
+    return fallback;
+  }
 }

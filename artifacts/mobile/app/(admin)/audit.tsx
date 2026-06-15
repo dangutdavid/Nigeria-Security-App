@@ -4,6 +4,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { ToolBackHeader } from "@/components/ToolBackHeader";
 import { useColors } from "@/hooks/useColors";
 import {
   AuditEvent,
@@ -46,7 +47,8 @@ export default function AdminAuditScreen() {
   const visibleEvents = useMemo(() => events.slice(0, 120), [events]);
 
   return (
-    <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 110 }}>
+    <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 110 }}>
+      <ToolBackHeader title="Admin Tools" />
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>Audit Activity</Text>
         <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Security-sensitive actions, report changes, and admin operations.</Text>
