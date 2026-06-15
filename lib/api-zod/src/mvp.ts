@@ -243,6 +243,48 @@ export type ReportStatusUpdate = z.infer<typeof ReportStatusUpdateSchema>;
 export type ReportReassign = z.infer<typeof ReportReassignSchema>;
 export type ReportTimelineAppend = z.infer<typeof ReportTimelineAppendSchema>;
 
+// ---- Notifications & push tokens ----
+export const NotificationAudienceSchema = z.enum(["citizen", "agency", "admin", "user"]);
+export const NotificationPrioritySchema = z.enum(["low", "normal", "high", "critical"]);
+
+// Lenient by design — mirrors the mobile `AppNotification`/`CreateNotificationInput`
+// shape so a notification round-trips to the app with no transform.
+export const NotificationCreateSchema = z.object({
+  id: z.string().optional(),
+  createdAt: z.string().optional(),
+  type: z.string().min(1),
+  audience: NotificationAudienceSchema,
+  title: z.string().min(1),
+  message: z.string().min(1),
+  agency: z.string().optional(),
+  userId: z.string().optional(),
+  role: z.string().optional(),
+  reportReference: z.string().optional(),
+  incidentId: z.string().optional(),
+  route: z.string().optional(),
+  priority: NotificationPrioritySchema.optional(),
+  sourceAgency: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+export const NotificationFilterSchema = z.object({
+  userId: z.string().optional(),
+  agency: z.string().optional(),
+  audience: NotificationAudienceSchema.optional(),
+  reportReference: z.string().optional(),
+});
+
+export const PushTokenSchema = z.object({
+  token: z.string().min(1),
+  platform: z.string().optional(),
+  userId: z.string().optional(),
+  agency: z.string().optional(),
+});
+
+export type NotificationCreate = z.infer<typeof NotificationCreateSchema>;
+export type NotificationFilter = z.infer<typeof NotificationFilterSchema>;
+export type PushToken = z.infer<typeof PushTokenSchema>;
+
 // ---- Citizen chat assistant ----
 export const AssistantChatRoleSchema = z.enum(["user", "assistant"]);
 export const AssistantChatMessageSchema = z.object({

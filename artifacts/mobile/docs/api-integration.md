@@ -222,6 +222,62 @@ provider abstraction lives in `artifacts/api-server/src/lib/assistant.ts`
 > The API server requires **Node 22** (pnpm). In a Node 20 shell, switch with
 > `nvm use 22` before `pnpm install` / running the server.
 
+## PostgreSQL Persistence (Phase 4)
+
+The API server now persists citizen reports, timelines, status/reassignment, and
+notifications to **PostgreSQL via Drizzle** when a database is configured, and
+falls back to in-memory storage otherwise. This is a **backend (api-server)**
+concern — the mobile app and its AsyncStorage fallback are unchanged.
+
+### Store selection
+
+`citizenReportStore` and `notificationStore` are chosen once at startup:
+
+- **`DATABASE_URL` set** → Drizzle/Postgres store. The server logs
+  `Citizen report store: PostgreSQL (Drizzle)` / `Notification store: PostgreSQL (Drizzle)`.
+- **`DATABASE_URL` unset** → in-memory store. The server logs a `WARN`:
+  `... in-memory fallback (... resets on restart)`. Local dev never crashes when
+  Postgres is absent (`lib/db` constructs the client lazily).
+
+### Tables (in `lib/db/src/schema/index.ts`)
+
+Three minimal, self-contained tables mirror the mobile models (agency stored as a
+plain id so DSS/Fire Service/custom agencies work without a tenant row):
+
+- `citizen_reports` — id, reference (unique), incident type, description, emergency
+  level, suggested + assigned agency, status (`case_status` enum incl. `rejected`),
+  flat location (`location`, latitude, longitude, address, state, lga,
+  locationSource, accuracy), vehicle registration, photo uri, `timeline` (jsonb),
+  submittedAt/createdAt/updatedAt.
+- `citizen_notifications` — full `AppNotification` shape + `read_at`.
+- `push_tokens` — token (unique), platform, userId, agency.
+
+The existing tenant-scoped `cases` table is left unchanged (different shape/FKs).
+
+### Running with PostgreSQL
+
+```sh
+# 1. Provision a database and export its URL
+export DATABASE_URL="postgresql://user:pass@localhost:5432/nsa"
+
+# 2. Create/sync tables (Node 22 + pnpm)
+nvm use 22
+pnpm --filter @workspace/db run push          # or push-force (non-interactive)
+
+# 3. Start the API server with the same DATABASE_URL
+pnpm --filter @workspace/api-server run dev
+```
+
+### Fallback behaviour & warning
+
+- With no `DATABASE_URL`, the server runs fully in **in-memory mode** — submit,
+  track, agency lists, dashboard metrics, status, reassignment, and notifications
+  all work, but **data resets on every server restart**.
+- DB mode persists across restarts: a report submitted (and its timeline / status /
+  reassignment) is still trackable by reference after the server is restarted.
+- Mobile AsyncStorage fallback is independent and always available regardless of
+  backend store.
+
 ## Backend Notes
 
 The repository already has:

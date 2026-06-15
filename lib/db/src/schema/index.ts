@@ -1,5 +1,6 @@
 import {
   boolean,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -307,6 +308,113 @@ export const dutySessions = pgTable(
   },
   (table) => ({
     officerIdx: index("duty_sessions_officer_idx").on(table.officerId),
+  }),
+);
+
+type CitizenReportTimelineEntry = {
+  id: string;
+  action: string;
+  by: string;
+  timestamp: string;
+};
+
+/**
+ * Citizen incident reports. A flat, self-contained mirror of the mobile
+ * `CitizenIncidentReceipt` model (agency as a plain id so dynamic agencies like
+ * DSS/Fire Service/custom work without a tenant row). Kept separate from the
+ * tenant-scoped `cases` table, which uses UUID foreign keys and a different shape.
+ */
+export const citizenReports = pgTable(
+  "citizen_reports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reference: text("reference").notNull(),
+    incidentType: text("incident_type").notNull(),
+    description: text("description").notNull(),
+    emergencyLevel: text("emergency_level").notNull(),
+    /** Agency the report was originally routed to at submission time. */
+    suggestedAgency: text("suggested_agency").notNull(),
+    /** Current owning agency after admin reassignment (may be a custom agency). */
+    assignedAgency: text("assigned_agency"),
+    status: caseStatus("status").notNull().default("submitted"),
+    location: text("location").notNull(),
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
+    address: text("address"),
+    state: text("state"),
+    lga: text("lga"),
+    locationSource: text("location_source"),
+    accuracy: doublePrecision("accuracy"),
+    vehicleRegistration: text("vehicle_registration"),
+    photoUri: text("photo_uri"),
+    timeline: jsonb("timeline")
+      .$type<CitizenReportTimelineEntry[]>()
+      .notNull()
+      .default([]),
+    submittedAt: timestamp("submitted_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    referenceIdx: uniqueIndex("citizen_reports_reference_idx").on(table.reference),
+    suggestedAgencyIdx: index("citizen_reports_suggested_agency_idx").on(table.suggestedAgency),
+    assignedAgencyIdx: index("citizen_reports_assigned_agency_idx").on(table.assignedAgency),
+  }),
+);
+
+/** In-app notifications mirroring the mobile `AppNotification` model. */
+export const citizenNotifications = pgTable(
+  "citizen_notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    type: text("type").notNull(),
+    audience: text("audience").notNull(),
+    title: text("title").notNull(),
+    message: text("message").notNull(),
+    agency: text("agency"),
+    userId: text("user_id"),
+    role: text("role"),
+    reportReference: text("report_reference"),
+    incidentId: text("incident_id"),
+    route: text("route"),
+    priority: text("priority").notNull().default("normal"),
+    sourceAgency: text("source_agency"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    audienceAgencyIdx: index("citizen_notifications_audience_agency_idx").on(
+      table.audience,
+      table.agency,
+    ),
+    referenceIdx: index("citizen_notifications_reference_idx").on(table.reportReference),
+  }),
+);
+
+/** Registered Expo push tokens (no real delivery yet). */
+export const pushTokens = pgTable(
+  "push_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    token: text("token").notNull(),
+    platform: text("platform"),
+    userId: text("user_id"),
+    agency: text("agency"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    tokenIdx: uniqueIndex("push_tokens_token_idx").on(table.token),
   }),
 );
 

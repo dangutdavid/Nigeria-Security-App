@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import { CitizenReportSubmissionSchema } from "@workspace/api-zod";
 import {
   citizenReportStore,
@@ -6,48 +6,67 @@ import {
   currentAgency,
   toReportPayload,
 } from "../lib/citizenReportStore";
+import { notifyReportSubmitted } from "../lib/notificationStore";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
+function fail(res: Response, error: unknown) {
+  logger.error({ err: error }, "Citizen report request failed");
+  res.status(500).json({ error: "Internal error processing the report request." });
+}
+
 // PART 1 — Submit a citizen report.
-router.post("/citizen-reports", (req, res) => {
+router.post("/citizen-reports", async (req, res) => {
   const result = CitizenReportSubmissionSchema.safeParse(req.body);
   if (!result.success) {
     res.status(400).json({ error: "Validation failed", issues: result.error.flatten() });
     return;
   }
-
-  const report = citizenReportStore.create(result.data);
-  res.status(201).json({
-    report: toReportPayload(report),
-    reference: report.reference,
-    routedAgency: report.suggestedAgency,
-  });
+  try {
+    const report = await citizenReportStore.create(result.data);
+    await notifyReportSubmitted(report);
+    res.status(201).json({
+      report: toReportPayload(report),
+      reference: report.reference,
+      routedAgency: report.suggestedAgency,
+    });
+  } catch (error) {
+    fail(res, error);
+  }
 });
 
 // PART 2 — Track a citizen report by its public reference number.
-router.get("/citizen-reports/track/:reference", (req, res) => {
-  const report = citizenReportStore.findByReference(req.params.reference);
-  if (!report) {
-    res.status(404).json({ error: `No report found for reference ${req.params.reference}` });
-    return;
+router.get("/citizen-reports/track/:reference", async (req, res) => {
+  try {
+    const report = await citizenReportStore.findByReference(req.params.reference);
+    if (!report) {
+      res.status(404).json({ error: `No report found for reference ${req.params.reference}` });
+      return;
+    }
+    res.json({
+      reference: report.reference,
+      report: toReportPayload(report),
+      citizenMessage: citizenStatusMessage(report.status),
+      currentAgency: currentAgency(report),
+    });
+  } catch (error) {
+    fail(res, error);
   }
-  res.json({
-    reference: report.reference,
-    report: toReportPayload(report),
-    citizenMessage: citizenStatusMessage(report.status),
-    currentAgency: currentAgency(report),
-  });
 });
 
 // PART 3 — Report timeline / history.
-router.get("/citizen-reports/:id/timeline", (req, res) => {
-  const report = citizenReportStore.findByIdOrReference(req.params.id);
-  if (!report) {
-    res.status(404).json({ error: `No report found for ${req.params.id}` });
-    return;
+router.get("/citizen-reports/:id/timeline", async (req, res) => {
+  try {
+    const report = await citizenReportStore.findByIdOrReference(req.params.id);
+    if (!report) {
+      res.status(404).json({ error: `No report found for ${req.params.id}` });
+      return;
+    }
+    res.json({ reference: report.reference, timeline: report.timeline });
+  } catch (error) {
+    fail(res, error);
   }
-  res.json({ reference: report.reference, timeline: report.timeline });
 });
 
 export default router;
