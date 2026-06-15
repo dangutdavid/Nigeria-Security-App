@@ -49,6 +49,10 @@ export default function AdminDashboard() {
         <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push("/(admin)/incidents" as any)}><Feather name="file-text" size={17} color="#fff" /><Text style={styles.primaryText}>All incidents</Text></TouchableOpacity>
         <TouchableOpacity style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => router.push("/(admin)/agencies" as any)}><Feather name="bar-chart-2" size={17} color="#344054" /><Text style={styles.secondaryText}>Workload</Text></TouchableOpacity>
       </View>
+      <TouchableOpacity style={[styles.auditBtn, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => router.push("/(admin)/audit" as any)}>
+        <Feather name="activity" size={17} color="#344054" />
+        <Text style={styles.secondaryText}>Open audit trail</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -66,6 +70,7 @@ const styles = StyleSheet.create({
   agencyLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   agencyValue: { fontSize: 14, fontFamily: "Inter_700Bold" },
   quickRow: { flexDirection: "row", gap: 10, marginTop: 8 },
+  auditBtn: { minHeight: 50, borderRadius: 14, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 10 },
   primaryBtn: { flex: 1, height: 50, borderRadius: 14, backgroundColor: "#344054", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   primaryText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
   secondaryBtn: { flex: 1, height: 50, borderRadius: 14, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },

@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
+import { createAuditEvent } from "@/services/auditLogService";
+
 export type UserRole = "citizen" | "officer" | "supervisor" | "commander" | "admin" | "super_admin";
 export type UserStatus = "active" | "inactive" | "suspended";
 export type AgencyType = string;
@@ -320,17 +322,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const agencyMatch = agency ? r.user.agency === agency : true;
       return badgeMatch && agencyMatch;
     });
-    if (!entry || entry.pin !== pin) return "invalid";
-    if (entry.user.status === "inactive") return "inactive";
-    if (entry.user.status === "suspended") return "suspended";
+    if (!entry || entry.pin !== pin) {
+      await createAuditEvent({
+        type: "auth.failed_login",
+        title: "Failed login attempt",
+        detail: `Failed login for badge ${badgeNumber.toUpperCase()}${agency ? ` in ${agency}` : ""}.`,
+        actor: { name: badgeNumber.toUpperCase(), agency },
+        agency,
+        severity: "warning",
+        metadata: { reason: "invalid_credentials" },
+      });
+      return "invalid";
+    }
+    if (entry.user.status === "inactive") {
+      await auditAuthBlocked(entry.user, "inactive");
+      return "inactive";
+    }
+    if (entry.user.status === "suspended") {
+      await auditAuthBlocked(entry.user, "suspended");
+      return "suspended";
+    }
     await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(entry.user));
     setUser(entry.user);
+    await createAuditEvent({
+      type: "auth.login",
+      title: "User signed in",
+      detail: `${entry.user.name} signed in to ${entry.user.agency}.`,
+      actor: { id: entry.user.id, name: entry.user.name, agency: entry.user.agency, role: entry.user.role },
+      agency: entry.user.agency,
+      severity: "info",
+    });
     return "ok";
   }
 
   async function logout() {
+    const previousUser = user;
     await AsyncStorage.multiRemove([AUTH_STORAGE_KEY, OTP_STORAGE_KEY, OTP_VERIFIED_KEY]);
     setUser(null);
+    if (previousUser) {
+      await createAuditEvent({
+        type: "auth.logout",
+        title: "User signed out",
+        detail: `${previousUser.name} signed out.`,
+        actor: { id: previousUser.id, name: previousUser.name, agency: previousUser.agency, role: previousUser.role },
+        agency: previousUser.agency,
+        severity: "info",
+      });
+    }
   }
 
   async function addUser(newUser: Omit<User, "id" | "createdAt">, pin: string): Promise<void> {
@@ -343,11 +381,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
     };
     await persistRecords([...records, record]);
+    await createAuditEvent({
+      type: "user.created",
+      title: "User created",
+      detail: `${record.user.name} was created for ${record.user.agency}.`,
+      actor: auditActor(user),
+      agency: record.user.agency,
+      targetId: record.user.id,
+      severity: "info",
+      metadata: { role: record.user.role, badgeNumber: record.user.badgeNumber },
+    });
   }
 
   async function updateUser(id: string, updates: Partial<Omit<User, "id" | "createdAt">>): Promise<void> {
+    const before = records.find((r) => r.user.id === id)?.user;
     const next = records.map((r) => (r.user.id === id ? { ...r, user: { ...r.user, ...updates } } : r));
     await persistRecords(next);
+    const after = next.find((r) => r.user.id === id)?.user;
+    if (after) {
+      await createAuditEvent({
+        type: "user.updated",
+        title: "User updated",
+        detail: `${after.name} was updated.`,
+        actor: auditActor(user),
+        agency: after.agency,
+        targetId: after.id,
+        severity: updates.status === "suspended" ? "warning" : "info",
+        metadata: {
+          changedFields: Object.keys(updates).join(", "),
+          previousStatus: before?.status,
+          nextStatus: after.status,
+        },
+      });
+    }
     if (user?.id === id) {
       const updated = next.find((r) => r.user.id === id)?.user ?? null;
       if (updated) {
@@ -358,13 +424,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function deleteUser(id: string): Promise<void> {
+    const deleted = records.find((r) => r.user.id === id)?.user;
     const next = records.filter((r) => r.user.id !== id);
     await persistRecords(next);
+    if (deleted) {
+      await createAuditEvent({
+        type: "user.deleted",
+        title: "User deleted",
+        detail: `${deleted.name} was removed from ${deleted.agency}.`,
+        actor: auditActor(user),
+        agency: deleted.agency,
+        targetId: deleted.id,
+        severity: "warning",
+      });
+    }
   }
 
   async function resetPin(id: string, newPin: string): Promise<void> {
     const next = records.map((r) => (r.user.id === id ? { ...r, pin: newPin } : r));
     await persistRecords(next);
+    const changed = next.find((r) => r.user.id === id)?.user;
+    if (changed) {
+      await createAuditEvent({
+        type: "user.pin_reset",
+        title: "User PIN reset",
+        detail: `PIN reset completed for ${changed.name}.`,
+        actor: auditActor(user),
+        agency: changed.agency,
+        targetId: changed.id,
+        severity: "warning",
+      });
+    }
   }
 
   function getUserById(id: string): User | undefined {
@@ -421,4 +511,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   return useContext(AuthContext);
+}
+
+function auditActor(user: User | null): { id?: string; name: string; agency?: AgencyType; role?: UserRole } {
+  return user
+    ? { id: user.id, name: user.name, agency: user.agency, role: user.role }
+    : { name: "System" };
+}
+
+async function auditAuthBlocked(user: User, reason: "inactive" | "suspended") {
+  await createAuditEvent({
+    type: "auth.failed_login",
+    title: "Blocked login attempt",
+    detail: `${user.name} attempted login while ${reason}.`,
+    actor: { id: user.id, name: user.name, agency: user.agency, role: user.role },
+    agency: user.agency,
+    targetId: user.id,
+    severity: "warning",
+    metadata: { reason },
+  });
 }

@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { createAuditEvent } from "@/services/auditLogService";
 import { createNotification, priorityFromEmergency } from "@/services/notificationService";
 
 export type CitizenIncidentType =
@@ -554,6 +555,21 @@ export async function submitCitizenIncidentMock(
   const existing: CitizenIncidentReceipt[] = raw ? JSON.parse(raw) : [];
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([normalizeCitizenIncidentReport(receipt), ...existing]));
 
+  await createAuditEvent({
+    type: "report.submitted",
+    title: "Citizen report submitted",
+    detail: `${receipt.reference} routed to ${formatCitizenAgencyLabel(receipt.suggestedAgency)}.`,
+    actor: { name: "Citizen", agency: "citizen", role: "citizen" },
+    agency: receipt.suggestedAgency,
+    reportReference: receipt.reference,
+    severity: receipt.emergencyLevel === "critical" ? "critical" : receipt.emergencyLevel === "high" ? "warning" : "info",
+    metadata: {
+      incidentType: receipt.incidentType,
+      emergencyLevel: receipt.emergencyLevel,
+      locationSource: receipt.locationSource,
+    },
+  });
+
   await createNotification({
     type: "citizen_report_submitted",
     audience: "citizen",
@@ -716,6 +732,16 @@ export async function updateCitizenIncidentStatusMock({
   const updatedReport = updated as CitizenIncidentReceipt | null;
   if (updatedReport) {
     await writeCitizenIncidentReports(next);
+    await createAuditEvent({
+      type: "report.status_changed",
+      title: "Report status changed",
+      detail: `${updatedReport.reference} marked ${formatCitizenIncidentStatus(status)} by ${actorName}.`,
+      actor: { name: actorName, agency: updatedReport.suggestedAgency },
+      agency: updatedReport.suggestedAgency,
+      reportReference: updatedReport.reference,
+      severity: updatedReport.emergencyLevel === "critical" ? "critical" : updatedReport.emergencyLevel === "high" ? "warning" : "info",
+      metadata: { status, actorAgencyLabel: actorAgencyLabel ?? null },
+    });
     await createNotification({
       type: "status_changed",
       audience: "citizen",
@@ -776,6 +802,16 @@ export async function reassignCitizenIncidentAgencyMock({
   const updatedReport = updated as CitizenIncidentReceipt | null;
   if (updatedReport) {
     await writeCitizenIncidentReports(next);
+    await createAuditEvent({
+      type: "report.reassigned",
+      title: "Report reassigned",
+      detail: `${actorName} reassigned ${updatedReport.reference} to ${formatCitizenAgencyLabel(agency)}.`,
+      actor: { name: actorName, agency: "admin" },
+      agency,
+      reportReference: updatedReport.reference,
+      severity: updatedReport.emergencyLevel === "critical" ? "critical" : "warning",
+      metadata: { targetAgency: agency },
+    });
     await createNotification({
       type: "report_reassigned",
       audience: "citizen",

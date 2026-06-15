@@ -13,6 +13,10 @@ import { listCitizenIncidentReports } from "@/services/citizenIncidentApi";
 const COLOR_OPTIONS = ["#1B5E3B", "#1A3A6C", "#7B3F00", "#234E2A", "#344054", "#5C6BC0", "#8B1E3F", "#0F766E"];
 
 type AgencyForm = Omit<NewAgencyInput, "icon">;
+type AgencyTemplate = AgencyForm & {
+  label: string;
+  icon: keyof typeof Feather.glyphMap;
+};
 
 const EMPTY_FORM: AgencyForm = {
   name: "",
@@ -23,6 +27,36 @@ const EMPTY_FORM: AgencyForm = {
   badgePrefix: "",
   description: "",
 };
+
+const AGENCY_TEMPLATES: AgencyTemplate[] = [
+  {
+    label: "DSS",
+    name: "DSS",
+    shortName: "DSS",
+    fullName: "Department of State Services",
+    primaryColor: "#111827",
+    secondaryColor: "#374151",
+    badgePrefix: "DSS",
+    description: "Domestic intelligence, counter-intelligence, and national security support",
+    icon: "shield",
+  },
+  {
+    label: "Fire Service",
+    name: "Fire Service",
+    shortName: "FFS",
+    fullName: "Federal Fire Service",
+    primaryColor: "#B42318",
+    secondaryColor: "#F04438",
+    badgePrefix: "FFS",
+    description: "Fire prevention, emergency response, rescue support, and public safety enforcement",
+    icon: "alert-octagon",
+  },
+  {
+    label: "Custom",
+    ...EMPTY_FORM,
+    icon: "edit-3",
+  },
+];
 
 export default function AdminAgenciesScreen() {
   const colors = useColors();
@@ -47,6 +81,19 @@ export default function AdminAgenciesScreen() {
 
   function set<K extends keyof AgencyForm>(key: K, value: AgencyForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    setError("");
+  }
+
+  function applyTemplate(template: AgencyTemplate) {
+    setForm({
+      name: template.name,
+      shortName: template.shortName,
+      fullName: template.fullName,
+      primaryColor: template.primaryColor,
+      secondaryColor: template.secondaryColor,
+      badgePrefix: template.badgePrefix,
+      description: template.description,
+    });
     setError("");
   }
 
@@ -118,6 +165,38 @@ export default function AdminAgenciesScreen() {
             </TouchableOpacity>
           </View>
 
+          <Text style={[styles.fieldLabel, { color: colors.text }]}>Start from template</Text>
+          <View style={styles.templateGrid}>
+            {AGENCY_TEMPLATES.map((template) => {
+              const active = form.shortName === template.shortName && template.shortName !== "";
+              return (
+                <TouchableOpacity
+                  key={template.label}
+                  style={[
+                    styles.templateCard,
+                    {
+                      backgroundColor: active ? template.primaryColor + "18" : colors.card,
+                      borderColor: active ? template.primaryColor : colors.border,
+                    },
+                  ]}
+                  onPress={() => applyTemplate(template)}
+                  activeOpacity={0.84}
+                >
+                  <View style={[styles.templateIcon, { backgroundColor: (template.primaryColor || "#344054") + "18" }]}>
+                    <Feather name={template.icon} size={17} color={template.primaryColor || "#344054"} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.templateTitle, { color: colors.text }]}>{template.label}</Text>
+                    <Text style={[styles.templateSub, { color: colors.mutedForeground }]} numberOfLines={2}>
+                      {template.fullName || "Create a blank agency profile"}
+                    </Text>
+                  </View>
+                  {active ? <Feather name="check" size={16} color={template.primaryColor} /> : null}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
           <Field label="Short name" value={form.shortName} onChangeText={(v) => set("shortName", v)} placeholder="e.g. FIRE" colors={colors} />
           <Field label="Display name" value={form.name} onChangeText={(v) => set("name", v)} placeholder="e.g. Fire Service" colors={colors} />
           <Field label="Full name" value={form.fullName} onChangeText={(v) => set("fullName", v)} placeholder="e.g. Federal Fire Service" colors={colors} />
@@ -168,6 +247,11 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12, paddingBottom: 16, marginBottom: 16, borderBottomWidth: 1 },
   modalTitle: { fontSize: 22, fontFamily: "Inter_700Bold" },
   modalSub: { fontSize: 13, fontFamily: "Inter_500Medium", marginTop: 3 },
+  templateGrid: { gap: 10, marginBottom: 16 },
+  templateCard: { borderWidth: 1, borderRadius: 14, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
+  templateIcon: { width: 38, height: 38, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  templateTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  templateSub: { fontSize: 12, fontFamily: "Inter_500Medium", lineHeight: 17, marginTop: 2 },
   fieldWrap: { marginBottom: 14, gap: 6 },
   fieldLabel: { fontSize: 13, fontFamily: "Inter_700Bold", marginBottom: 8 },
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14, fontFamily: "Inter_500Medium" },

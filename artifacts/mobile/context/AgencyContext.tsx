@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { AgencyType } from "@/context/AuthContext";
+import { createAuditEvent } from "@/services/auditLogService";
 
 export type AgencyId = AgencyType | string;
 
@@ -169,6 +170,20 @@ export function AgencyProvider({ children }: { children: React.ReactNode }) {
     setAgencies(next);
     const customAgencies = next.filter((item) => !DEFAULT_AGENCIES.some((seed) => seed.id === item.id));
     await AsyncStorage.setItem(AGENCY_REGISTRY_KEY, JSON.stringify(customAgencies));
+    await createAuditEvent({
+      type: "agency.created",
+      title: "Agency registry entry created",
+      detail: `${agency.shortName} was added to the frontend agency registry.`,
+      actor: { name: "Admin", agency: "admin", role: "admin" },
+      agency: agency.id,
+      targetId: agency.id,
+      severity: "warning",
+      metadata: {
+        fullName: agency.fullName,
+        badgePrefix: agency.badgePrefix,
+        tabRoute: agency.tabRoute,
+      },
+    });
     return agency;
   }, [agencies]);
 
