@@ -17,7 +17,11 @@ export interface AgencyConfig {
   tabRoute: string;
 }
 
-export const AGENCIES: AgencyConfig[] = [
+export type NewAgencyInput = Omit<AgencyConfig, "id" | "tabRoute"> & {
+  id?: string;
+};
+
+export const DEFAULT_AGENCIES: AgencyConfig[] = [
   {
     id: "frsc",
     name: "FRSC",
@@ -80,20 +84,27 @@ export const AGENCIES: AgencyConfig[] = [
   },
 ];
 
+export const AGENCIES = DEFAULT_AGENCIES;
+
 const STORAGE_KEY = "@frsc_selected_agency";
+const AGENCY_REGISTRY_KEY = "@security_agency_registry_v1";
 
 interface AgencyContextType {
+  agencies: AgencyConfig[];
   selectedAgency: AgencyConfig | null;
   selectAgency: (id: AgencyId) => Promise<void>;
   clearAgency: () => Promise<void>;
   getAgencyById: (id: AgencyId) => AgencyConfig | undefined;
+  addAgency: (input: NewAgencyInput) => Promise<AgencyConfig>;
 }
 
 const AgencyContext = createContext<AgencyContextType>({
+  agencies: DEFAULT_AGENCIES,
   selectedAgency: null,
   selectAgency: async () => {},
   clearAgency: async () => {},
   getAgencyById: () => undefined,
+  addAgency: async () => DEFAULT_AGENCIES[0],
 });
 
 export function useAgency() {
@@ -101,33 +112,111 @@ export function useAgency() {
 }
 
 export function AgencyProvider({ children }: { children: React.ReactNode }) {
+  const [agencies, setAgencies] = useState<AgencyConfig[]>(DEFAULT_AGENCIES);
   const [selectedAgency, setSelectedAgency] = useState<AgencyConfig | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then((val) => {
-      if (val) {
-        const agency = AGENCIES.find((a) => a.id === val);
+    async function load() {
+      const [selected, registry] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEY),
+        AsyncStorage.getItem(AGENCY_REGISTRY_KEY),
+      ]);
+      const storedAgencies = parseStoredAgencies(registry);
+      const merged = mergeAgencies(DEFAULT_AGENCIES, storedAgencies);
+      setAgencies(merged);
+      if (selected) {
+        const agency = merged.find((a) => a.id === selected);
         if (agency) setSelectedAgency(agency);
       }
-    });
+    }
+
+    void load();
   }, []);
 
   const selectAgency = useCallback(async (id: AgencyId) => {
-    const agency = AGENCIES.find((a) => a.id === id) ?? null;
+    const agency = agencies.find((a) => a.id === id) ?? null;
     setSelectedAgency(agency);
     if (agency) await AsyncStorage.setItem(STORAGE_KEY, id);
-  }, []);
+  }, [agencies]);
 
   const clearAgency = useCallback(async () => {
     setSelectedAgency(null);
     await AsyncStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  const getAgencyById = useCallback((id: AgencyId) => AGENCIES.find((a) => a.id === id), []);
+  const getAgencyById = useCallback((id: AgencyId) => agencies.find((a) => a.id === id), [agencies]);
+
+  const addAgency = useCallback(async (input: NewAgencyInput): Promise<AgencyConfig> => {
+    const id = normalizeAgencyId(input.id || input.shortName || input.name);
+    if (!id) throw new Error("Agency ID is required.");
+    if (agencies.some((agency) => agency.id === id)) throw new Error("Agency already exists.");
+
+    const agency: AgencyConfig = {
+      ...input,
+      id,
+      name: input.name.trim(),
+      shortName: input.shortName.trim().toUpperCase(),
+      fullName: input.fullName.trim(),
+      description: input.description.trim(),
+      badgePrefix: input.badgePrefix.trim().toUpperCase(),
+      icon: input.icon || "shield",
+      primaryColor: input.primaryColor || "#344054",
+      secondaryColor: input.secondaryColor || "#667085",
+      tabRoute: "/unauthorized",
+    };
+
+    const next = [...agencies, agency];
+    setAgencies(next);
+    const customAgencies = next.filter((item) => !DEFAULT_AGENCIES.some((seed) => seed.id === item.id));
+    await AsyncStorage.setItem(AGENCY_REGISTRY_KEY, JSON.stringify(customAgencies));
+    return agency;
+  }, [agencies]);
 
   return (
-    <AgencyContext.Provider value={{ selectedAgency, selectAgency, clearAgency, getAgencyById }}>
+    <AgencyContext.Provider value={{ agencies, selectedAgency, selectAgency, clearAgency, getAgencyById, addAgency }}>
       {children}
     </AgencyContext.Provider>
   );
+}
+
+function parseStoredAgencies(raw: string | null): AgencyConfig[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(isAgencyConfig) : [];
+  } catch {
+    return [];
+  }
+}
+
+function isAgencyConfig(value: unknown): value is AgencyConfig {
+  const item = value as Partial<AgencyConfig>;
+  return Boolean(
+    item &&
+    typeof item.id === "string" &&
+    typeof item.name === "string" &&
+    typeof item.shortName === "string" &&
+    typeof item.fullName === "string" &&
+    typeof item.primaryColor === "string" &&
+    typeof item.secondaryColor === "string" &&
+    typeof item.badgePrefix === "string" &&
+    typeof item.description === "string",
+  );
+}
+
+function mergeAgencies(defaults: AgencyConfig[], stored: AgencyConfig[]) {
+  const seen = new Set<string>();
+  return [...defaults, ...stored].filter((agency) => {
+    if (seen.has(agency.id)) return false;
+    seen.add(agency.id);
+    return true;
+  });
+}
+
+function normalizeAgencyId(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
 }

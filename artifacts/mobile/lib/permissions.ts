@@ -122,7 +122,16 @@ export function can(user: User | null | undefined, action: Action, resource: Res
  * agencies; only the wording changes (e.g. a "supervisor" is a "Deputy
  * Superintendent" in the police agency).
  */
-export const ROLE_LABELS: Record<AgencyType, Record<UserRole, string>> = {
+const DEFAULT_ROLE_LABELS: Record<UserRole, string> = {
+  citizen: "Citizen",
+  officer: "Officer",
+  supervisor: "Supervisor",
+  commander: "Commander",
+  admin: "Administrator",
+  super_admin: "Super Administrator",
+};
+
+export const ROLE_LABELS: Partial<Record<AgencyType, Record<UserRole, string>>> = {
   frsc: {
     citizen: "Citizen",
     officer: "Field Officer",
@@ -182,8 +191,8 @@ export const ROLE_LABELS: Record<AgencyType, Record<UserRole, string>> = {
 };
 
 export function roleLabel(agency: AgencyType | undefined, role: UserRole): string {
-  if (!agency) return role;
-  return ROLE_LABELS[agency]?.[role] ?? role;
+  if (!agency) return DEFAULT_ROLE_LABELS[role];
+  return ROLE_LABELS[agency]?.[role] ?? DEFAULT_ROLE_LABELS[role];
 }
 
 /**

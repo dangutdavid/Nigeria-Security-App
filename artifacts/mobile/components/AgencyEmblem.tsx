@@ -2,7 +2,7 @@ import React from "react";
 import { Image, StyleSheet, View } from "react-native";
 import Svg, { Circle, G, Path, Polygon, Rect, Text as SvgText } from "react-native-svg";
 
-export type AgencyEmblemId = "frsc" | "police" | "vio" | "civil_defence" | "admin";
+export type AgencyEmblemId = "frsc" | "police" | "vio" | "civil_defence" | "admin" | string;
 
 const FRSC_LOGO = require("../assets/images/logo-frsc.jpg");
 const NPF_LOGO = require("../assets/images/logo-npf.jpg");
@@ -45,7 +45,7 @@ function GenericEmblem({ size, label, color }: { size: number; label: string; co
   );
 }
 
-export function AgencyEmblem({ agency, size = 80 }: { agency: AgencyEmblemId; size?: number }) {
+export function AgencyEmblem({ agency, size = 80, color = "#344054", label }: { agency: AgencyEmblemId; size?: number; color?: string; label?: string }) {
   if (agency === "vio") {
     return <VIOEmblem size={size} />;
   }
@@ -54,6 +54,9 @@ export function AgencyEmblem({ agency, size = 80 }: { agency: AgencyEmblemId; si
   }
   if (agency === "admin") {
     return <GenericEmblem size={size} label="ADMIN" color="#344054" />;
+  }
+  if (agency !== "frsc" && agency !== "police") {
+    return <GenericEmblem size={size} label={label ?? "AGENCY"} color={color} />;
   }
 
   const source = agency === "police" ? NPF_LOGO : FRSC_LOGO;

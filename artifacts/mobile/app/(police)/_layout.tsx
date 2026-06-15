@@ -65,6 +65,13 @@ export default function PoliceTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="map"
+        options={{
+          title: "Map",
+          tabBarIcon: ({ color }) => <Feather name="map" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="stolen-alerts"
         options={{
           title: "Alerts",

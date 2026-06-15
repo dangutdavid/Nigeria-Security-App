@@ -34,6 +34,7 @@ export type CitizenIncidentType =
 
 export type CitizenEmergencyLevel = "low" | "medium" | "high" | "critical";
 export type CitizenAgencyRoute = "frsc" | "police" | "vio" | "civil_defence";
+export type CitizenLocationSource = "gps" | "manual";
 export type CitizenIncidentStatus =
   | "submitted"
   | "triaged"
@@ -48,6 +49,11 @@ export interface CitizenIncidentSubmission {
   location: string;
   latitude?: number;
   longitude?: number;
+  address?: string;
+  state?: string;
+  lga?: string;
+  locationSource?: CitizenLocationSource;
+  accuracy?: number;
   photoUri?: string;
   vehicleRegistration?: string;
   emergencyLevel: CitizenEmergencyLevel;
@@ -500,6 +506,20 @@ export const VIO_CITIZEN_INCIDENT_TYPES: CitizenIncidentType[] = [
   "vehicle_issue",
 ];
 
+function hasCoordinates(report: Pick<CitizenIncidentSubmission, "latitude" | "longitude">) {
+  return Number.isFinite(report.latitude) && Number.isFinite(report.longitude);
+}
+
+function normalizeCitizenIncidentReport(report: CitizenIncidentReceipt): CitizenIncidentReceipt {
+  const fallbackLocation = report.location || report.address || "Location not provided";
+  return {
+    ...report,
+    location: fallbackLocation,
+    address: report.address || fallbackLocation,
+    locationSource: report.locationSource ?? (hasCoordinates(report) ? "gps" : "manual"),
+  };
+}
+
 function makeReference() {
   const stamp = Date.now().toString(36).toUpperCase();
   return `CIR-${stamp.slice(-6)}`;
@@ -512,6 +532,8 @@ export async function submitCitizenIncidentMock(
 
   const receipt: CitizenIncidentReceipt = {
     ...input,
+    address: input.address || input.location,
+    locationSource: input.locationSource ?? (hasCoordinates(input) ? "gps" : "manual"),
     id: `citizen-${Date.now()}`,
     reference: makeReference(),
     status: "submitted",
@@ -528,25 +550,25 @@ export async function submitCitizenIncidentMock(
 
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
   const existing: CitizenIncidentReceipt[] = raw ? JSON.parse(raw) : [];
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([receipt, ...existing]));
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([normalizeCitizenIncidentReport(receipt), ...existing]));
 
-  return receipt;
+  return normalizeCitizenIncidentReport(receipt);
 }
 
 async function readCitizenIncidentReports(): Promise<CitizenIncidentReceipt[]> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
   const reports: CitizenIncidentReceipt[] = raw ? JSON.parse(raw) : [];
-  if (!Array.isArray(reports)) return SEED_CITIZEN_REPORTS;
+  if (!Array.isArray(reports)) return SEED_CITIZEN_REPORTS.map(normalizeCitizenIncidentReport);
 
   const storedIds = new Set(reports.map((report) => report.id));
   const seedsToAdd = SEED_CITIZEN_REPORTS.filter((seed) => !storedIds.has(seed.id));
   const next = seedsToAdd.length > 0 ? [...reports, ...seedsToAdd] : reports;
   if (seedsToAdd.length > 0) await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  return next;
+  return next.map(normalizeCitizenIncidentReport);
 }
 
 async function writeCitizenIncidentReports(reports: CitizenIncidentReceipt[]) {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(reports.map(normalizeCitizenIncidentReport)));
 }
 
 export async function listCitizenIncidentReports(): Promise<CitizenIncidentReceipt[]> {
@@ -574,6 +596,40 @@ export async function listCitizenIncidentReportsByAgency(
 
 export async function listNscdcCitizenIncidentReports(): Promise<CitizenIncidentReceipt[]> {
   return listCitizenIncidentReportsByAgency("civil_defence");
+}
+
+export async function listReportsWithLocation(): Promise<CitizenIncidentReceipt[]> {
+  return readCitizenIncidentReports();
+}
+
+export async function listReportsByAgencyWithLocation(
+  agency: CitizenAgencyRoute,
+): Promise<CitizenIncidentReceipt[]> {
+  return listCitizenIncidentReportsByAgency(agency);
+}
+
+export function hasCitizenReportCoordinates(report: CitizenIncidentSubmission): boolean {
+  return hasCoordinates(report);
+}
+
+export function getCitizenReportLocationText(report: CitizenIncidentSubmission): string {
+  return report.address || report.location || "Location not provided";
+}
+
+export function getCitizenReportCoordinatesText(report: CitizenIncidentSubmission): string | null {
+  if (!hasCitizenReportCoordinates(report)) return null;
+  return `${report.latitude!.toFixed(5)}, ${report.longitude!.toFixed(5)}`;
+}
+
+export function getMapMetrics(reports: CitizenIncidentReceipt[]) {
+  const withCoordinates = reports.filter(hasCitizenReportCoordinates).length;
+  return {
+    total: reports.length,
+    withCoordinates,
+    withoutCoordinates: reports.length - withCoordinates,
+    highEmergency: reports.filter((report) => report.emergencyLevel === "high" || report.emergencyLevel === "critical").length,
+    open: reports.filter((report) => report.status !== "resolved" && report.status !== "closed").length,
+  };
 }
 
 export async function findCitizenIncidentByReference(

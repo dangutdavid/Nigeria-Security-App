@@ -11,8 +11,15 @@ export default function UnauthorizedScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
+  const workspaceRoute = routeForUser(user);
+  const hasWorkspace = workspaceRoute !== "/unauthorized";
+
+  async function handleSignOut() {
+    await logout();
+    router.replace("/");
+  }
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: topPad }]}>
@@ -24,13 +31,20 @@ export default function UnauthorizedScreen() {
         <Text style={[styles.copy, { color: colors.mutedForeground }]}>
           Your current role or agency does not have access to this part of the app.
         </Text>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace(routeForUser(user) as any)}>
-          <Feather name="arrow-right" size={17} color="#fff" />
-          <Text style={styles.primaryText}>Go to My Workspace</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.secondaryBtn, { borderColor: colors.border }]} onPress={() => router.replace("/")}>
+        {hasWorkspace ? (
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.replace(workspaceRoute as any)}>
+            <Feather name="arrow-right" size={17} color="#fff" />
+            <Text style={styles.primaryText}>Go to My Workspace</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.primaryBtn} onPress={handleSignOut}>
+            <Feather name="log-out" size={17} color="#fff" />
+            <Text style={styles.primaryText}>Sign Out</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={[styles.secondaryBtn, { borderColor: colors.border }]} onPress={hasWorkspace ? () => router.replace("/") : handleSignOut}>
           <Feather name="home" size={17} color="#0F4C81" />
-          <Text style={styles.secondaryText}>Back to Home</Text>
+          <Text style={styles.secondaryText}>{hasWorkspace ? "Back to Home" : "Back to Sign In"}</Text>
         </TouchableOpacity>
       </View>
     </View>

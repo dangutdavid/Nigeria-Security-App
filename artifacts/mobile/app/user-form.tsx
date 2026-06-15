@@ -63,7 +63,7 @@ export default function UserFormScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, agency } = useLocalSearchParams<{ id?: string; agency?: string }>();
   const { user: currentUser, getUserById, addUser, updateUser, deleteUser, resetPin, allUsers } = useAuth();
 
   const isEditing = !!id;
@@ -71,8 +71,13 @@ export default function UserFormScreen() {
 
   const isCommander = currentUser?.role === "commander";
   const { getAgencyById } = useAgency();
-  const agencyColor =
-    (currentUser ? getAgencyById(currentUser.agency)?.primaryColor : undefined) ?? colors.primary;
+  const targetAgency = isEditing
+    ? editTarget?.agency
+    : currentUser?.role === "admin" || currentUser?.role === "super_admin"
+      ? agency ?? currentUser?.agency
+      : currentUser?.agency;
+  const targetAgencyConfig = targetAgency ? getAgencyById(targetAgency) : undefined;
+  const agencyColor = targetAgencyConfig?.primaryColor ?? (currentUser ? getAgencyById(currentUser.agency)?.primaryColor : undefined) ?? colors.primary;
 
   // Roles this user is allowed to assign (centralized RBAC rule:
   // commanders → agency roles, supervisors → officers only, admins → platform roles.
@@ -160,7 +165,7 @@ export default function UserFormScreen() {
             station: form.station.trim(),
             phone: form.phone.trim(),
             status: form.status,
-            agency: currentUser?.agency ?? "frsc",
+            agency: targetAgency ?? currentUser?.agency ?? "frsc",
           },
           form.pin
         );
@@ -294,6 +299,12 @@ export default function UserFormScreen() {
           {/* Section: Assignment */}
           <SectionLabel label="ASSIGNMENT" colors={colors} />
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {!isEditing && targetAgencyConfig && (
+              <View style={[styles.agencyBanner, { backgroundColor: agencyColor + "14", borderColor: agencyColor + "33" }]}>
+                <Feather name="shield" size={16} color={agencyColor} />
+                <Text style={[styles.agencyBannerText, { color: agencyColor }]}>Creating user for {targetAgencyConfig.shortName}</Text>
+              </View>
+            )}
             <FormField
               label="Sector"
               icon="map"
@@ -690,6 +701,20 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     overflow: "hidden",
+  },
+  agencyBanner: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    margin: 12,
+    marginBottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  agencyBannerText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
   },
   optionRow: {
     flexDirection: "row",

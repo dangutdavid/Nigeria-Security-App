@@ -23,6 +23,7 @@ import { useColors } from "@/hooks/useColors";
 import {
   CitizenAgencyRoute,
   CitizenEmergencyLevel,
+  CitizenLocationSource,
   CitizenIncidentReceipt,
   CitizenIncidentType,
   submitCitizenIncidentMock,
@@ -100,6 +101,11 @@ export default function CitizenIncidentReportScreen() {
   const [location, setLocation] = useState("");
   const [latitude, setLatitude] = useState<number | undefined>();
   const [longitude, setLongitude] = useState<number | undefined>();
+  const [locationState, setLocationState] = useState("");
+  const [locationLga, setLocationLga] = useState("");
+  const [locationSource, setLocationSource] = useState<CitizenLocationSource>("manual");
+  const [accuracy, setAccuracy] = useState<number | undefined>();
+  const [locationMessage, setLocationMessage] = useState("");
   const [photoUri, setPhotoUri] = useState<string | undefined>();
   const [vehicleRegistration, setVehicleRegistration] = useState("");
   const [emergencyLevel, setEmergencyLevel] = useState<CitizenEmergencyLevel | "">("");
@@ -121,6 +127,8 @@ export default function CitizenIncidentReportScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
+        setLocationSource("manual");
+        setLocationMessage("GPS permission was denied. You can still continue by typing the nearest street, landmark, state, or LGA.");
         setErrors((next) => ({ ...next, location: "Location permission was denied. Type your location manually." }));
         return;
       }
@@ -128,15 +136,24 @@ export default function CitizenIncidentReportScreen() {
       const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       setLatitude(current.coords.latitude);
       setLongitude(current.coords.longitude);
+      setAccuracy(current.coords.accuracy ?? undefined);
+      setLocationSource("gps");
 
       const [geo] = await Location.reverseGeocodeAsync({
         latitude: current.coords.latitude,
         longitude: current.coords.longitude,
       });
+      const stateName = geo?.region ?? "";
+      const lgaName = geo?.subregion || geo?.district || geo?.city || "";
+      setLocationState(stateName);
+      setLocationLga(lgaName);
       const parts = geo ? [geo.street, geo.district, geo.city, geo.region].filter(Boolean) : [];
       setLocation(parts.length > 0 ? parts.join(", ") : `${current.coords.latitude.toFixed(5)}, ${current.coords.longitude.toFixed(5)}`);
+      setLocationMessage("GPS location captured. You can refine the text field with a landmark if needed.");
       setErrors((next) => ({ ...next, location: undefined }));
     } catch {
+      setLocationSource("manual");
+      setLocationMessage("GPS could not be captured. Type the closest landmark or address to continue.");
       setErrors((next) => ({ ...next, location: "Could not capture your location. Type the nearest landmark instead." }));
     } finally {
       setLocating(false);
@@ -190,6 +207,11 @@ export default function CitizenIncidentReportScreen() {
         location: location.trim(),
         latitude,
         longitude,
+        address: location.trim(),
+        state: locationState.trim() || undefined,
+        lga: locationLga.trim() || undefined,
+        locationSource,
+        accuracy,
         photoUri,
         vehicleRegistration: vehicleRegistration.trim().toUpperCase() || undefined,
         emergencyLevel: emergencyLevel as CitizenEmergencyLevel,
@@ -219,6 +241,9 @@ export default function CitizenIncidentReportScreen() {
           <View style={[styles.receiptCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <ReceiptRow label="Emergency level" value={receipt.emergencyLevel.toUpperCase()} />
             <ReceiptRow label="Location" value={receipt.location} />
+            {receipt.state || receipt.lga ? (
+              <ReceiptRow label="Area" value={[receipt.lga, receipt.state].filter(Boolean).join(", ")} />
+            ) : null}
             <ReceiptRow label="Status" value="SUBMITTED" />
           </View>
           <TouchableOpacity style={styles.doneButton} onPress={() => router.replace("/")}>
@@ -302,6 +327,7 @@ export default function CitizenIncidentReportScreen() {
                 value={location}
                 onChangeText={(value) => {
                   setLocation(value);
+                  if (!latitude || !longitude) setLocationSource("manual");
                   if (value.trim()) setErrors((next) => ({ ...next, location: undefined }));
                 }}
                 placeholder="Nearest street, landmark, area, or GPS location"
@@ -313,8 +339,17 @@ export default function CitizenIncidentReportScreen() {
               </TouchableOpacity>
             </View>
             {latitude != null && longitude != null ? (
-              <Text style={styles.gpsText}>GPS captured: {latitude.toFixed(5)}, {longitude.toFixed(5)}</Text>
+              <Text style={styles.gpsText}>
+                GPS captured: {latitude.toFixed(5)}, {longitude.toFixed(5)}
+                {accuracy != null ? ` · accuracy ${Math.round(accuracy)}m` : ""}
+              </Text>
             ) : null}
+            {locationState || locationLga ? (
+              <Text style={styles.locationMeta}>
+                {[locationLga, locationState].filter(Boolean).join(", ")}
+              </Text>
+            ) : null}
+            {locationMessage ? <Text style={styles.locationHint}>{locationMessage}</Text> : null}
           </Field>
 
           <Field label="Photo upload">
@@ -504,6 +539,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   gpsText: { color: "#1B5E3B", fontFamily: "Inter_600SemiBold", fontSize: 12 },
+  locationMeta: { color: "#0F4C81", fontFamily: "Inter_600SemiBold", fontSize: 12 },
+  locationHint: { color: "#6B7280", fontFamily: "Inter_500Medium", fontSize: 12, lineHeight: 17 },
   photoActions: { flexDirection: "row", gap: 10 },
   photoButton: { flex: 1, minHeight: 64, borderWidth: 1, borderRadius: 14, alignItems: "center", justifyContent: "center", gap: 6 },
   photoText: { fontFamily: "Inter_700Bold", fontSize: 13 },

@@ -5,24 +5,24 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CitizenReportMapFallback } from "@/components/CitizenReportMapFallback";
 import { CitizenIncidentReceipt, listReportsByAgencyWithLocation } from "@/services/citizenIncidentApi";
 
-export default function CivilDefenceMapScreen() {
+export default function VioMapScreen() {
   const insets = useSafeAreaInsets();
   const [reports, setReports] = useState<CitizenIncidentReceipt[]>([]);
 
   useFocusEffect(
     useCallback(() => {
-      void listReportsByAgencyWithLocation("civil_defence").then(setReports);
+      void listReportsByAgencyWithLocation("vio").then(setReports);
     }, []),
   );
 
   return (
     <CitizenReportMapFallback
-      title="NSCDC Location View"
-      subtitle="Citizen reports routed to Civil Defence with GPS pins where available and manual-location fallback where needed."
+      title="VIO Location View"
+      subtitle="VIO-routed roadworthiness and vehicle safety reports with GPS-ready locations and manual fallback."
       reports={reports}
-      accentColor="#234E2A"
+      accentColor="#7B3F00"
       bottomPadding={insets.bottom + 110}
-      detailRouteForReport={() => "/(civil-defence)/incidents"}
+      detailRouteForReport={() => "/(vio)/inspections"}
     />
   );
 }

@@ -41,6 +41,7 @@ export default function AdminLayout() {
     >
       <Tabs.Screen name="index" options={{ title: "Home", tabBarIcon: ({ color }) => <Feather name="grid" size={22} color={color} /> }} />
       <Tabs.Screen name="incidents" options={{ title: "Incidents", tabBarIcon: ({ color }) => <Feather name="file-text" size={22} color={color} /> }} />
+      <Tabs.Screen name="map" options={{ title: "Map", tabBarIcon: ({ color }) => <Feather name="map" size={22} color={color} /> }} />
       <Tabs.Screen name="agencies" options={{ title: "Agencies", tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={22} color={color} /> }} />
       <Tabs.Screen name="users" options={{ title: "Users", tabBarIcon: ({ color }) => <Feather name="users" size={22} color={color} /> }} />
       <Tabs.Screen name="referrals" options={{ title: "Referrals", tabBarIcon: ({ color }) => <Feather name="git-pull-request" size={22} color={color} /> }} />

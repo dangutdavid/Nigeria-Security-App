@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -13,6 +13,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useIncidents, Incident } from "@/context/IncidentContext";
 import { StatusBadge } from "@/components/StatusBadge";
+import {
+  CitizenIncidentReceipt,
+  formatCitizenIncidentStatus,
+  getCitizenReportCoordinatesText,
+  getCitizenReportLocationText,
+  hasCitizenReportCoordinates,
+  listReportsByAgencyWithLocation,
+} from "@/services/citizenIncidentApi";
 
 const SEVERITY_COLORS: Record<string, string> = {
   fatal: "#8B0000",
@@ -27,8 +35,10 @@ export default function MapScreen() {
   const { incidents } = useIncidents();
   const router = useRouter();
   const [selected, setSelected] = useState<Incident | null>(null);
+  const [selectedCitizen, setSelectedCitizen] = useState<CitizenIncidentReceipt | null>(null);
   const [filter, setFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [citizenReports, setCitizenReports] = useState<CitizenIncidentReceipt[]>([]);
 
   const topPad = insets.top;
   const bottomPad = insets.bottom + 90;
@@ -53,6 +63,13 @@ export default function MapScreen() {
     const typ = typeFilter === "all" || i.type === typeFilter;
     return sev && typ;
   });
+  const citizenMapReports = citizenReports.filter(hasCitizenReportCoordinates);
+
+  useFocusEffect(
+    useCallback(() => {
+      void listReportsByAgencyWithLocation("frsc").then(setCitizenReports);
+    }, []),
+  );
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -127,7 +144,23 @@ export default function MapScreen() {
               key={inc.id}
               coordinate={{ latitude: inc.latitude, longitude: inc.longitude }}
               pinColor={SEVERITY_COLORS[inc.severity]}
-              onPress={() => setSelected(inc)}
+              onPress={() => {
+                setSelectedCitizen(null);
+                setSelected(inc);
+              }}
+            />
+          ))}
+          {citizenMapReports.map((report) => (
+            <Marker
+              key={report.reference}
+              coordinate={{ latitude: report.latitude!, longitude: report.longitude! }}
+              pinColor="#1B5E3B"
+              title={report.reference}
+              description={getCitizenReportLocationText(report)}
+              onPress={() => {
+                setSelected(null);
+                setSelectedCitizen(report);
+              }}
             />
           ))}
         </MapView>
@@ -179,6 +212,37 @@ export default function MapScreen() {
               <Text style={styles.viewBtnText}>View</Text>
               <Feather name="arrow-right" size={13} color="#fff" />
             </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {selectedCitizen && (
+        <View
+          style={[
+            styles.selectedCard,
+            { backgroundColor: colors.card, borderColor: colors.border, bottom: bottomPad + 10 },
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={() => setSelectedCitizen(null)}
+          >
+            <Feather name="x" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          <Text style={[styles.selId, { color: colors.mutedForeground }]}>{selectedCitizen.reference}</Text>
+          <Text style={[styles.selTitle, { color: colors.text }]} numberOfLines={2}>Citizen Report</Text>
+          <View style={styles.selLocation}>
+            <Feather name="map-pin" size={12} color={colors.mutedForeground} />
+            <Text style={[styles.selLocationText, { color: colors.mutedForeground }]}>
+              {getCitizenReportLocationText(selectedCitizen)}
+            </Text>
+          </View>
+          <View style={styles.selFooter}>
+            <StatusBadge type="severity" value={selectedCitizen.emergencyLevel === "critical" ? "fatal" : selectedCitizen.emergencyLevel === "high" ? "serious" : "minor"} small />
+            <Text style={[styles.citizenStatus, { color: "#1B5E3B" }]}>{formatCitizenIncidentStatus(selectedCitizen.status)}</Text>
+            <Text style={[styles.citizenCoords, { color: colors.mutedForeground }]}>
+              {getCitizenReportCoordinatesText(selectedCitizen)}
+            </Text>
           </View>
         </View>
       )}
@@ -273,6 +337,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_500Medium",
     textTransform: "capitalize",
+  },
+  citizenStatus: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+  },
+  citizenCoords: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    marginLeft: "auto",
   },
   selectedCard: {
     position: "absolute",

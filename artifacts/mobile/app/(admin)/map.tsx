@@ -3,26 +3,27 @@ import React, { useCallback, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CitizenReportMapFallback } from "@/components/CitizenReportMapFallback";
-import { CitizenIncidentReceipt, listReportsByAgencyWithLocation } from "@/services/citizenIncidentApi";
+import { CitizenIncidentReceipt, listReportsWithLocation } from "@/services/citizenIncidentApi";
 
-export default function CivilDefenceMapScreen() {
+export default function AdminMapScreen() {
   const insets = useSafeAreaInsets();
   const [reports, setReports] = useState<CitizenIncidentReceipt[]>([]);
 
   useFocusEffect(
     useCallback(() => {
-      void listReportsByAgencyWithLocation("civil_defence").then(setReports);
+      void listReportsWithLocation().then(setReports);
     }, []),
   );
 
   return (
     <CitizenReportMapFallback
-      title="NSCDC Location View"
-      subtitle="Citizen reports routed to Civil Defence with GPS pins where available and manual-location fallback where needed."
+      title="National Incident Map"
+      subtitle="Admin cross-agency view of all citizen reports, including GPS-ready reports and manual-location fallbacks."
       reports={reports}
-      accentColor="#234E2A"
+      accentColor="#344054"
       bottomPadding={insets.bottom + 110}
-      detailRouteForReport={() => "/(civil-defence)/incidents"}
+      showAgencyFilter
+      detailRouteForReport={() => "/(admin)/incidents"}
     />
   );
 }

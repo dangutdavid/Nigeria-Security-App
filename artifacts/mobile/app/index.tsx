@@ -1,19 +1,20 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Redirect, useRouter } from "expo-router";
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { routeForUser, useAuth } from "@/context/AuthContext";
-import { AGENCIES, useAgency } from "@/context/AgencyContext";
+import { useAgency } from "@/context/AgencyContext";
 import { AgencyEmblem, AgencyEmblemId } from "@/components/AgencyEmblem";
 import { useColors } from "@/hooks/useColors";
 
@@ -52,10 +53,12 @@ const PUBLIC_ACTIONS = [
 
 export default function AgencySelectScreen() {
   const { user, isLoading } = useAuth();
-  const { selectAgency } = useAgency();
+  const { agencies, selectAgency } = useAgency();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [agencyQuery, setAgencyQuery] = useState("");
+  const [selectedAgencyId, setSelectedAgencyId] = useState<string>("frsc");
 
   if (isLoading) return null;
 
@@ -64,10 +67,30 @@ export default function AgencySelectScreen() {
     return <Redirect href={routeForUser(user) as any} />;
   }
 
-  async function handleAgency(id: string) {
+  const filteredAgencies = useMemo(() => {
+    const q = agencyQuery.trim().toLowerCase();
+    if (!q) return agencies;
+    return agencies.filter((agency) =>
+      `${agency.shortName} ${agency.name} ${agency.fullName} ${agency.description} ${agency.badgePrefix}`
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [agencies, agencyQuery]);
+
+  const activeAgency =
+    agencies.find((agency) => agency.id === selectedAgencyId) ??
+    filteredAgencies[0] ??
+    agencies[0];
+
+  async function handleAgencySignIn(id: string) {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await selectAgency(id);
     router.push("/login");
+  }
+
+  async function handleSelectAgency(id: string) {
+    await Haptics.selectionAsync();
+    setSelectedAgencyId(id);
   }
 
   async function handlePublic(route: string) {
@@ -96,37 +119,88 @@ export default function AgencySelectScreen() {
           </Text>
         </View>
 
-        {/* Agency Login Cards */}
-        <Text style={styles.sectionLabel}>SELECT YOUR AGENCY</Text>
-        <View style={styles.agencyGrid}>
-          {AGENCIES.map((agency) => (
-            <TouchableOpacity
-              key={agency.id}
-              style={[
-                styles.agencyCard,
-                { backgroundColor: agency.primaryColor },
-              ]}
-              onPress={() => handleAgency(agency.id)}
-              activeOpacity={0.85}
-            >
-              <View style={styles.agencyCardInner}>
-                <AgencyEmblem agency={agency.id as AgencyEmblemId} size={54} />
+        {/* Agency Login */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionLabel}>AGENCY SIGN IN</Text>
+          <Text style={styles.agencyCount}>{agencies.length} agencies</Text>
+        </View>
+        <View style={styles.agencySelector}>
+          <View style={styles.agencySearch}>
+            <Feather name="search" size={16} color="rgba(255,255,255,0.55)" />
+            <TextInput
+              value={agencyQuery}
+              onChangeText={setAgencyQuery}
+              placeholder="Search agency, role, mandate..."
+              placeholderTextColor="rgba(255,255,255,0.45)"
+              style={styles.agencySearchInput}
+              autoCorrect={false}
+            />
+            {agencyQuery ? (
+              <TouchableOpacity onPress={() => setAgencyQuery("")}>
+                <Feather name="x" size={16} color="rgba(255,255,255,0.55)" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          <View style={styles.agencyList}>
+            {filteredAgencies.map((agency) => {
+              const active = activeAgency?.id === agency.id;
+              return (
+                <TouchableOpacity
+                  key={agency.id}
+                  style={[
+                    styles.agencyRow,
+                    {
+                      borderColor: active ? agency.primaryColor : "rgba(255,255,255,0.1)",
+                      backgroundColor: active ? agency.primaryColor + "26" : "rgba(255,255,255,0.055)",
+                    },
+                  ]}
+                  onPress={() => handleSelectAgency(agency.id)}
+                  activeOpacity={0.86}
+                >
+                  <AgencyEmblem agency={agency.id as AgencyEmblemId} size={38} color={agency.primaryColor} label={agency.shortName} />
+                  <View style={styles.agencyRowText}>
+                    <Text style={styles.agencyShort}>{agency.shortName}</Text>
+                    <Text style={styles.agencyFull} numberOfLines={1}>{agency.fullName}</Text>
+                  </View>
+                  {active ? (
+                    <View style={[styles.selectedDot, { backgroundColor: agency.primaryColor }]}>
+                      <Feather name="check" size={13} color="#fff" />
+                    </View>
+                  ) : (
+                    <Feather name="chevron-right" size={16} color="rgba(255,255,255,0.35)" />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+            {filteredAgencies.length === 0 && (
+              <View style={styles.emptyAgency}>
+                <Feather name="search" size={18} color="rgba(255,255,255,0.45)" />
+                <Text style={styles.emptyAgencyText}>No agency matches your search.</Text>
+              </View>
+            )}
+          </View>
+
+          {activeAgency ? (
+            <View style={[styles.selectedAgencyPanel, { borderColor: activeAgency.primaryColor + "66" }]}>
+              <View style={styles.selectedAgencyTop}>
+                <AgencyEmblem agency={activeAgency.id as AgencyEmblemId} size={50} color={activeAgency.primaryColor} label={activeAgency.shortName} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.agencyShort}>{agency.shortName}</Text>
-                  <Text style={styles.agencyFull}>{agency.fullName}</Text>
-                  <Text style={styles.agencyDesc}>{agency.description}</Text>
+                  <Text style={styles.selectedAgencyName}>{activeAgency.shortName}</Text>
+                  <Text style={styles.selectedAgencyFull}>{activeAgency.fullName}</Text>
                 </View>
               </View>
-              <View style={styles.agencyLoginRow}>
+              <Text style={styles.selectedAgencyDesc}>{activeAgency.description}</Text>
+              <TouchableOpacity
+                style={[styles.agencyLoginBtn, { backgroundColor: activeAgency.primaryColor }]}
+                onPress={() => handleAgencySignIn(activeAgency.id)}
+                activeOpacity={0.88}
+              >
                 <Text style={styles.agencyLoginText}>Officer Sign In</Text>
-                <Feather
-                  name="arrow-right"
-                  size={14}
-                  color="rgba(255,255,255,0.8)"
-                />
-              </View>
-            </TouchableOpacity>
-          ))}
+                <Feather name="arrow-right" size={15} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          ) : null}
         </View>
 
         {/* Divider */}
@@ -192,59 +266,111 @@ const styles = StyleSheet.create({
     marginTop: 4,
     textAlign: "center",
   },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
   sectionLabel: {
     fontSize: 11,
     fontFamily: "Inter_700Bold",
     color: "rgba(255,255,255,0.45)",
     letterSpacing: 1.5,
-    marginBottom: 12,
   },
-  agencyGrid: { gap: 12, marginBottom: 28 },
-  agencyCard: { borderRadius: 18, overflow: "hidden" },
-  agencyCardInner: {
+  agencyCount: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: "rgba(255,255,255,0.45)",
+  },
+  agencySelector: {
+    gap: 12,
+    marginBottom: 28,
+  },
+  agencySearch: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 14,
-    padding: 18,
-    paddingBottom: 10,
-  },
-  agencyIconBg: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
     alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
+    gap: 10,
+    minHeight: 46,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.12)",
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.065)",
+    paddingHorizontal: 13,
   },
-  agencyShort: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#fff" },
+  agencySearchInput: {
+    flex: 1,
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+  },
+  agencyList: { gap: 8 },
+  agencyRow: {
+    minHeight: 64,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  agencyRowText: { flex: 1, minWidth: 0 },
+  agencyShort: { fontSize: 17, fontFamily: "Inter_700Bold", color: "#fff" },
   agencyFull: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
     color: "rgba(255,255,255,0.75)",
     marginTop: 1,
   },
-  agencyDesc: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.6)",
-    marginTop: 4,
-    lineHeight: 16,
+  selectedDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  agencyLoginRow: {
+  emptyAgency: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+    borderRadius: 14,
+    padding: 14,
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  emptyAgencyText: { color: "rgba(255,255,255,0.58)", fontSize: 13, fontFamily: "Inter_500Medium" },
+  selectedAgencyPanel: {
+    borderWidth: 1,
+    borderRadius: 18,
+    padding: 14,
+    gap: 12,
+    backgroundColor: "rgba(255,255,255,0.075)",
+  },
+  selectedAgencyTop: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "center",
+  },
+  selectedAgencyName: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#fff" },
+  selectedAgencyFull: { fontSize: 12, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.7)", marginTop: 2 },
+  selectedAgencyDesc: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "rgba(255,255,255,0.8)",
+    lineHeight: 17,
+  },
+  agencyLoginBtn: {
+    minHeight: 46,
+    borderRadius: 14,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingBottom: 14,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(255,255,255,0.12)",
+    justifyContent: "center",
+    gap: 8,
   },
   agencyLoginText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    color: "rgba(255,255,255,0.8)",
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: "#fff",
   },
   dividerRow: {
     flexDirection: "row",

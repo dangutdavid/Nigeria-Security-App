@@ -22,6 +22,8 @@ import {
   CitizenIncidentType,
   findCitizenIncidentByReference,
   formatCitizenIncidentStatus,
+  getCitizenReportCoordinatesText,
+  getCitizenReportLocationText,
   getCitizenStatusMessage,
 } from "@/services/citizenIncidentApi";
 
@@ -198,6 +200,8 @@ function ReportDetails({
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(report.submittedAt));
+  const coordinates = getCitizenReportCoordinatesText(report);
+  const area = [report.lga, report.state].filter(Boolean).join(", ");
 
   return (
     <View style={[styles.detailCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -224,6 +228,10 @@ function ReportDetails({
         <InfoRow label="Suggested agency" value={AGENCY_LABELS[report.suggestedAgency]} />
         <InfoRow label="Emergency level" value={report.emergencyLevel.toUpperCase()} />
         <InfoRow label="Current status" value={formatCitizenIncidentStatus(report.status)} />
+        <InfoRow label="Location" value={getCitizenReportLocationText(report)} />
+        {area ? <InfoRow label="Area" value={area} /> : null}
+        {coordinates ? <InfoRow label="Coordinates" value={coordinates} /> : null}
+        <InfoRow label="Location source" value={report.locationSource === "gps" ? "GPS captured" : "Manual location"} />
       </View>
     </View>
   );

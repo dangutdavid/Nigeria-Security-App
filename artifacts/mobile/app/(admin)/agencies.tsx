@@ -1,20 +1,41 @@
+import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import React, { useCallback, useMemo, useState } from "react";
 import { useFocusEffect } from "expo-router";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AgencyEmblem } from "@/components/AgencyEmblem";
+import { AgencyConfig, NewAgencyInput, useAgency } from "@/context/AgencyContext";
 import { useColors } from "@/hooks/useColors";
-import { CitizenAgencyRoute, formatCitizenAgencyLabel, listCitizenIncidentReports } from "@/services/citizenIncidentApi";
+import { listCitizenIncidentReports } from "@/services/citizenIncidentApi";
 
-const AGENCIES: CitizenAgencyRoute[] = ["frsc", "police", "vio", "civil_defence"];
+const COLOR_OPTIONS = ["#1B5E3B", "#1A3A6C", "#7B3F00", "#234E2A", "#344054", "#5C6BC0", "#8B1E3F", "#0F766E"];
+
+type AgencyForm = Omit<NewAgencyInput, "icon">;
+
+const EMPTY_FORM: AgencyForm = {
+  name: "",
+  shortName: "",
+  fullName: "",
+  primaryColor: COLOR_OPTIONS[0],
+  secondaryColor: "#2E7D52",
+  badgePrefix: "",
+  description: "",
+};
 
 export default function AdminAgenciesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { agencies, addAgency } = useAgency();
   const [reports, setReports] = useState<Awaited<ReturnType<typeof listCitizenIncidentReports>>>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState<AgencyForm>(EMPTY_FORM);
+  const [error, setError] = useState("");
   useFocusEffect(useCallback(() => { void listCitizenIncidentReports().then(setReports); }, []));
-  const rows = useMemo(() => AGENCIES.map((agency) => {
-    const agencyReports = reports.filter((r) => r.suggestedAgency === agency);
+
+  const rows = useMemo(() => agencies.map((agency) => {
+    const agencyReports = reports.filter((r) => r.suggestedAgency === agency.id);
     return {
       agency,
       total: agencyReports.length,
@@ -22,13 +43,60 @@ export default function AdminAgenciesScreen() {
       resolved: agencyReports.filter((r) => r.status === "resolved" || r.status === "closed").length,
       high: agencyReports.filter((r) => r.emergencyLevel === "high" || r.emergencyLevel === "critical").length,
     };
-  }), [reports]);
+  }), [agencies, reports]);
+
+  function set<K extends keyof AgencyForm>(key: K, value: AgencyForm[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setError("");
+  }
+
+  async function submitAgency() {
+    const validation = validateAgencyForm(form);
+    if (validation) {
+      setError(validation);
+      return;
+    }
+
+    try {
+      await addAgency({
+        ...form,
+        icon: "shield",
+      });
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setForm(EMPTY_FORM);
+      setShowAdd(false);
+      setError("");
+    } catch (err) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setError(err instanceof Error ? err.message : "Unable to add agency.");
+    }
+  }
+
   return (
     <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 110 }}>
-      <Text style={[styles.title, { color: colors.text }]}>Agency workload</Text>
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={[styles.title, { color: colors.text }]}>Agency workload</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Manage the agency registry used by login and admin views.</Text>
+        </View>
+        <TouchableOpacity style={styles.addBtn} onPress={() => setShowAdd(true)}>
+          <Feather name="plus" size={16} color="#fff" />
+          <Text style={styles.addBtnText}>Add</Text>
+        </TouchableOpacity>
+      </View>
+
       {rows.map((row) => (
-        <View key={row.agency} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>{formatCitizenAgencyLabel(row.agency)}</Text>
+        <View key={row.agency.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.cardHeader}>
+            <AgencyEmblem agency={row.agency.id} size={42} color={row.agency.primaryColor} label={row.agency.shortName} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{row.agency.shortName}</Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>{row.agency.fullName}</Text>
+            </View>
+            <View style={[styles.registryPill, { backgroundColor: row.agency.primaryColor + "18" }]}>
+              <Text style={[styles.registryText, { color: row.agency.primaryColor }]}>{row.agency.badgePrefix}</Text>
+            </View>
+          </View>
           <View style={styles.grid}>
             <Stat label="Total" value={row.total} />
             <Stat label="Open" value={row.open} />
@@ -37,6 +105,40 @@ export default function AdminAgenciesScreen() {
           </View>
         </View>
       ))}
+
+      <Modal visible={showAdd} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAdd(false)}>
+        <ScrollView style={[styles.modalRoot, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <View>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Add Agency</Text>
+              <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>Create a frontend agency profile for scalable onboarding.</Text>
+            </View>
+            <TouchableOpacity onPress={() => setShowAdd(false)}>
+              <Feather name="x" size={22} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <Field label="Short name" value={form.shortName} onChangeText={(v) => set("shortName", v)} placeholder="e.g. FIRE" colors={colors} />
+          <Field label="Display name" value={form.name} onChangeText={(v) => set("name", v)} placeholder="e.g. Fire Service" colors={colors} />
+          <Field label="Full name" value={form.fullName} onChangeText={(v) => set("fullName", v)} placeholder="e.g. Federal Fire Service" colors={colors} />
+          <Field label="Badge prefix" value={form.badgePrefix} onChangeText={(v) => set("badgePrefix", v)} placeholder="e.g. FFS" colors={colors} />
+          <Field label="Mandate / description" value={form.description} onChangeText={(v) => set("description", v)} placeholder="Emergency response, fire safety..." colors={colors} multiline />
+
+          <Text style={[styles.fieldLabel, { color: colors.text }]}>Primary color</Text>
+          <View style={styles.swatches}>
+            {COLOR_OPTIONS.map((color) => (
+              <TouchableOpacity key={color} style={[styles.swatch, { backgroundColor: color, borderColor: form.primaryColor === color ? colors.text : "transparent" }]} onPress={() => set("primaryColor", color)}>
+                {form.primaryColor === color && <Feather name="check" size={16} color="#fff" />}
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          <TouchableOpacity style={styles.saveBtn} onPress={submitAgency}>
+            <Text style={styles.saveText}>Add Agency</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </Modal>
     </ScrollView>
   );
 }
@@ -47,11 +149,72 @@ function Stat({ label, value }: { label: string; value: number }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  title: { fontSize: 24, fontFamily: "Inter_700Bold", marginBottom: 14 },
+  headerRow: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 14 },
+  title: { fontSize: 24, fontFamily: "Inter_700Bold" },
+  subtitle: { fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 3, maxWidth: 250 },
+  addBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 12, backgroundColor: "#344054", paddingHorizontal: 12, paddingVertical: 10 },
+  addBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_700Bold" },
   card: { borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 12 },
-  cardTitle: { fontSize: 17, fontFamily: "Inter_700Bold", marginBottom: 12 },
+  cardHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
+  cardTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
+  cardSub: { fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 2 },
+  registryPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5 },
+  registryText: { fontSize: 10, fontFamily: "Inter_700Bold" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   stat: { width: "47%", backgroundColor: "#34405410", borderRadius: 12, padding: 12 },
   statValue: { color: "#344054", fontSize: 22, fontFamily: "Inter_700Bold" },
   statLabel: { color: "#667085", fontSize: 11, fontFamily: "Inter_600SemiBold", marginTop: 2 },
+  modalRoot: { flex: 1 },
+  modalHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12, paddingBottom: 16, marginBottom: 16, borderBottomWidth: 1 },
+  modalTitle: { fontSize: 22, fontFamily: "Inter_700Bold" },
+  modalSub: { fontSize: 13, fontFamily: "Inter_500Medium", marginTop: 3 },
+  fieldWrap: { marginBottom: 14, gap: 6 },
+  fieldLabel: { fontSize: 13, fontFamily: "Inter_700Bold", marginBottom: 8 },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, fontSize: 14, fontFamily: "Inter_500Medium" },
+  textArea: { minHeight: 86, textAlignVertical: "top" },
+  swatches: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 14 },
+  swatch: { width: 38, height: 38, borderRadius: 19, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  errorText: { color: "#C0392B", fontSize: 13, fontFamily: "Inter_600SemiBold", marginBottom: 12 },
+  saveBtn: { minHeight: 50, borderRadius: 14, backgroundColor: "#344054", alignItems: "center", justifyContent: "center" },
+  saveText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
 });
+
+function Field({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  colors,
+  multiline,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  colors: ReturnType<typeof useColors>;
+  multiline?: boolean;
+}) {
+  return (
+    <View style={styles.fieldWrap}>
+      <Text style={[styles.fieldLabel, { color: colors.text }]}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.mutedForeground}
+        multiline={multiline}
+        style={[styles.input, multiline && styles.textArea, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]}
+      />
+    </View>
+  );
+}
+
+function validateAgencyForm(form: AgencyForm) {
+  if (!form.shortName.trim()) return "Short name is required.";
+  if (!form.name.trim()) return "Display name is required.";
+  if (!form.fullName.trim()) return "Full name is required.";
+  if (!form.badgePrefix.trim()) return "Badge prefix is required.";
+  if (!form.description.trim()) return "Description is required.";
+  if (form.shortName.trim().length > 12) return "Short name should be 12 characters or fewer.";
+  return null;
+}

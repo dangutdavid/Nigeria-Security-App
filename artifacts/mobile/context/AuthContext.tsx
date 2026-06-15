@@ -3,7 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 
 export type UserRole = "citizen" | "officer" | "supervisor" | "commander" | "admin" | "super_admin";
 export type UserStatus = "active" | "inactive" | "suspended";
-export type AgencyType = "frsc" | "police" | "vio" | "civil_defence" | "admin" | "citizen" | "public";
+export type AgencyType = string;
 
 export interface User {
   id: string;
@@ -271,7 +271,7 @@ export function routeForUser(user: User | null | undefined): string {
   if (user.agency === "vio") return "/(vio)";
   if (user.agency === "civil_defence") return "/(civil-defence)";
   if (user.agency === "frsc") return "/(tabs)";
-  return "/";
+  return "/unauthorized";
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
