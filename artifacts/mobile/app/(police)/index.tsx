@@ -15,6 +15,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useCrimeReports, CRIME_TYPE_LABELS, CrimeType } from "@/context/CrimeReportContext";
 import { useTheftReports } from "@/context/TheftReportContext";
 import { useColors } from "@/hooks/useColors";
+import { NotificationAccessCard } from "@/components/NotificationAccessCard";
 import {
   CitizenIncidentReceipt,
   formatCitizenIncidentStatus,
@@ -143,6 +144,8 @@ export default function PoliceHome() {
             </View>
           </View>
         </View>
+
+        <NotificationAccessCard accentColor={PRIMARY} />
 
         {/* Critical alert */}
         {stats.critical > 0 && (

@@ -63,6 +63,7 @@ export default function VIOProfile() {
     { icon: "award", label: "Certificates", sub: "View all issued certs", onPress: () => router.push("/(vio)/certificates" as any) },
     { icon: "search", label: "Vehicle Lookup", sub: "Check registration and records", onPress: () => router.push("/vehicle-lookup") },
     { icon: "git-pull-request", label: "Referrals", sub: "Cross-agency shared records", badge: pendingReferrals, onPress: () => router.push("/referrals") },
+    { icon: "bell", label: "Notifications", sub: "Alerts, read state, and local preferences", onPress: () => router.push("/notifications" as any) },
     { icon: "anchor", label: "Duty Log", sub: "Start or review patrol sessions", onPress: () => router.push("/patrol-log") },
     { icon: "bar-chart-2", label: "Analytics", sub: "Inspection trends and pass rates", onPress: () => router.push("/analytics-vio") },
     ...(canManageUsers

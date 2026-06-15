@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useInspections } from "@/context/InspectionContext";
 import { useColors } from "@/hooks/useColors";
+import { NotificationAccessCard } from "@/components/NotificationAccessCard";
 import {
   CitizenIncidentReceipt,
   formatCitizenIncidentStatus,
@@ -132,6 +133,8 @@ export default function VIOHome() {
             </View>
           </View>
         </View>
+
+        <NotificationAccessCard accentColor={PRIMARY} />
 
         {/* Failed inspections alert */}
         {stats.fail > 0 && (

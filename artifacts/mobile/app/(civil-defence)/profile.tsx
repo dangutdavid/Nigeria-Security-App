@@ -28,6 +28,14 @@ export default function CivilDefenceProfileScreen() {
         <Info label="Station" value={user?.station ?? "-"} />
         <Info label="Phone" value={user?.phone ?? "-"} />
       </View>
+      <TouchableOpacity style={[styles.notificationBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.push("/notifications" as any)}>
+        <Feather name="bell" size={17} color="#234E2A" />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.notificationTitle, { color: colors.text }]}>Notifications</Text>
+          <Text style={[styles.notificationSub, { color: colors.mutedForeground }]}>Alerts and local preferences</Text>
+        </View>
+        <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+      </TouchableOpacity>
       <TouchableOpacity style={styles.logoutBtn} onPress={() => router.replace("/logout")}>
         <Feather name="log-out" size={17} color="#fff" />
         <Text style={styles.logoutText}>Sign Out</Text>
@@ -52,6 +60,9 @@ const styles = StyleSheet.create({
   name: { color: "#fff", fontSize: 22, fontFamily: "Inter_700Bold", marginTop: 12, textAlign: "center" },
   role: { color: "rgba(255,255,255,0.8)", fontSize: 13, fontFamily: "Inter_600SemiBold", marginTop: 4 },
   card: { borderWidth: 1, borderRadius: 16, margin: 16, padding: 16, gap: 12 },
+  notificationBtn: { borderWidth: 1, borderRadius: 16, marginHorizontal: 16, marginBottom: 12, padding: 14, flexDirection: "row", alignItems: "center", gap: 10 },
+  notificationTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  notificationSub: { fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 2 },
   infoRow: { borderBottomWidth: 1, borderBottomColor: "rgba(0,0,0,0.06)", paddingBottom: 10 },
   infoLabel: { color: "#6B7280", fontSize: 11, fontFamily: "Inter_700Bold", textTransform: "uppercase" },
   infoValue: { color: "#111827", fontSize: 14, fontFamily: "Inter_600SemiBold", marginTop: 3 },

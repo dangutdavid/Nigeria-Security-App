@@ -5,6 +5,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MetricCard } from "@/components/MetricCard";
+import { NotificationAccessCard } from "@/components/NotificationAccessCard";
 import { useReferrals } from "@/context/ReferralContext";
 import { useColors } from "@/hooks/useColors";
 import { CitizenIncidentReceipt, listCitizenIncidentReports } from "@/services/citizenIncidentApi";
@@ -36,6 +37,7 @@ export default function AdminDashboard() {
   return (
     <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 110 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}>
       <View style={styles.hero}><Text style={styles.kicker}>ADMIN CONTROL</Text><Text style={styles.heroTitle}>Cross-agency overview</Text><Text style={styles.heroSub}>Citizen reports, agency workload, referrals, users, and activity.</Text></View>
+      <NotificationAccessCard accentColor="#344054" />
       <View style={styles.row}><MetricCard label="Total citizen reports" value={metrics.total} icon="file-text" color="#344054" bgColor="#34405418" /><MetricCard label="High emergency" value={metrics.high} icon="alert-octagon" color="#C0392B" bgColor="#FEE8E8" /></View>
       <View style={styles.row}><MetricCard label="Pending triage" value={metrics.triage} icon="clock" color="#C8960C" bgColor="#FFF8DC" /><MetricCard label="In progress" value={metrics.progress} icon="activity" color="#7C3AED" bgColor="#7C3AED18" /></View>
       <View style={styles.row}><MetricCard label="Resolved / closed" value={metrics.resolved} icon="check-circle" color="#27AE60" bgColor="#E8F8EE" /><MetricCard label="Referrals" value={referrals.length} icon="git-pull-request" color="#2C7BE5" bgColor="#2C7BE518" /></View>

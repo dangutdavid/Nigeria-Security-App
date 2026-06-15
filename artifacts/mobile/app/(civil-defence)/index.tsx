@@ -5,6 +5,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { MetricCard } from "@/components/MetricCard";
+import { NotificationAccessCard } from "@/components/NotificationAccessCard";
 import { useAuth } from "@/context/AuthContext";
 import { useReferrals } from "@/context/ReferralContext";
 import { useColors } from "@/hooks/useColors";
@@ -48,6 +49,8 @@ export default function CivilDefenceHome() {
         <Text style={styles.heroTitle}>Welcome, {user?.name.split(" ")[0] ?? "Officer"}</Text>
         <Text style={styles.heroSub}>Civil protection, emergency response, and community safety operations.</Text>
       </View>
+
+      <NotificationAccessCard accentColor="#234E2A" />
 
       <View style={styles.metricRow}>
         <MetricCard label="New citizen reports" value={metrics.newReports} icon="inbox" color="#234E2A" bgColor="#234E2A18" />

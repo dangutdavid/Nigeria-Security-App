@@ -308,6 +308,12 @@ export default function ProfileScreen() {
             badge={pendingReferrals}
             onPress={() => router.push("/referrals")}
           />
+          <SettingRow
+            icon="bell"
+            label="Notifications"
+            subtitle="Alerts, read state, and local preferences"
+            onPress={() => router.push("/notifications" as any)}
+          />
           {canAssignCases ? (
             <SettingRow
               icon="clipboard"

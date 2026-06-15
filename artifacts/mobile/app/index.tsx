@@ -32,6 +32,12 @@ const PUBLIC_ACTIONS = [
     color: "#2E7D52",
   },
   {
+    icon: "bell" as const,
+    label: "Notifications",
+    route: "/notifications",
+    color: "#0F4C81",
+  },
+  {
     icon: "alert-triangle" as const,
     label: "Report Stolen Vehicle",
     route: "/report-theft",

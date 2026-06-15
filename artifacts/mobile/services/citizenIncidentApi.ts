@@ -1,5 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+import { createNotification, priorityFromEmergency } from "@/services/notificationService";
+
 export type CitizenIncidentType =
   | "road_crash"
   | "traffic_obstruction"
@@ -552,6 +554,41 @@ export async function submitCitizenIncidentMock(
   const existing: CitizenIncidentReceipt[] = raw ? JSON.parse(raw) : [];
   await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([normalizeCitizenIncidentReport(receipt), ...existing]));
 
+  await createNotification({
+    type: "citizen_report_submitted",
+    audience: "citizen",
+    title: "Report submitted",
+    message: `Your report ${receipt.reference} has been submitted and routed to ${formatCitizenAgencyLabel(receipt.suggestedAgency)}.`,
+    reportReference: receipt.reference,
+    route: "/track-report",
+    priority: priorityFromEmergency(receipt.emergencyLevel),
+    sourceAgency: "citizen",
+  });
+  await createNotification({
+    type: "agency_referral_received",
+    audience: "agency",
+    agency: receipt.suggestedAgency,
+    title: "New citizen report",
+    message: `${receipt.reference} was routed to ${formatCitizenAgencyLabel(receipt.suggestedAgency)} for ${receipt.incidentType.replaceAll("_", " ")}.`,
+    reportReference: receipt.reference,
+    route: agencyRouteForReport(receipt.suggestedAgency),
+    priority: priorityFromEmergency(receipt.emergencyLevel),
+    sourceAgency: "citizen",
+  });
+  if (receipt.emergencyLevel === "high" || receipt.emergencyLevel === "critical") {
+    await createNotification({
+      type: "nearby_high_priority_alert",
+      audience: "agency",
+      agency: receipt.suggestedAgency,
+      title: "High-priority citizen alert",
+      message: `${receipt.reference} is marked ${receipt.emergencyLevel.toUpperCase()} at ${receipt.location}.`,
+      reportReference: receipt.reference,
+      route: agencyRouteForReport(receipt.suggestedAgency),
+      priority: priorityFromEmergency(receipt.emergencyLevel),
+      sourceAgency: "citizen",
+    });
+  }
+
   return normalizeCitizenIncidentReport(receipt);
 }
 
@@ -676,8 +713,32 @@ export async function updateCitizenIncidentStatusMock({
     return updated;
   });
 
-  if (updated) await writeCitizenIncidentReports(next);
-  return updated;
+  const updatedReport = updated as CitizenIncidentReceipt | null;
+  if (updatedReport) {
+    await writeCitizenIncidentReports(next);
+    await createNotification({
+      type: "status_changed",
+      audience: "citizen",
+      title: "Report status updated",
+      message: `${updatedReport.reference} is now ${formatCitizenIncidentStatus(status)}. ${getCitizenStatusMessage(status)}`,
+      reportReference: updatedReport.reference,
+      route: "/track-report",
+      priority: priorityFromEmergency(updatedReport.emergencyLevel),
+      sourceAgency: updatedReport.suggestedAgency,
+    });
+    await createNotification({
+      type: status === "assigned" ? "case_assigned" : "status_changed",
+      audience: "agency",
+      agency: updatedReport.suggestedAgency,
+      title: status === "assigned" ? "Case assigned" : "Case status changed",
+      message: `${updatedReport.reference} was marked ${formatCitizenIncidentStatus(status)} by ${actorName}.`,
+      reportReference: updatedReport.reference,
+      route: agencyRouteForReport(updatedReport.suggestedAgency),
+      priority: priorityFromEmergency(updatedReport.emergencyLevel),
+      sourceAgency: updatedReport.suggestedAgency,
+    });
+  }
+  return updatedReport;
 }
 
 export async function reassignCitizenIncidentAgencyMock({
@@ -712,8 +773,43 @@ export async function reassignCitizenIncidentAgencyMock({
     return updated;
   });
 
-  if (updated) await writeCitizenIncidentReports(next);
-  return updated;
+  const updatedReport = updated as CitizenIncidentReceipt | null;
+  if (updatedReport) {
+    await writeCitizenIncidentReports(next);
+    await createNotification({
+      type: "report_reassigned",
+      audience: "citizen",
+      title: "Report reassigned",
+      message: `${updatedReport.reference} has been reassigned to ${formatCitizenAgencyLabel(agency)} for handling.`,
+      reportReference: updatedReport.reference,
+      route: "/track-report",
+      priority: priorityFromEmergency(updatedReport.emergencyLevel),
+      sourceAgency: "admin",
+    });
+    await createNotification({
+      type: "report_reassigned",
+      audience: "agency",
+      agency,
+      title: "Report reassigned to your agency",
+      message: `${updatedReport.reference} was reassigned to ${formatCitizenAgencyLabel(agency)} by ${actorName}.`,
+      reportReference: updatedReport.reference,
+      route: agencyRouteForReport(agency),
+      priority: priorityFromEmergency(updatedReport.emergencyLevel),
+      sourceAgency: "admin",
+    });
+    await createNotification({
+      type: "admin_action",
+      audience: "admin",
+      agency: "admin",
+      title: "Agency reassignment completed",
+      message: `${actorName} reassigned ${updatedReport.reference} to ${formatCitizenAgencyLabel(agency)}.`,
+      reportReference: updatedReport.reference,
+      route: "/(admin)/incidents",
+      priority: "normal",
+      sourceAgency: "admin",
+    });
+  }
+  return updatedReport;
 }
 
 export async function appendCitizenIncidentTimelineMock({
@@ -783,4 +879,14 @@ export function formatCitizenAgencyLabel(agency: CitizenAgencyRoute): string {
     civil_defence: "Civil Defence / NSCDC",
   };
   return labels[agency];
+}
+
+function agencyRouteForReport(agency: CitizenAgencyRoute): string {
+  const routes: Record<CitizenAgencyRoute, string> = {
+    frsc: "/(tabs)/cases",
+    police: "/(police)/crime-reports",
+    vio: "/(vio)/inspections",
+    civil_defence: "/(civil-defence)/incidents",
+  };
+  return routes[agency];
 }

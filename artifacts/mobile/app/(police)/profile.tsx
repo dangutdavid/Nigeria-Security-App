@@ -61,6 +61,7 @@ export default function PoliceProfile() {
     { icon: "file-text", label: "My Crime Reports", sub: `${myReports.length} total`, onPress: () => router.push("/(police)/crime-reports" as any) },
     { icon: "search", label: "Vehicle Check", sub: "Run a plate or VIN lookup", onPress: () => router.push("/(police)/vehicle-check" as any) },
     { icon: "git-pull-request", label: "Referrals", sub: "Cross-agency shared records", badge: pendingReferrals, onPress: () => router.push("/referrals") },
+    { icon: "bell", label: "Notifications", sub: "Alerts, read state, and local preferences", onPress: () => router.push("/notifications" as any) },
     { icon: "anchor", label: "Duty Log", sub: "Start or review patrol sessions", onPress: () => router.push("/patrol-log") },
     { icon: "bar-chart-2", label: "Analytics", sub: "Crime trends and hotspots", onPress: () => router.push("/analytics-police") },
     ...(canManageUsers

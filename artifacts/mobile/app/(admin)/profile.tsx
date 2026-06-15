@@ -21,6 +21,14 @@ export default function AdminProfileScreen() {
         <Text style={[styles.label, { color: colors.mutedForeground }]}>Badge</Text><Text style={[styles.value, { color: colors.text }]}>{user?.badgeNumber}</Text>
         <Text style={[styles.label, { color: colors.mutedForeground }]}>Station</Text><Text style={[styles.value, { color: colors.text }]}>{user?.station}</Text>
       </View>
+      <TouchableOpacity style={[styles.notificationBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.push("/notifications" as any)}>
+        <Feather name="bell" size={17} color="#344054" />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.notificationTitle, { color: colors.text }]}>Notifications</Text>
+          <Text style={[styles.notificationSub, { color: colors.mutedForeground }]}>Admin alerts and local preferences</Text>
+        </View>
+        <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+      </TouchableOpacity>
       <TouchableOpacity style={styles.logout} onPress={() => router.replace("/logout")}><Text style={styles.logoutText}>Sign Out</Text></TouchableOpacity>
     </ScrollView>
   );
@@ -32,6 +40,9 @@ const styles = StyleSheet.create({
   name: { color: "#fff", fontSize: 22, fontFamily: "Inter_700Bold", marginTop: 10, textAlign: "center" },
   role: { color: "rgba(255,255,255,0.78)", fontSize: 13, fontFamily: "Inter_600SemiBold", marginTop: 4 },
   card: { borderWidth: 1, borderRadius: 16, margin: 16, padding: 16, gap: 6 },
+  notificationBtn: { borderWidth: 1, borderRadius: 16, marginHorizontal: 16, marginBottom: 12, padding: 14, flexDirection: "row", alignItems: "center", gap: 10 },
+  notificationTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  notificationSub: { fontSize: 12, fontFamily: "Inter_500Medium", marginTop: 2 },
   label: { fontSize: 11, fontFamily: "Inter_700Bold", textTransform: "uppercase" },
   value: { fontSize: 14, fontFamily: "Inter_600SemiBold", marginBottom: 10 },
   logout: { marginHorizontal: 16, height: 50, borderRadius: 14, backgroundColor: "#C0392B", alignItems: "center", justifyContent: "center" },

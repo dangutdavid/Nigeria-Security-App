@@ -8,6 +8,7 @@ import { useIncidents } from "@/context/IncidentContext";
 import { usePatrol } from "@/context/PatrolContext";
 import { useAuth } from "@/context/AuthContext";
 import { IncidentCard } from "@/components/IncidentCard";
+import { NotificationAccessCard } from "@/components/NotificationAccessCard";
 import { formatMinutesAgo, useTheftReports } from "@/context/TheftReportContext";
 import {
   CitizenIncidentReceipt,
@@ -227,6 +228,8 @@ export default function HomeScreen() {
             </View>
           )}
         </View>
+
+        <NotificationAccessCard accentColor={colors.primary} />
 
         {pendingSyncCount > 0 && (
           <View style={[styles.syncBanner, { backgroundColor: colors.warningLight, borderColor: colors.warning + "40" }]}>
