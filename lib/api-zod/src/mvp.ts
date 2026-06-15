@@ -5,33 +5,30 @@ export const AgencyTypeSchema = z.enum([
   "police",
   "vio",
   "civil_defence",
+  "admin",
+  "citizen",
+  "dss",
   "fire_service",
-  "emergency_management",
-  "state_traffic",
-  "ambulance",
-  "hospital",
-  "insurance",
-  "towing",
+  "custom",
 ]);
 
 export const RoleSchema = z.enum([
-  "admin",
-  "commander",
-  "supervisor",
-  "field_officer",
-  "investigator",
-  "analyst",
-  "partner",
   "citizen",
+  "officer",
+  "supervisor",
+  "commander",
+  "admin",
+  "super_admin",
 ]);
 
 export const CaseStatusSchema = z.enum([
-  "new",
+  "submitted",
+  "triaged",
   "assigned",
-  "investigating",
-  "referred",
+  "in_progress",
   "resolved",
   "closed",
+  "rejected",
 ]);
 
 export const ReferralStatusSchema = z.enum([
@@ -43,17 +40,32 @@ export const ReferralStatusSchema = z.enum([
 
 export const CaseKindSchema = z.enum([
   "road_crash",
-  "vehicle_theft",
-  "stolen_plate",
-  "vehicle_inspection",
-  "road_obstruction",
-  "vandalism",
-  "fire",
-  "disaster",
+  "traffic_obstruction",
   "dangerous_driving",
+  "vehicle_breakdown",
+  "road_hazard",
+  "theft",
+  "robbery",
+  "assault",
+  "suspicious_activity",
+  "public_threat",
+  "vehicle_theft",
+  "missing_vehicle_alert",
+  "security_incident",
+  "roadworthiness_complaint",
+  "dangerous_vehicle",
+  "vehicle_inspection_concern",
+  "invalid_certificate_concern",
+  "commercial_vehicle_safety_issue",
+  "vehicle_documentation_concern",
+  "fire_rescue",
+  "disaster",
+  "civil_emergency",
+  "infrastructure_risk",
+  "custom",
 ]);
 
-export const PrioritySchema = z.enum(["low", "normal", "high", "critical"]);
+export const PrioritySchema = z.enum(["low", "medium", "high", "critical"]);
 
 export const LocationSchema = z.object({
   address: z.string().min(3),
@@ -61,6 +73,8 @@ export const LocationSchema = z.object({
   lga: z.string().min(2).optional(),
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
+  source: z.enum(["gps", "manual"]).default("manual"),
+  accuracy: z.number().optional(),
 });
 
 export const EvidenceInputSchema = z.object({
@@ -82,10 +96,11 @@ export const CitizenReportInputSchema = z.object({
   title: z.string().min(4),
   description: z.string().min(10),
   location: LocationSchema,
-  priority: PrioritySchema.default("normal"),
+  priority: PrioritySchema.default("medium"),
   vehicle: z
     .object({
       plate: z.string().min(3).optional(),
+      registrationNumber: z.string().min(3).optional(),
       make: z.string().optional(),
       model: z.string().optional(),
       color: z.string().optional(),

@@ -16,33 +16,30 @@ export const agencyType = pgEnum("agency_type", [
   "police",
   "vio",
   "civil_defence",
+  "admin",
+  "citizen",
+  "dss",
   "fire_service",
-  "emergency_management",
-  "state_traffic",
-  "ambulance",
-  "hospital",
-  "insurance",
-  "towing",
+  "custom",
 ]);
 
 export const userRole = pgEnum("user_role", [
-  "admin",
-  "commander",
-  "supervisor",
-  "field_officer",
-  "investigator",
-  "analyst",
-  "partner",
   "citizen",
+  "officer",
+  "supervisor",
+  "commander",
+  "admin",
+  "super_admin",
 ]);
 
 export const caseStatus = pgEnum("case_status", [
-  "new",
+  "submitted",
+  "triaged",
   "assigned",
-  "investigating",
-  "referred",
+  "in_progress",
   "resolved",
   "closed",
+  "rejected",
 ]);
 
 export const referralStatus = pgEnum("referral_status", [
@@ -166,7 +163,7 @@ export const caseTypes = pgTable(
     workflow: jsonb("workflow")
       .$type<string[]>()
       .notNull()
-      .default(["new", "assigned", "investigating", "resolved", "closed"]),
+      .default(["submitted", "triaged", "assigned", "in_progress", "resolved", "closed"]),
     requiredFields: jsonb("required_fields")
       .$type<string[]>()
       .notNull()
@@ -196,8 +193,8 @@ export const cases = pgTable(
     caseTypeId: uuid("case_type_id").references(() => caseTypes.id),
     reporterId: uuid("reporter_id").references(() => citizenProfiles.id),
     assignedToId: uuid("assigned_to_id").references(() => users.id),
-    status: caseStatus("status").notNull().default("new"),
-    priority: text("priority").notNull().default("normal"),
+    status: caseStatus("status").notNull().default("submitted"),
+    priority: text("priority").notNull().default("medium"),
     title: text("title").notNull(),
     description: text("description").notNull(),
     location: jsonb("location").$type<Record<string, unknown>>().notNull(),

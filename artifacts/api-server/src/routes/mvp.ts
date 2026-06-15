@@ -55,7 +55,7 @@ interface PlatformCase {
   tenantId: string;
   kind: CaseKind;
   status: CaseStatus;
-  priority: "low" | "normal" | "high" | "critical";
+  priority: "low" | "medium" | "high" | "critical";
   title: string;
   description: string;
   location: Record<string, unknown>;
@@ -154,10 +154,10 @@ const tenants: TenantConfig[] = [
       {
         kind: "road_crash",
         stages: [
-          "new",
+          "submitted",
+          "triaged",
           "assigned",
-          "investigating",
-          "referred",
+          "in_progress",
           "resolved",
           "closed",
         ],
@@ -167,7 +167,7 @@ const tenants: TenantConfig[] = [
       },
       {
         kind: "dangerous_driving",
-        stages: ["new", "assigned", "investigating", "resolved", "closed"],
+        stages: ["submitted", "triaged", "assigned", "in_progress", "resolved", "closed"],
         requiredFields: ["plate", "location", "description"],
         slaMinutes: 60,
         documentTemplate: "FRSC enforcement report",
@@ -175,12 +175,10 @@ const tenants: TenantConfig[] = [
     ],
     permissions: {
       admin: ADMIN_PERMISSIONS,
+      super_admin: ADMIN_PERMISSIONS,
       commander: ADMIN_PERMISSIONS,
       supervisor: SUPERVISOR_PERMISSIONS,
-      field_officer: COMMON_PERMISSIONS,
-      investigator: COMMON_PERMISSIONS,
-      analyst: ["case:read", "audit:read"],
-      partner: [],
+      officer: COMMON_PERMISSIONS,
       citizen: [],
     },
   },
@@ -194,10 +192,10 @@ const tenants: TenantConfig[] = [
       {
         kind: "vehicle_theft",
         stages: [
-          "new",
+          "submitted",
+          "triaged",
           "assigned",
-          "investigating",
-          "referred",
+          "in_progress",
           "resolved",
           "closed",
         ],
@@ -206,8 +204,8 @@ const tenants: TenantConfig[] = [
         documentTemplate: "Police theft report with QR verification",
       },
       {
-        kind: "stolen_plate",
-        stages: ["new", "assigned", "investigating", "resolved", "closed"],
+        kind: "missing_vehicle_alert",
+        stages: ["submitted", "triaged", "assigned", "in_progress", "resolved", "closed"],
         requiredFields: ["plate", "location", "reporter"],
         slaMinutes: 60,
         documentTemplate: "Police stolen plate report",
@@ -215,12 +213,10 @@ const tenants: TenantConfig[] = [
     ],
     permissions: {
       admin: ADMIN_PERMISSIONS,
+      super_admin: ADMIN_PERMISSIONS,
       commander: ADMIN_PERMISSIONS,
       supervisor: SUPERVISOR_PERMISSIONS,
-      field_officer: COMMON_PERMISSIONS,
-      investigator: [...COMMON_PERMISSIONS, "referral:create"],
-      analyst: ["case:read", "audit:read"],
-      partner: [],
+      officer: [...COMMON_PERMISSIONS, "referral:create"],
       citizen: [],
     },
   },
@@ -232,8 +228,8 @@ const tenants: TenantConfig[] = [
     primaryColor: "#7B3F00",
     workflows: [
       {
-        kind: "vehicle_inspection",
-        stages: ["new", "assigned", "investigating", "resolved", "closed"],
+        kind: "vehicle_inspection_concern",
+        stages: ["submitted", "triaged", "assigned", "in_progress", "resolved", "closed"],
         requiredFields: ["plate", "inspection_items", "roadworthiness"],
         slaMinutes: 1440,
         documentTemplate: "VIO inspection certificate with QR verification",
@@ -241,12 +237,10 @@ const tenants: TenantConfig[] = [
     ],
     permissions: {
       admin: ADMIN_PERMISSIONS,
+      super_admin: ADMIN_PERMISSIONS,
       commander: ADMIN_PERMISSIONS,
       supervisor: SUPERVISOR_PERMISSIONS,
-      field_officer: COMMON_PERMISSIONS,
-      investigator: COMMON_PERMISSIONS,
-      analyst: ["case:read", "audit:read"],
-      partner: [],
+      officer: COMMON_PERMISSIONS,
       citizen: [],
     },
   },
@@ -273,7 +267,7 @@ const officers: Officer[] = [
     badgeNumber: "NPF-112",
     pin: "1234",
     name: "Inspector Grace Musa",
-    role: "investigator",
+    role: "officer",
     station: "Ikeja Division",
     sector: "Lagos Command",
     email: "grace.musa@npf.gov.ng",
@@ -311,9 +305,14 @@ function hashEvidence(value: string): string {
 
 function caseReference(kind: CaseKind): string {
   const prefix =
-    kind === "vehicle_theft" || kind === "stolen_plate"
+    kind === "vehicle_theft" || kind === "missing_vehicle_alert"
       ? "NPF"
-      : kind === "vehicle_inspection"
+      : kind === "vehicle_inspection_concern" ||
+          kind === "roadworthiness_complaint" ||
+          kind === "dangerous_vehicle" ||
+          kind === "invalid_certificate_concern" ||
+          kind === "commercial_vehicle_safety_issue" ||
+          kind === "vehicle_documentation_concern"
         ? "VIO"
         : "FRSC";
   return `${prefix}-${new Date().getUTCFullYear()}-${String(cases.length + 1).padStart(5, "0")}`;
@@ -330,14 +329,29 @@ function tenantForAgency(agency: AgencyType): TenantConfig {
 function primaryAgencyFor(kind: CaseKind): AgencyType {
   const routing: Record<CaseKind, AgencyType> = {
     road_crash: "frsc",
-    vehicle_theft: "police",
-    stolen_plate: "police",
-    vehicle_inspection: "vio",
-    road_obstruction: "frsc",
-    vandalism: "civil_defence",
-    fire: "fire_service",
-    disaster: "emergency_management",
+    traffic_obstruction: "frsc",
     dangerous_driving: "frsc",
+    vehicle_breakdown: "frsc",
+    road_hazard: "frsc",
+    theft: "police",
+    robbery: "police",
+    assault: "police",
+    suspicious_activity: "police",
+    public_threat: "police",
+    vehicle_theft: "police",
+    missing_vehicle_alert: "police",
+    security_incident: "police",
+    roadworthiness_complaint: "vio",
+    dangerous_vehicle: "vio",
+    vehicle_inspection_concern: "vio",
+    invalid_certificate_concern: "vio",
+    commercial_vehicle_safety_issue: "vio",
+    vehicle_documentation_concern: "vio",
+    fire_rescue: "fire_service",
+    disaster: "civil_defence",
+    civil_emergency: "civil_defence",
+    infrastructure_risk: "civil_defence",
+    custom: "custom",
   };
   return routing[kind];
 }
@@ -484,7 +498,7 @@ router.post("/citizen-reports", (req, res) => {
     reference: caseReference(input.kind),
     tenantId: tenant.id,
     kind: input.kind,
-    status: "new",
+    status: "submitted",
     priority: input.priority,
     title: input.title,
     description: input.description,
@@ -701,11 +715,11 @@ router.post(
       updatedAt: createdAt,
     };
     referrals.unshift(referral);
-    item.status = "referred";
+    item.status = "triaged";
     item.updatedAt = createdAt;
     item.timeline.unshift({
       at: createdAt,
-      action: "case.referred",
+      action: "case.reassigned",
       actor: actor.userId,
       note: `Referred to ${targetTenant.shortName}: ${input.reason}`,
     });
