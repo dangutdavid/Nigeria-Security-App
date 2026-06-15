@@ -4,15 +4,17 @@ import { Redirect, Tabs } from "expo-router";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { isAdminRole } from "@/lib/permissions";
 
-const PRIMARY = "#344054";
+const FALLBACK_PRIMARY = "#344054";
 
 export default function AdminLayout() {
   const { user, isLoading } = useAuth();
   const colors = useColors();
+  const { primary: PRIMARY } = useAgencyBrand("admin", { primary: FALLBACK_PRIMARY });
   const scheme = useColorScheme();
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";

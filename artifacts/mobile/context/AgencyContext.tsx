@@ -126,6 +126,25 @@ export function useAgency() {
   return useContext(AgencyContext);
 }
 
+/**
+ * Resolve an agency's brand colours from the live registry, with safe fallbacks
+ * so screens never render invisible text/buttons if a config value is missing.
+ * Lets built-in agency screens react to admin/commander colour edits just like
+ * dynamic agencies do.
+ */
+export function useAgencyBrand(
+  id: AgencyId,
+  fallback: { primary: string; secondary?: string },
+) {
+  const { getAgencyById } = useAgency();
+  const agency = getAgencyById(id);
+  return {
+    agency,
+    primary: agency?.primaryColor || fallback.primary,
+    secondary: agency?.secondaryColor || fallback.secondary || fallback.primary,
+  };
+}
+
 export function AgencyProvider({ children }: { children: React.ReactNode }) {
   const [agencies, setAgencies] = useState<AgencyConfig[]>(DEFAULT_AGENCIES);
   const [selectedAgency, setSelectedAgency] = useState<AgencyConfig | null>(null);

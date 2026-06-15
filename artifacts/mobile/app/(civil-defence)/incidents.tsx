@@ -5,6 +5,7 @@ import React, { useCallback, useMemo, useState } from "react";
 import { Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import {
@@ -38,6 +39,7 @@ export default function CivilDefenceIncidentsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { primary: PRIMARY } = useAgencyBrand("civil_defence", { primary: "#234E2A" });
   const [reports, setReports] = useState<CitizenIncidentReceipt[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -94,7 +96,7 @@ export default function CivilDefenceIncidentsScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background, paddingBottom: insets.bottom + 90 }]}>
-      <View style={[styles.header, { backgroundColor: "#234E2A" }]}>
+      <View style={[styles.header, { backgroundColor: PRIMARY }]}>
         <Text style={styles.headerTitle}>NSCDC Incidents</Text>
         <Text style={styles.headerSub}>Citizen reports and civil protection cases</Text>
       </View>
@@ -105,7 +107,7 @@ export default function CivilDefenceIncidentsScreen() {
       <View style={styles.filterPanel}>
         <View style={styles.filterGroup}>
           {STATUS_FILTERS.map((item) => (
-            <TouchableOpacity key={item} onPress={() => setStatus(item)} style={[styles.filterChip, { backgroundColor: status === item ? "#234E2A" : colors.card, borderColor: status === item ? "#234E2A" : colors.border }]}>
+            <TouchableOpacity key={item} onPress={() => setStatus(item)} style={[styles.filterChip, { backgroundColor: status === item ? PRIMARY : colors.card, borderColor: status === item ? PRIMARY : colors.border }]}>
               <Text style={[styles.filterText, { color: status === item ? "#fff" : colors.text }]}>{item === "all" ? "All" : formatCitizenIncidentStatus(item)}</Text>
             </TouchableOpacity>
           ))}
@@ -119,7 +121,7 @@ export default function CivilDefenceIncidentsScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.list} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#234E2A" />}>
+      <ScrollView contentContainerStyle={styles.list} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={PRIMARY} />}>
         {filtered.map((report) => (
           <TouchableOpacity key={report.reference} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => setSelected(report)} activeOpacity={0.86}>
             <View style={styles.cardTop}>
@@ -138,7 +140,7 @@ export default function CivilDefenceIncidentsScreen() {
       <Modal visible={!!selected} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelected(null)}>
         {selected && (
           <ScrollView style={[styles.modal, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
-            <View style={[styles.modalHeader, { backgroundColor: "#234E2A" }]}>
+            <View style={[styles.modalHeader, { backgroundColor: PRIMARY }]}>
               <TouchableOpacity onPress={() => setSelected(null)}><Feather name="x" size={22} color="#fff" /></TouchableOpacity>
               <Text style={styles.modalTitle}>{selected.reference}</Text>
             </View>
@@ -160,10 +162,10 @@ export default function CivilDefenceIncidentsScreen() {
                 </View>
               ))}
               <TextInput value={note} onChangeText={setNote} placeholder="Add NSCDC note..." placeholderTextColor={colors.mutedForeground} style={[styles.noteInput, { borderColor: colors.border, color: colors.text }]} />
-              <TouchableOpacity style={styles.noteBtn} onPress={submitNote}><Text style={styles.noteBtnText}>Add note</Text></TouchableOpacity>
+              <TouchableOpacity style={[styles.noteBtn, { backgroundColor: PRIMARY }]} onPress={submitNote}><Text style={styles.noteBtnText}>Add note</Text></TouchableOpacity>
             </View>
             {STATUS_FLOW[selected.status] && (
-              <TouchableOpacity style={styles.advanceBtn} onPress={() => advance(selected)}>
+              <TouchableOpacity style={[styles.advanceBtn, { backgroundColor: PRIMARY }]} onPress={() => advance(selected)}>
                 <Text style={styles.advanceText}>Mark {formatCitizenIncidentStatus(STATUS_FLOW[selected.status]!)}</Text>
               </TouchableOpacity>
             )}

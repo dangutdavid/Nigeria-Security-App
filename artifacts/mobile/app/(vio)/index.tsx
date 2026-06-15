@@ -14,13 +14,14 @@ import { useAuth } from "@/context/AuthContext";
 import { useInspections } from "@/context/InspectionContext";
 import { useColors } from "@/hooks/useColors";
 import { NotificationAccessCard } from "@/components/NotificationAccessCard";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import {
   CitizenIncidentReceipt,
   formatCitizenIncidentStatus,
 } from "@/services/citizenIncidentApi";
 import { listReportsByAgency } from "@/services/reportRepository";
 
-const PRIMARY = "#7B3F00";
+const FALLBACK_PRIMARY = "#7B3F00";
 
 const RESULT_COLORS: Record<string, string> = {
   pass: "#388E3C",
@@ -31,7 +32,7 @@ const RESULT_COLORS: Record<string, string> = {
 const CITIZEN_STATUS_COLORS: Record<string, string> = {
   submitted: "#E53935",
   triaged: "#F57C00",
-  assigned: PRIMARY,
+  assigned: FALLBACK_PRIMARY,
   in_progress: "#1565C0",
   resolved: "#388E3C",
   closed: "#9E9E9E",
@@ -51,6 +52,7 @@ function timeAgo(iso: string) {
 
 export default function VIOHome() {
   const colors = useColors();
+  const { primary: PRIMARY } = useAgencyBrand("vio", { primary: FALLBACK_PRIMARY });
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();

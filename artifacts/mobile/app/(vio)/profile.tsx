@@ -8,11 +8,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useInspections } from "@/context/InspectionContext";
 import { useReferrals } from "@/context/ReferralContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { useColors } from "@/hooks/useColors";
 import { usePermissions } from "@/lib/permissions";
 import { confirmAction } from "@/utils/confirm";
 
-const PRIMARY = "#7B3F00";
+const FALLBACK_PRIMARY = "#7B3F00";
 
 type MenuItem = {
   icon: keyof typeof Feather.glyphMap;
@@ -28,6 +29,7 @@ type MenuItem = {
 
 export default function VIOProfile() {
   const colors = useColors();
+  const { primary: PRIMARY } = useAgencyBrand("vio", { primary: FALLBACK_PRIMARY });
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();

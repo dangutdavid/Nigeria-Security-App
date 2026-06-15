@@ -3,11 +3,13 @@ import React, { useCallback, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CitizenReportMap } from "@/components/CitizenReportMap";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { CitizenIncidentReceipt } from "@/services/citizenIncidentApi";
 import { listReportsByAgency } from "@/services/reportRepository";
 
 export default function CivilDefenceMapScreen() {
   const insets = useSafeAreaInsets();
+  const { primary } = useAgencyBrand("civil_defence", { primary: "#234E2A" });
   const [reports, setReports] = useState<CitizenIncidentReceipt[]>([]);
 
   useFocusEffect(
@@ -21,7 +23,7 @@ export default function CivilDefenceMapScreen() {
       title="NSCDC Location View"
       subtitle="Citizen reports routed to Civil Defence with GPS pins where available and manual-location fallback where needed."
       reports={reports}
-      accentColor="#234E2A"
+      accentColor={primary}
       bottomPadding={insets.bottom + 110}
       detailRouteForReport={() => "/(civil-defence)/incidents"}
     />

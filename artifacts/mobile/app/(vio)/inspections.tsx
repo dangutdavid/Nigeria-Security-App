@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { InspectionReport, InspectionResult, useInspections } from "@/context/InspectionContext";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { useColors } from "@/hooks/useColors";
 import {
   CitizenIncidentReceipt,
@@ -22,7 +23,7 @@ import {
 } from "@/services/citizenIncidentApi";
 import { listReportsByAgency, updateReportStatus } from "@/services/reportRepository";
 
-const PRIMARY = "#7B3F00";
+const FALLBACK_PRIMARY = "#7B3F00";
 
 const RESULT_COLORS: Record<InspectionResult, string> = {
   pass: "#388E3C",
@@ -49,7 +50,7 @@ const CITIZEN_STATUS_FLOW: Record<CitizenIncidentStatus, CitizenIncidentStatus |
 const CITIZEN_STATUS_COLORS: Record<CitizenIncidentStatus, string> = {
   submitted: "#E53935",
   triaged: "#F57C00",
-  assigned: PRIMARY,
+  assigned: FALLBACK_PRIMARY,
   in_progress: "#1565C0",
   resolved: "#388E3C",
   closed: "#9E9E9E",
@@ -68,6 +69,7 @@ function timeAgo(iso: string) {
 
 export default function InspectionsScreen() {
   const colors = useColors();
+  const { primary: PRIMARY } = useAgencyBrand("vio", { primary: FALLBACK_PRIMARY });
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();

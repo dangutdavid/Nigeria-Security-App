@@ -4,14 +4,16 @@ import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { BlurView } from "expo-blur";
 
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-const PRIMARY = "#234E2A";
+const FALLBACK_PRIMARY = "#234E2A";
 
 export default function CivilDefenceLayout() {
   const { user, isLoading } = useAuth();
   const colors = useColors();
+  const { primary: PRIMARY } = useAgencyBrand("civil_defence", { primary: FALLBACK_PRIMARY });
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";

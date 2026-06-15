@@ -9,6 +9,7 @@ import { NotificationAccessCard } from "@/components/NotificationAccessCard";
 import { useAuth } from "@/context/AuthContext";
 import { useReferrals } from "@/context/ReferralContext";
 import { useColors } from "@/hooks/useColors";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { CitizenIncidentReceipt } from "@/services/citizenIncidentApi";
 import { AgencyMetrics, getAgencyMetrics, listReportsByAgency } from "@/services/reportRepository";
 
@@ -18,6 +19,7 @@ export default function CivilDefenceHome() {
   const router = useRouter();
   const { user } = useAuth();
   const { inboxFor } = useReferrals();
+  const { primary: PRIMARY } = useAgencyBrand("civil_defence", { primary: "#234E2A" });
   const [reports, setReports] = useState<CitizenIncidentReceipt[]>([]);
   const [serverMetrics, setServerMetrics] = useState<AgencyMetrics | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -53,18 +55,18 @@ export default function CivilDefenceHome() {
     <ScrollView
       style={[styles.root, { backgroundColor: colors.background }]}
       contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 110 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#234E2A" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={PRIMARY} />}
     >
-      <View style={styles.hero}>
+      <View style={[styles.hero, { backgroundColor: PRIMARY }]}>
         <Text style={styles.kicker}>Civil Defence / NSCDC</Text>
         <Text style={styles.heroTitle}>Welcome, {user?.name.split(" ")[0] ?? "Officer"}</Text>
         <Text style={styles.heroSub}>Civil protection, emergency response, and community safety operations.</Text>
       </View>
 
-      <NotificationAccessCard accentColor="#234E2A" />
+      <NotificationAccessCard accentColor={PRIMARY} />
 
       <View style={styles.metricRow}>
-        <MetricCard label="New citizen reports" value={metrics.newReports} icon="inbox" color="#234E2A" bgColor="#234E2A18" />
+        <MetricCard label="New citizen reports" value={metrics.newReports} icon="inbox" color={PRIMARY} bgColor={PRIMARY + "18"} />
         <MetricCard label="High priority" value={metrics.high} icon="alert-octagon" color="#C0392B" bgColor="#FEE8E8" />
       </View>
       <View style={styles.metricRow}>
@@ -77,20 +79,20 @@ export default function CivilDefenceHome() {
       </View>
 
       <View style={styles.quickRow}>
-        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push("/(civil-defence)/incidents" as any)}>
+        <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: PRIMARY }]} onPress={() => router.push("/(civil-defence)/incidents" as any)}>
           <Feather name="shield" size={18} color="#fff" />
           <Text style={styles.primaryText}>Open incidents</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => router.push("/(civil-defence)/alerts" as any)}>
-          <Feather name="bell" size={18} color="#234E2A" />
-          <Text style={styles.secondaryText}>Alerts</Text>
+          <Feather name="bell" size={18} color={PRIMARY} />
+          <Text style={[styles.secondaryText, { color: PRIMARY }]}>Alerts</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>RECENT NSCDC REPORTS</Text>
         <TouchableOpacity onPress={() => router.push("/(civil-defence)/incidents" as any)}>
-          <Text style={styles.linkText}>See all</Text>
+          <Text style={[styles.linkText, { color: PRIMARY }]}>See all</Text>
         </TouchableOpacity>
       </View>
       {reports.slice(0, 3).map((report) => (

@@ -4,6 +4,7 @@ import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { usePermissions } from "@/lib/permissions";
@@ -14,11 +15,12 @@ export default function CivilDefenceProfileScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { roleLabel, canCustomizeOwnAgency } = usePermissions();
+  const { primary: PRIMARY } = useAgencyBrand("civil_defence", { primary: "#234E2A" });
 
   return (
     <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}>
-      <View style={styles.hero}>
-        <View style={styles.avatar}><Feather name="shield" size={30} color="#234E2A" /></View>
+      <View style={[styles.hero, { backgroundColor: PRIMARY }]}>
+        <View style={styles.avatar}><Feather name="shield" size={30} color={PRIMARY} /></View>
         <Text style={styles.name}>{user?.name}</Text>
         <Text style={styles.role}>{roleLabel}</Text>
       </View>
@@ -29,7 +31,7 @@ export default function CivilDefenceProfileScreen() {
         <Info label="Phone" value={user?.phone ?? "-"} />
       </View>
       <TouchableOpacity style={[styles.notificationBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.push("/notifications" as any)}>
-        <Feather name="bell" size={17} color="#234E2A" />
+        <Feather name="bell" size={17} color={PRIMARY} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.notificationTitle, { color: colors.text }]}>Notifications</Text>
           <Text style={[styles.notificationSub, { color: colors.mutedForeground }]}>Alerts and local preferences</Text>
@@ -38,7 +40,7 @@ export default function CivilDefenceProfileScreen() {
       </TouchableOpacity>
       {canCustomizeOwnAgency ? (
         <TouchableOpacity style={[styles.notificationBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.push("/agency-customize" as any)}>
-          <Feather name="edit-2" size={17} color="#234E2A" />
+          <Feather name="edit-2" size={17} color={PRIMARY} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.notificationTitle, { color: colors.text }]}>Customise Agency</Text>
             <Text style={[styles.notificationSub, { color: colors.mutedForeground }]}>Theme colours and logo</Text>

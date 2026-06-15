@@ -4,6 +4,7 @@ import { Feather } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { useIncidents } from "@/context/IncidentContext";
 import { usePatrol } from "@/context/PatrolContext";
 import { useAuth } from "@/context/AuthContext";
@@ -33,6 +34,7 @@ function greeting(name: string): string {
 
 export default function HomeScreen() {
   const colors = useColors();
+  const { primary: brandPrimary } = useAgencyBrand("frsc", { primary: colors.primary });
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { incidents } = useIncidents();
@@ -148,7 +150,7 @@ export default function HomeScreen() {
           />
         }
       >
-        <View style={[styles.hero, { backgroundColor: colors.primary }]}>
+        <View style={[styles.hero, { backgroundColor: brandPrimary }]}>
           <View style={styles.heroTop}>
             <View>
               <Text style={styles.kicker}>FRSC Field Operations</Text>

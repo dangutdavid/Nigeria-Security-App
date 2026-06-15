@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { useAuth } from "@/context/AuthContext";
 import { useCrimeReports, CRIME_TYPE_LABELS, CrimeType } from "@/context/CrimeReportContext";
 import { useTheftReports } from "@/context/TheftReportContext";
@@ -22,7 +23,7 @@ import {
 } from "@/services/citizenIncidentApi";
 import { listReportsByAgency } from "@/services/reportRepository";
 
-const PRIMARY = "#1A3A6C";
+const FALLBACK_PRIMARY = "#1A3A6C";
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -65,6 +66,7 @@ export default function PoliceHome() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
+  const { primary: PRIMARY } = useAgencyBrand("police", { primary: FALLBACK_PRIMARY });
   const { reports } = useCrimeReports();
   const { reports: theftReports } = useTheftReports();
   const [citizenReports, setCitizenReports] = useState<CitizenIncidentReceipt[]>([]);

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { useIncidents, Incident } from "@/context/IncidentContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
@@ -386,10 +387,11 @@ function CitizenReportLocationCard({
   onPress: () => void;
 }) {
   const coordinates = getCitizenReportCoordinatesText(report);
+  const { primary: brandPrimary } = useAgencyBrand("frsc", { primary: "#1B5E3B" });
   return (
     <TouchableOpacity activeOpacity={0.75} onPress={onPress} style={[styles.citizenCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={styles.citizenIcon}>
-        <Feather name={coordinates ? "map-pin" : "navigation"} size={17} color="#1B5E3B" />
+        <Feather name={coordinates ? "map-pin" : "navigation"} size={17} color={brandPrimary} />
       </View>
       <View style={{ flex: 1 }}>
         <View style={styles.citizenTop}>

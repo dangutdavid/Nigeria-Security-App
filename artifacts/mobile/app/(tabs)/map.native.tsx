@@ -11,6 +11,7 @@ import {
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { useIncidents, Incident } from "@/context/IncidentContext";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
@@ -31,6 +32,7 @@ const SEVERITY_COLORS: Record<string, string> = {
 
 export default function MapScreen() {
   const colors = useColors();
+  const { primary: brandPrimary } = useAgencyBrand("frsc", { primary: "#1B5E3B" });
   const insets = useSafeAreaInsets();
   const { incidents } = useIncidents();
   const router = useRouter();
@@ -154,7 +156,7 @@ export default function MapScreen() {
             <Marker
               key={report.reference}
               coordinate={{ latitude: report.latitude!, longitude: report.longitude! }}
-              pinColor="#1B5E3B"
+              pinColor={brandPrimary}
               title={report.reference}
               description={getCitizenReportLocationText(report)}
               onPress={() => {
@@ -239,7 +241,7 @@ export default function MapScreen() {
           </View>
           <View style={styles.selFooter}>
             <StatusBadge type="severity" value={selectedCitizen.emergencyLevel === "critical" ? "fatal" : selectedCitizen.emergencyLevel === "high" ? "serious" : "minor"} small />
-            <Text style={[styles.citizenStatus, { color: "#1B5E3B" }]}>{formatCitizenIncidentStatus(selectedCitizen.status)}</Text>
+            <Text style={[styles.citizenStatus, { color: brandPrimary }]}>{formatCitizenIncidentStatus(selectedCitizen.status)}</Text>
             <Text style={[styles.citizenCoords, { color: colors.mutedForeground }]}>
               {getCitizenReportCoordinatesText(selectedCitizen)}
             </Text>

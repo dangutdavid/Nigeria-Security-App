@@ -28,8 +28,9 @@ import {
   formatCitizenIncidentStatus,
 } from "@/services/citizenIncidentApi";
 import { listReportsByAgency, updateReportStatus } from "@/services/reportRepository";
+import { useAgencyBrand } from "@/context/AgencyContext";
 
-const PRIMARY = "#1A3A6C";
+const FALLBACK_PRIMARY = "#1A3A6C";
 
 const STATUS_TABS: { id: CrimeStatus | "all"; label: string }[] = [
   { id: "all", label: "All" },
@@ -68,7 +69,7 @@ const CITIZEN_STATUS_FLOW: Record<CitizenIncidentStatus, CitizenIncidentStatus |
 const CITIZEN_STATUS_COLORS: Record<CitizenIncidentStatus, string> = {
   submitted: "#E53935",
   triaged: "#F57C00",
-  assigned: PRIMARY,
+  assigned: FALLBACK_PRIMARY,
   in_progress: "#1565C0",
   resolved: "#388E3C",
   closed: "#9E9E9E",
@@ -98,6 +99,7 @@ function timeAgo(iso: string) {
 
 function NewReportModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const colors = useColors();
+  const { primary: PRIMARY } = useAgencyBrand("police", { primary: FALLBACK_PRIMARY });
   const { user } = useAuth();
   const { addReport } = useCrimeReports();
   const [crimeType, setCrimeType] = useState<CrimeType>("robbery");
@@ -204,6 +206,7 @@ function NewReportModal({ visible, onClose }: { visible: boolean; onClose: () =>
 
 export default function CrimeReportsScreen() {
   const colors = useColors();
+  const { primary: PRIMARY } = useAgencyBrand("police", { primary: FALLBACK_PRIMARY });
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();

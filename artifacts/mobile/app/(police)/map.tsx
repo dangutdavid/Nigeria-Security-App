@@ -3,11 +3,13 @@ import React, { useCallback, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CitizenReportMap } from "@/components/CitizenReportMap";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { CitizenIncidentReceipt } from "@/services/citizenIncidentApi";
 import { listReportsByAgency } from "@/services/reportRepository";
 
 export default function PoliceMapScreen() {
   const insets = useSafeAreaInsets();
+  const { primary } = useAgencyBrand("police", { primary: "#1A3A6C" });
   const [reports, setReports] = useState<CitizenIncidentReceipt[]>([]);
 
   useFocusEffect(
@@ -21,7 +23,7 @@ export default function PoliceMapScreen() {
       title="Police Location View"
       subtitle="Police-routed citizen reports with GPS-ready locations and manual-location fallback for reports without coordinates."
       reports={reports}
-      accentColor="#1A3A6C"
+      accentColor={primary}
       bottomPadding={insets.bottom + 110}
       detailRouteForReport={() => "/(police)/crime-reports"}
     />

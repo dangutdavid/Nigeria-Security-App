@@ -18,6 +18,7 @@ import { usePatrol } from "@/context/PatrolContext";
 import { useReferrals } from "@/context/ReferralContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { usePermissions } from "@/lib/permissions";
 import { confirmAction } from "@/utils/confirm";
 
@@ -97,6 +98,7 @@ export default function ProfileScreen() {
   const myDrafts = incidents.filter((i) => i.reportedBy === user?.id && i.status === "draft").length;
   const myPatrolSessions = sessions.filter((s) => s.officerId === user?.id).length;
   const { can, roleLabel, canCustomizeOwnAgency } = usePermissions();
+  const { primary: brandPrimary } = useAgencyBrand("frsc", { primary: colors.primary });
   const canManageUsers = can("manage_users", "user");
   const canAssignCases = can("assign", "incident");
   const canUseCommandTools = canManageUsers;
@@ -127,7 +129,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
-      <View style={[styles.header, { backgroundColor: colors.primary, paddingTop: topPad + 16 }]}>
+      <View style={[styles.header, { backgroundColor: brandPrimary, paddingTop: topPad + 16 }]}>
         <View style={styles.avatarWrap}>
           <View style={[styles.avatar, { backgroundColor: "rgba(255,255,255,0.2)" }]}> 
             <Text style={styles.avatarText}>{user.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}</Text>

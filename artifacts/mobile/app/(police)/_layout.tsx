@@ -4,13 +4,15 @@ import { Redirect, Tabs } from "expo-router";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { useAuth } from "@/context/AuthContext";
 
-const PRIMARY = "#1A3A6C";
+const FALLBACK_PRIMARY = "#1A3A6C";
 
 export default function PoliceTabLayout() {
   const { user, isLoading } = useAuth();
   const colors = useColors();
+  const { primary: PRIMARY } = useAgencyBrand("police", { primary: FALLBACK_PRIMARY });
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
