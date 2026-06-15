@@ -32,6 +32,12 @@ const PUBLIC_ACTIONS = [
     color: "#2E7D52",
   },
   {
+    icon: "message-circle" as const,
+    label: "Ask Assistant",
+    route: "/assistant",
+    color: "#0F4C81",
+  },
+  {
     icon: "bell" as const,
     label: "Notifications",
     route: "/notifications",

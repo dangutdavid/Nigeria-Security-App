@@ -12,6 +12,15 @@ import {
   updateCitizenIncidentStatusMock,
 } from "@/services/citizenIncidentApi";
 import { mobileApiFetch } from "@/services/apiClient";
+import { shouldUseApi } from "@/services/apiConfig";
+
+// Dev aid: surface why a backend call fell back to local storage, but stay quiet
+// in local/offline demo mode (where every call "falls back" by design).
+function logFallback(method: string, error: string) {
+  if (shouldUseApi()) {
+    console.warn(`[reportRepository] ${method} fell back to local storage: ${error}`);
+  }
+}
 
 interface StatusUpdateInput {
   reference: string;
@@ -44,6 +53,8 @@ export async function submitCitizenReport(
   if (api.ok) {
     const report = api.data.report ?? api.data.case;
     if (report) return report;
+  } else {
+    logFallback("submitCitizenReport", api.error);
   }
 
   return submitCitizenIncidentMock(input);
@@ -59,6 +70,7 @@ export async function trackCitizenReportByReference(
   });
 
   if (api.ok) return api.data.report ?? api.data.case ?? null;
+  logFallback("trackCitizenReportByReference", api.error);
   return findCitizenIncidentByReference(reference);
 }
 

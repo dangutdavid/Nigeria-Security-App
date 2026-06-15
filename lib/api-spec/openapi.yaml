@@ -92,7 +92,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /citizen/reports:
+  /citizen-reports:
     post:
       operationId: submitCitizenReport
       tags: [citizen-reports]
@@ -114,7 +114,7 @@ paths:
         "400":
           $ref: "#/components/responses/BadRequest"
 
-  /citizen/reports/{reference}:
+  /citizen-reports/track/{reference}:
     get:
       operationId: trackCitizenReport
       tags: [citizen-reports]
@@ -129,6 +129,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CitizenReportTracking"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /citizen-reports/{reportId}/timeline:
+    get:
+      operationId: getCitizenReportTimeline
+      tags: [citizen-reports]
+      summary: Get a citizen report timeline/history by id or reference
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ReportIdParam"
+      responses:
+        "200":
+          description: Report timeline
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reference:
+                    type: string
+                  timeline:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TimelineEntry"
+                required: [timeline]
         "404":
           $ref: "#/components/responses/NotFound"
 

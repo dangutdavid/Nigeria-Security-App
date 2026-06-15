@@ -42,6 +42,19 @@ const EMERGENCY_COLORS: Record<CitizenEmergencyLevel, string> = {
   critical: "#C0392B",
 };
 
+export type CitizenReportMapProps = {
+  title: string;
+  subtitle: string;
+  reports: CitizenIncidentReceipt[];
+  accentColor: string;
+  bottomPadding: number;
+  showAgencyFilter?: boolean;
+  /** Returns a router path to open for a report, or null to fall back to the local summary modal. */
+  detailRouteForReport?: (report: CitizenIncidentReceipt) => string | null;
+  /** Optional custom handler invoked when a report is tapped (takes precedence over detailRouteForReport). */
+  onReportPress?: (report: CitizenIncidentReceipt) => void;
+};
+
 export function CitizenReportMapFallback({
   title,
   subtitle,
@@ -50,15 +63,8 @@ export function CitizenReportMapFallback({
   bottomPadding,
   showAgencyFilter = false,
   detailRouteForReport,
-}: {
-  title: string;
-  subtitle: string;
-  reports: CitizenIncidentReceipt[];
-  accentColor: string;
-  bottomPadding: number;
-  showAgencyFilter?: boolean;
-  detailRouteForReport?: (report: CitizenIncidentReceipt) => string | null;
-}) {
+  onReportPress,
+}: CitizenReportMapProps) {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -84,6 +90,10 @@ export function CitizenReportMapFallback({
   const noCoordinates = filtered.filter((report) => !hasCitizenReportCoordinates(report));
 
   function openDetail(report: CitizenIncidentReceipt) {
+    if (onReportPress) {
+      onReportPress(report);
+      return;
+    }
     const route = detailRouteForReport?.(report);
     if (route) {
       router.push(route as any);
@@ -186,7 +196,7 @@ function SectionHeader({ title, count }: { title: string; count: number }) {
   );
 }
 
-function ReportLocationCard({
+export function ReportLocationCard({
   report,
   colors,
   accentColor,
@@ -226,16 +236,19 @@ function ReportLocationCard({
   );
 }
 
-function ReportSummaryModal({
+export function ReportSummaryModal({
   report,
   onClose,
   colors,
   accentColor,
+  onViewDetail,
 }: {
   report: CitizenIncidentReceipt | null;
   onClose: () => void;
   colors: ReturnType<typeof useColors>;
   accentColor: string;
+  /** When provided, renders a primary action that opens the agency's full report/case detail. */
+  onViewDetail?: (report: CitizenIncidentReceipt) => void;
 }) {
   if (!report) return null;
   const submittedAt = new Date(report.submittedAt).toLocaleString();
@@ -262,10 +275,22 @@ function ReportSummaryModal({
           <SummaryRow label="Submitted" value={submittedAt} />
           <SummaryRow label="Location" value={getCitizenReportLocationText(report)} />
           {area ? <SummaryRow label="Area" value={area} /> : null}
+          {report.vehicleRegistration ? <SummaryRow label="Vehicle registration" value={report.vehicleRegistration} /> : null}
           {coordinates ? <SummaryRow label="Coordinates" value={coordinates} /> : <SummaryRow label="Coordinates" value="Not captured. Use manual location details." />}
-          <TouchableOpacity onPress={onClose} style={[styles.modalDone, { backgroundColor: accentColor }]}>
-            <Text style={styles.modalDoneText}>Done</Text>
-          </TouchableOpacity>
+          {onViewDetail ? (
+            <>
+              <TouchableOpacity onPress={() => onViewDetail(report)} style={[styles.modalDone, { backgroundColor: accentColor }]}>
+                <Text style={styles.modalDoneText}>View full detail</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onClose} style={[styles.modalSecondary, { borderColor: colors.border }]}>
+                <Text style={[styles.modalSecondaryText, { color: colors.text }]}>Done</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity onPress={onClose} style={[styles.modalDone, { backgroundColor: accentColor }]}>
+              <Text style={styles.modalDoneText}>Done</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </Modal>
@@ -341,4 +366,6 @@ const styles = StyleSheet.create({
   summaryValue: { color: "#111827", fontSize: 13, fontFamily: "Inter_600SemiBold", lineHeight: 18, textTransform: "capitalize" },
   modalDone: { minHeight: 46, borderRadius: 13, alignItems: "center", justifyContent: "center", marginTop: 4 },
   modalDoneText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
+  modalSecondary: { minHeight: 46, borderRadius: 13, borderWidth: 1, alignItems: "center", justifyContent: "center", marginTop: 8 },
+  modalSecondaryText: { fontSize: 14, fontFamily: "Inter_700Bold" },
 });

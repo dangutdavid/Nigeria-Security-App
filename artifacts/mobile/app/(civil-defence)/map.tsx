@@ -2,7 +2,7 @@ import { useFocusEffect } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { CitizenReportMapFallback } from "@/components/CitizenReportMapFallback";
+import { CitizenReportMap } from "@/components/CitizenReportMap";
 import { CitizenIncidentReceipt, listReportsByAgencyWithLocation } from "@/services/citizenIncidentApi";
 
 export default function CivilDefenceMapScreen() {
@@ -16,7 +16,7 @@ export default function CivilDefenceMapScreen() {
   );
 
   return (
-    <CitizenReportMapFallback
+    <CitizenReportMap
       title="NSCDC Location View"
       subtitle="Citizen reports routed to Civil Defence with GPS pins where available and manual-location fallback where needed."
       reports={reports}

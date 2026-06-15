@@ -1,4 +1,4 @@
-import { randomUUID, createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   Router,
   type Request,
@@ -7,7 +7,6 @@ import {
 } from "express";
 import {
   AssignCaseInputSchema,
-  CitizenReportInputSchema,
   CreateReferralInputSchema,
   DutySessionInputSchema,
   OfflineSyncInputSchema,
@@ -299,61 +298,12 @@ function now(): string {
   return new Date().toISOString();
 }
 
-function hashEvidence(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-function caseReference(kind: CaseKind): string {
-  const prefix =
-    kind === "vehicle_theft" || kind === "missing_vehicle_alert"
-      ? "NPF"
-      : kind === "vehicle_inspection_concern" ||
-          kind === "roadworthiness_complaint" ||
-          kind === "dangerous_vehicle" ||
-          kind === "invalid_certificate_concern" ||
-          kind === "commercial_vehicle_safety_issue" ||
-          kind === "vehicle_documentation_concern"
-        ? "VIO"
-        : "FRSC";
-  return `${prefix}-${new Date().getUTCFullYear()}-${String(cases.length + 1).padStart(5, "0")}`;
-}
-
 function tenantForAgency(agency: AgencyType): TenantConfig {
   const tenant = tenants.find((item) => item.agency === agency);
   if (!tenant) {
     throw new Error(`No tenant configured for ${agency}`);
   }
   return tenant;
-}
-
-function primaryAgencyFor(kind: CaseKind): AgencyType {
-  const routing: Record<CaseKind, AgencyType> = {
-    road_crash: "frsc",
-    traffic_obstruction: "frsc",
-    dangerous_driving: "frsc",
-    vehicle_breakdown: "frsc",
-    road_hazard: "frsc",
-    theft: "police",
-    robbery: "police",
-    assault: "police",
-    suspicious_activity: "police",
-    public_threat: "police",
-    vehicle_theft: "police",
-    missing_vehicle_alert: "police",
-    security_incident: "police",
-    roadworthiness_complaint: "vio",
-    dangerous_vehicle: "vio",
-    vehicle_inspection_concern: "vio",
-    invalid_certificate_concern: "vio",
-    commercial_vehicle_safety_issue: "vio",
-    vehicle_documentation_concern: "vio",
-    fire_rescue: "fire_service",
-    disaster: "civil_defence",
-    civil_emergency: "civil_defence",
-    infrastructure_risk: "civil_defence",
-    custom: "custom",
-  };
-  return routing[kind];
 }
 
 function audit(input: Omit<AuditLog, "id" | "createdAt">): AuditLog {
@@ -487,61 +437,10 @@ router.post("/auth/officer-login", (req, res) => {
   });
 });
 
-router.post("/citizen-reports", (req, res) => {
-  const input = parseBody(CitizenReportInputSchema, req, res);
-  if (!input) return;
-
-  const tenant = tenantForAgency(primaryAgencyFor(input.kind));
-  const createdAt = now();
-  const platformCase: PlatformCase = {
-    id: randomUUID(),
-    reference: caseReference(input.kind),
-    tenantId: tenant.id,
-    kind: input.kind,
-    status: "submitted",
-    priority: input.priority,
-    title: input.title,
-    description: input.description,
-    location: input.location,
-    reporter: input.reporter,
-    vehicle: input.vehicle,
-    crash: input.crash,
-    evidence: input.evidence.map((item) => ({
-      ...item,
-      id: randomUUID(),
-      checksum: item.checksum ?? hashEvidence(`${item.uri}:${createdAt}`),
-      capturedAt: item.capturedAt ?? createdAt,
-    })),
-    timeline: [
-      {
-        at: createdAt,
-        action: "case.created",
-        actor: "citizen",
-        note: "Submitted from public reporting flow",
-      },
-    ],
-    offlineClientId: input.clientMutationId,
-    createdAt,
-    updatedAt: createdAt,
-  };
-
-  cases.unshift(platformCase);
-  audit({
-    tenantId: tenant.id,
-    action: "case.create",
-    entityType: "case",
-    entityId: platformCase.id,
-    metadata: { source: "citizen", reference: platformCase.reference },
-  });
-
-  res
-    .status(201)
-    .json({
-      case: platformCase,
-      routedTo: tenant.shortName,
-      reference: platformCase.reference,
-    });
-});
+// NOTE: Citizen report submission now lives in routes/citizen-reports.ts, which
+// is mounted ahead of this router and uses the mobile-aligned report model. The
+// remaining MVP routes (auth, cases, referrals, duty, sync, analytics, audit)
+// are unchanged.
 
 router.get(
   "/cases",

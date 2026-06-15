@@ -2,7 +2,7 @@ import { useFocusEffect } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { CitizenReportMapFallback } from "@/components/CitizenReportMapFallback";
+import { CitizenReportMap } from "@/components/CitizenReportMap";
 import { CitizenIncidentReceipt, listReportsByAgencyWithLocation } from "@/services/citizenIncidentApi";
 
 export default function PoliceMapScreen() {
@@ -16,7 +16,7 @@ export default function PoliceMapScreen() {
   );
 
   return (
-    <CitizenReportMapFallback
+    <CitizenReportMap
       title="Police Location View"
       subtitle="Police-routed citizen reports with GPS-ready locations and manual-location fallback for reports without coordinates."
       reports={reports}
