@@ -17,10 +17,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import {
-  CitizenAgencyRoute,
   CitizenIncidentReceipt,
   CitizenIncidentType,
   findCitizenIncidentByReference,
+  formatCitizenAgencyLabel,
   formatCitizenIncidentStatus,
   getCitizenReportCoordinatesText,
   getCitizenReportLocationText,
@@ -58,13 +58,6 @@ const INCIDENT_TYPE_LABELS: Record<CitizenIncidentType, string> = {
   vehicle_documentation_concern: "Vehicle Documentation Concern",
   medical: "Medical Emergency",
   other: "Other",
-};
-
-const AGENCY_LABELS: Record<CitizenAgencyRoute, string> = {
-  frsc: "FRSC",
-  police: "Nigeria Police",
-  vio: "VIO",
-  civil_defence: "Civil Defence",
 };
 
 export default function TrackReportScreen() {
@@ -225,7 +218,7 @@ function ReportDetails({
         <InfoRow label="Reference number" value={report.reference} />
         <InfoRow label="Incident type" value={INCIDENT_TYPE_LABELS[report.incidentType]} />
         <InfoRow label="Submitted" value={submittedAt} />
-        <InfoRow label="Suggested agency" value={AGENCY_LABELS[report.suggestedAgency]} />
+        <InfoRow label="Suggested agency" value={formatCitizenAgencyLabel(report.suggestedAgency)} />
         <InfoRow label="Emergency level" value={report.emergencyLevel.toUpperCase()} />
         <InfoRow label="Current status" value={formatCitizenIncidentStatus(report.status)} />
         <InfoRow label="Location" value={getCitizenReportLocationText(report)} />

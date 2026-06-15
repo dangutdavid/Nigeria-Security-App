@@ -5,10 +5,10 @@ import React, { useCallback, useMemo, useState } from "react";
 import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useAgency } from "@/context/AgencyContext";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import {
-  CitizenAgencyRoute,
   CitizenIncidentReceipt,
   CitizenIncidentStatus,
   formatCitizenAgencyLabel,
@@ -21,7 +21,6 @@ import {
   updateReportStatus,
 } from "@/services/reportRepository";
 
-const AGENCIES: Array<CitizenAgencyRoute | "all"> = ["all", "frsc", "police", "vio", "civil_defence"];
 const STATUSES: Array<CitizenIncidentStatus | "all"> = ["all", "submitted", "triaged", "assigned", "in_progress", "resolved", "closed"];
 const EMERGENCIES = ["all", "low", "medium", "high", "critical"] as const;
 const FLOW: Record<CitizenIncidentStatus, CitizenIncidentStatus | null> = { submitted: "triaged", triaged: "assigned", assigned: "in_progress", in_progress: "resolved", resolved: "closed", closed: null };
@@ -30,15 +29,26 @@ export default function AdminIncidentsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { agencies, getAgencyById } = useAgency();
   const [reports, setReports] = useState<CitizenIncidentReceipt[]>([]);
   const [query, setQuery] = useState("");
-  const [agency, setAgency] = useState<CitizenAgencyRoute | "all">("all");
+  const [agency, setAgency] = useState<string | "all">("all");
   const [status, setStatus] = useState<CitizenIncidentStatus | "all">("all");
   const [emergency, setEmergency] = useState<(typeof EMERGENCIES)[number]>("all");
   const [selected, setSelected] = useState<CitizenIncidentReceipt | null>(null);
   const [note, setNote] = useState("");
   const load = useCallback(async () => setReports(await listReports()), []);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  const agencyFilters = useMemo(
+    () => ["all", ...agencies.filter((item) => item.id !== "admin" && item.isActive !== false).map((item) => item.id)],
+    [agencies],
+  );
+
+  function agencyLabel(id: string) {
+    if (id === "all") return "All agencies";
+    return getAgencyById(id)?.shortName ?? formatCitizenAgencyLabel(id);
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -58,7 +68,7 @@ export default function AdminIncidentsScreen() {
     if (updated) setSelected(updated);
   }
 
-  async function reassign(report: CitizenIncidentReceipt, nextAgency: CitizenAgencyRoute) {
+  async function reassign(report: CitizenIncidentReceipt, nextAgency: string) {
     const updated = await reassignReport({ reference: report.reference, agency: nextAgency, actorName: user?.name ?? "Admin" });
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await load();
@@ -77,14 +87,14 @@ export default function AdminIncidentsScreen() {
     <View style={[styles.root, { backgroundColor: colors.background, paddingBottom: insets.bottom + 90 }]}>
       <View style={[styles.header, { paddingTop: insets.top + 18 }]}><Text style={styles.headerTitle}>All Incidents</Text><Text style={styles.headerSub}>Cross-agency citizen report management</Text></View>
       <View style={[styles.search, { backgroundColor: colors.card, borderColor: colors.border }]}><Feather name="search" size={16} color={colors.mutedForeground} /><TextInput value={query} onChangeText={setQuery} placeholder="Search reference, location, vehicle..." placeholderTextColor={colors.mutedForeground} style={[styles.searchInput, { color: colors.text }]} /></View>
-      <FilterRow values={AGENCIES} active={agency} setActive={(v) => setAgency(v as CitizenAgencyRoute | "all")} label={(v) => v === "all" ? "All agencies" : formatCitizenAgencyLabel(v as CitizenAgencyRoute)} colors={colors} />
+      <FilterRow values={agencyFilters} active={agency} setActive={setAgency} label={agencyLabel} colors={colors} />
       <FilterRow values={STATUSES} active={status} setActive={(v) => setStatus(v as CitizenIncidentStatus | "all")} label={(v) => v === "all" ? "All status" : formatCitizenIncidentStatus(v as CitizenIncidentStatus)} colors={colors} />
       <FilterRow values={[...EMERGENCIES]} active={emergency} setActive={(v) => setEmergency(v as typeof emergency)} label={(v) => v === "all" ? "Any level" : v.toUpperCase()} colors={colors} />
 
       <ScrollView contentContainerStyle={styles.list}>
         {filtered.map((report) => (
           <TouchableOpacity key={report.reference} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => setSelected(report)}>
-            <View style={styles.cardTop}><Text style={styles.source}>{formatCitizenAgencyLabel(report.suggestedAgency)}</Text><Text style={styles.status}>{formatCitizenIncidentStatus(report.status)}</Text></View>
+            <View style={styles.cardTop}><Text style={styles.source}>{agencyLabel(report.suggestedAgency)}</Text><Text style={styles.status}>{formatCitizenIncidentStatus(report.status)}</Text></View>
             <Text style={[styles.ref, { color: colors.text }]}>{report.reference}</Text>
             <Text style={[styles.meta, { color: colors.mutedForeground }]}>{report.emergencyLevel.toUpperCase()} · {new Date(report.submittedAt).toLocaleString()}</Text>
             <Text style={[styles.desc, { color: colors.text }]} numberOfLines={2}>{report.description}</Text>
@@ -100,11 +110,11 @@ export default function AdminIncidentsScreen() {
               <Text style={[styles.detailTitle, { color: colors.text }]}>Incident detail</Text>
               <Text style={[styles.detailText, { color: colors.text }]}>{selected.description}</Text>
               <Text style={[styles.detailSub, { color: colors.mutedForeground }]}>{selected.location}</Text>
-              <Text style={[styles.detailSub, { color: colors.mutedForeground }]}>Agency: {formatCitizenAgencyLabel(selected.suggestedAgency)} · Status: {formatCitizenIncidentStatus(selected.status)}</Text>
+              <Text style={[styles.detailSub, { color: colors.mutedForeground }]}>Agency: {agencyLabel(selected.suggestedAgency)} · Status: {formatCitizenIncidentStatus(selected.status)}</Text>
             </View>
             <View style={[styles.detail, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.detailTitle, { color: colors.text }]}>Reassign agency</Text>
-              <View style={styles.wrapRow}>{(AGENCIES.filter((a) => a !== "all") as CitizenAgencyRoute[]).map((a) => <TouchableOpacity key={a} onPress={() => reassign(selected, a)} style={[styles.actionChip, { backgroundColor: selected.suggestedAgency === a ? "#344054" : colors.muted }]}><Text style={[styles.actionText, { color: selected.suggestedAgency === a ? "#fff" : colors.text }]}>{formatCitizenAgencyLabel(a)}</Text></TouchableOpacity>)}</View>
+              <View style={styles.wrapRow}>{agencyFilters.filter((a) => a !== "all").map((a) => <TouchableOpacity key={a} onPress={() => reassign(selected, a)} style={[styles.actionChip, { backgroundColor: selected.suggestedAgency === a ? "#344054" : colors.muted }]}><Text style={[styles.actionText, { color: selected.suggestedAgency === a ? "#fff" : colors.text }]}>{agencyLabel(a)}</Text></TouchableOpacity>)}</View>
               {FLOW[selected.status] && <TouchableOpacity style={styles.primaryBtn} onPress={() => updateStatus(selected, FLOW[selected.status]!)}><Text style={styles.primaryText}>Mark {formatCitizenIncidentStatus(FLOW[selected.status]!)}</Text></TouchableOpacity>}
               <TextInput value={note} onChangeText={setNote} placeholder="Add admin note..." placeholderTextColor={colors.mutedForeground} style={[styles.noteInput, { borderColor: colors.border, color: colors.text }]} />
               <TouchableOpacity style={styles.secondaryBtn} onPress={addNote}><Text style={styles.secondaryText}>Add note</Text></TouchableOpacity>

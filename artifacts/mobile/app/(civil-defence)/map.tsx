@@ -3,7 +3,8 @@ import React, { useCallback, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CitizenReportMap } from "@/components/CitizenReportMap";
-import { CitizenIncidentReceipt, listReportsByAgencyWithLocation } from "@/services/citizenIncidentApi";
+import { CitizenIncidentReceipt } from "@/services/citizenIncidentApi";
+import { listReportsByAgency } from "@/services/reportRepository";
 
 export default function CivilDefenceMapScreen() {
   const insets = useSafeAreaInsets();
@@ -11,7 +12,7 @@ export default function CivilDefenceMapScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void listReportsByAgencyWithLocation("civil_defence").then(setReports);
+      void listReportsByAgency("civil_defence").then(setReports);
     }, []),
   );
 

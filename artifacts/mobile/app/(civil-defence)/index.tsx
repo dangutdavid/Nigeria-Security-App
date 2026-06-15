@@ -10,7 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useReferrals } from "@/context/ReferralContext";
 import { useColors } from "@/hooks/useColors";
 import { CitizenIncidentReceipt } from "@/services/citizenIncidentApi";
-import { listReportsByAgency } from "@/services/reportRepository";
+import { AgencyMetrics, getAgencyMetrics, listReportsByAgency } from "@/services/reportRepository";
 
 export default function CivilDefenceHome() {
   const colors = useColors();
@@ -19,19 +19,29 @@ export default function CivilDefenceHome() {
   const { user } = useAuth();
   const { inboxFor } = useReferrals();
   const [reports, setReports] = useState<CitizenIncidentReceipt[]>([]);
+  const [serverMetrics, setServerMetrics] = useState<AgencyMetrics | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => setReports(await listReportsByAgency("civil_defence")), []);
+  const load = useCallback(async () => {
+    // Prefer server-computed metrics in API mode; getAgencyMetrics returns null
+    // when API is disabled/unavailable, so the list-derived counts below apply.
+    const [list, metricsResult] = await Promise.all([
+      listReportsByAgency("civil_defence"),
+      getAgencyMetrics("civil_defence"),
+    ]);
+    setReports(list);
+    setServerMetrics(metricsResult);
+  }, []);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const referrals = user ? inboxFor("civil_defence") : [];
   const metrics = useMemo(() => ({
-    newReports: reports.filter((r) => r.status === "submitted").length,
-    high: reports.filter((r) => r.emergencyLevel === "high" || r.emergencyLevel === "critical").length,
-    active: reports.filter((r) => r.status === "assigned" || r.status === "in_progress").length,
-    resolved: reports.filter((r) => r.status === "resolved" || r.status === "closed").length,
+    newReports: serverMetrics ? serverMetrics.submitted : reports.filter((r) => r.status === "submitted").length,
+    high: serverMetrics ? serverMetrics.highPriority : reports.filter((r) => r.emergencyLevel === "high" || r.emergencyLevel === "critical").length,
+    active: serverMetrics ? serverMetrics.assigned + serverMetrics.in_progress : reports.filter((r) => r.status === "assigned" || r.status === "in_progress").length,
+    resolved: serverMetrics ? serverMetrics.resolved + serverMetrics.closed : reports.filter((r) => r.status === "resolved" || r.status === "closed").length,
     referrals: referrals.filter((r) => r.status !== "closed").length,
-  }), [reports, referrals]);
+  }), [reports, referrals, serverMetrics]);
 
   async function refresh() {
     setRefreshing(true);

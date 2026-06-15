@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import {
-  CitizenAgencyRoute,
   CitizenIncidentReceipt,
   formatCitizenIncidentStatus,
   getCitizenReportLocationText,
@@ -21,7 +20,7 @@ import {
 } from "./CitizenReportMapFallback";
 
 // Pin colour per agency so the Admin cross-agency view is legible at a glance.
-const AGENCY_PIN_COLORS: Record<CitizenAgencyRoute, string> = {
+const AGENCY_PIN_COLORS: Record<string, string> = {
   frsc: "#1B5E3B",
   police: "#1A3A6C",
   vio: "#7B3F00",

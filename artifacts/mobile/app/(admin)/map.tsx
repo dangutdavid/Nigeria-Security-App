@@ -3,7 +3,8 @@ import React, { useCallback, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CitizenReportMap } from "@/components/CitizenReportMap";
-import { CitizenIncidentReceipt, listReportsWithLocation } from "@/services/citizenIncidentApi";
+import { CitizenIncidentReceipt } from "@/services/citizenIncidentApi";
+import { listReports } from "@/services/reportRepository";
 
 export default function AdminMapScreen() {
   const insets = useSafeAreaInsets();
@@ -11,7 +12,7 @@ export default function AdminMapScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void listReportsWithLocation().then(setReports);
+      void listReports().then(setReports);
     }, []),
   );
 

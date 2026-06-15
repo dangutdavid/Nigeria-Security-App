@@ -19,8 +19,8 @@ import {
   getCitizenReportCoordinatesText,
   getCitizenReportLocationText,
   hasCitizenReportCoordinates,
-  listReportsByAgencyWithLocation,
 } from "@/services/citizenIncidentApi";
+import { listReportsByAgency } from "@/services/reportRepository";
 
 const SEVERITY_COLORS: Record<string, string> = {
   fatal: "#8B0000",
@@ -67,7 +67,7 @@ export default function MapScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void listReportsByAgencyWithLocation("frsc").then(setCitizenReports);
+      void listReportsByAgency("frsc").then(setCitizenReports);
     }, []),
   );
 

@@ -13,7 +13,7 @@ export default function CivilDefenceProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
-  const { roleLabel } = usePermissions();
+  const { roleLabel, canCustomizeOwnAgency } = usePermissions();
 
   return (
     <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}>
@@ -36,6 +36,16 @@ export default function CivilDefenceProfileScreen() {
         </View>
         <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
       </TouchableOpacity>
+      {canCustomizeOwnAgency ? (
+        <TouchableOpacity style={[styles.notificationBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.push("/agency-customize" as any)}>
+          <Feather name="edit-2" size={17} color="#234E2A" />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.notificationTitle, { color: colors.text }]}>Customise Agency</Text>
+            <Text style={[styles.notificationSub, { color: colors.mutedForeground }]}>Theme colours and logo</Text>
+          </View>
+          <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+        </TouchableOpacity>
+      ) : null}
       <TouchableOpacity style={styles.logoutBtn} onPress={() => router.replace("/logout")}>
         <Feather name="log-out" size={17} color="#fff" />
         <Text style={styles.logoutText}>Sign Out</Text>

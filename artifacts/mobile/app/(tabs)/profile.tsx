@@ -96,7 +96,7 @@ export default function ProfileScreen() {
   const myClosed = incidents.filter((i) => i.reportedBy === user?.id && i.status === "closed").length;
   const myDrafts = incidents.filter((i) => i.reportedBy === user?.id && i.status === "draft").length;
   const myPatrolSessions = sessions.filter((s) => s.officerId === user?.id).length;
-  const { can, roleLabel } = usePermissions();
+  const { can, roleLabel, canCustomizeOwnAgency } = usePermissions();
   const canManageUsers = can("manage_users", "user");
   const canAssignCases = can("assign", "incident");
   const canUseCommandTools = canManageUsers;
@@ -324,6 +324,9 @@ export default function ProfileScreen() {
           ) : null}
           {canManageUsers ? (
             <SettingRow icon="users" label="Manage Users" subtitle="Create and assign officers" onPress={() => router.push("/users")} />
+          ) : null}
+          {canCustomizeOwnAgency ? (
+            <SettingRow icon="edit-2" label="Customise Agency" subtitle="Theme colours and logo" onPress={() => router.push("/agency-customize" as any)} />
           ) : null}
           <SettingRow icon="key" label="Change PIN" subtitle="Update your login PIN" onPress={() => router.push("/change-pin")} />
           <SettingRow icon="help-circle" label="Forgot PIN" subtitle="Recover access with OTP" onPress={() => router.push("/forgot-pin")} />

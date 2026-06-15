@@ -38,6 +38,8 @@ function RootLayoutNav() {
       <Stack.Screen name="(vio)" options={{ headerShown: false }} />
       <Stack.Screen name="(civil-defence)" options={{ headerShown: false }} />
       <Stack.Screen name="(admin)" options={{ headerShown: false }} />
+      <Stack.Screen name="agency-workspace" options={{ headerShown: false }} />
+      <Stack.Screen name="agency-customize" options={{ headerShown: false }} />
       <Stack.Screen
         name="report"
         options={{ headerShown: false, presentation: "modal" }}

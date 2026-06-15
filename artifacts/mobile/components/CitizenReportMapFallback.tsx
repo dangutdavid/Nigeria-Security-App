@@ -13,7 +13,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import {
-  CitizenAgencyRoute,
   CitizenEmergencyLevel,
   CitizenIncidentReceipt,
   CitizenIncidentStatus,
@@ -27,7 +26,7 @@ import {
 
 type StatusFilter = "all" | CitizenIncidentStatus;
 type EmergencyFilter = "all" | CitizenEmergencyLevel;
-type AgencyFilter = "all" | CitizenAgencyRoute;
+type AgencyFilter = "all" | string;
 type SourceFilter = "all" | "citizen" | "referral";
 
 const STATUS_FILTERS: StatusFilter[] = ["all", "submitted", "triaged", "assigned", "in_progress", "resolved", "closed"];

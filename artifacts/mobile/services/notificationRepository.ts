@@ -34,6 +34,7 @@ export async function listNotifications(options: {
   reportReference?: string;
 }): Promise<AppNotification[]> {
   const query = new URLSearchParams();
+  if (options.userId) query.set("userId", options.userId);
   if (options.agency) query.set("agency", options.agency);
   if (options.audience) query.set("audience", options.audience);
   if (options.reportReference) query.set("reportReference", options.reportReference);

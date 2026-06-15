@@ -11,7 +11,7 @@ import { NotificationAccessCard } from "@/components/NotificationAccessCard";
 import { useAgency } from "@/context/AgencyContext";
 import { routeForUser, useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
-import { roleLabel } from "@/lib/permissions";
+import { canCustomizeOwnAgency, roleLabel } from "@/lib/permissions";
 import {
   CitizenIncidentReceipt,
   CitizenIncidentStatus,
@@ -221,6 +221,18 @@ export default function AgencyWorkspaceScreen() {
           </View>
           <View style={[styles.toolsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Workspace tools</Text>
+            {canCustomizeOwnAgency(user.role) ? (
+              <TouchableOpacity style={[styles.toolRow, { borderColor: colors.border }]} onPress={() => router.push("/agency-customize" as any)} activeOpacity={0.84}>
+                <View style={[styles.toolIcon, { backgroundColor: accent + "18" }]}>
+                  <Feather name="edit-2" size={17} color={accent} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>Customise agency</Text>
+                  <Text style={[styles.toolSub, { color: colors.mutedForeground }]}>Update your agency theme colours and logo.</Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            ) : null}
             <TouchableOpacity style={[styles.toolRow, { borderColor: colors.border }]} onPress={generateDemoReports} disabled={seeding} activeOpacity={0.84}>
               <View style={[styles.toolIcon, { backgroundColor: accent + "18" }]}>
                 <Feather name="database" size={17} color={accent} />

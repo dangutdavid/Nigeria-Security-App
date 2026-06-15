@@ -31,7 +31,7 @@ interface StatusUpdateInput {
 
 interface ReassignInput {
   reference: string;
-  agency: CitizenAgencyRoute;
+  agency: string;
   actorName: string;
 }
 
@@ -39,6 +39,39 @@ interface TimelineInput {
   reference: string;
   action: string;
   actorName: string;
+}
+
+export interface AgencyMetrics {
+  total: number;
+  submitted: number;
+  triaged: number;
+  assigned: number;
+  in_progress: number;
+  resolved: number;
+  closed: number;
+  rejected: number;
+  highPriority: number;
+  withCoordinates: number;
+  withoutCoordinates: number;
+}
+
+/**
+ * Server-computed agency dashboard metrics. Returns null when API mode is off or
+ * the request fails, so callers fall back to client-side computation from the
+ * (already backend-backed) report list.
+ */
+export async function getAgencyMetrics(
+  agency: string,
+): Promise<AgencyMetrics | null> {
+  const api = await mobileApiFetch<{ metrics?: AgencyMetrics }>({
+    method: "GET",
+    path: `/agencies/${agency}/dashboard`,
+    requireAuth: true,
+  });
+
+  if (api.ok && api.data.metrics) return api.data.metrics;
+  if (!api.ok) logFallback("getAgencyMetrics", api.error);
+  return null;
 }
 
 export async function submitCitizenReport(
@@ -87,7 +120,7 @@ export async function listReports(): Promise<CitizenIncidentReceipt[]> {
 }
 
 export async function listReportsByAgency(
-  agency: CitizenAgencyRoute,
+  agency: string,
 ): Promise<CitizenIncidentReceipt[]> {
   const api = await mobileApiFetch<{ reports?: CitizenIncidentReceipt[]; cases?: CitizenIncidentReceipt[] }>({
     method: "GET",

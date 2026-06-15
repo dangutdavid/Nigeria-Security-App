@@ -24,6 +24,9 @@ export type NewAgencyInput = Omit<AgencyConfig, "id" | "tabRoute" | "isActive"> 
   isActive?: boolean;
 };
 
+/** Fields an editor may change. `id` and `tabRoute` are immutable (routing keys). */
+export type AgencyUpdateInput = Partial<Omit<AgencyConfig, "id" | "tabRoute">>;
+
 export const DEFAULT_AGENCIES: AgencyConfig[] = [
   {
     id: "frsc",
@@ -104,6 +107,7 @@ interface AgencyContextType {
   clearAgency: () => Promise<void>;
   getAgencyById: (id: AgencyId) => AgencyConfig | undefined;
   addAgency: (input: NewAgencyInput) => Promise<AgencyConfig>;
+  updateAgency: (id: AgencyId, updates: AgencyUpdateInput, actorName?: string) => Promise<AgencyConfig>;
   setAgencyActive: (id: AgencyId, isActive: boolean) => Promise<void>;
 }
 
@@ -114,6 +118,7 @@ const AgencyContext = createContext<AgencyContextType>({
   clearAgency: async () => {},
   getAgencyById: () => undefined,
   addAgency: async () => DEFAULT_AGENCIES[0],
+  updateAgency: async () => DEFAULT_AGENCIES[0],
   setAgencyActive: async () => {},
 });
 
@@ -132,7 +137,7 @@ export function AgencyProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.getItem(AGENCY_REGISTRY_KEY),
       ]);
       const storedAgencies = parseStoredAgencies(registry);
-      const merged = mergeAgencies(DEFAULT_AGENCIES, storedAgencies);
+      const merged = sortAgencies(mergeAgencies(DEFAULT_AGENCIES, storedAgencies));
       setAgencies(merged);
       if (selected) {
         const agency = merged.find((a) => a.id === selected && a.isActive !== false);
@@ -174,11 +179,11 @@ export function AgencyProvider({ children }: { children: React.ReactNode }) {
       icon: input.icon || "shield",
       primaryColor: input.primaryColor || "#344054",
       secondaryColor: input.secondaryColor || "#667085",
-      tabRoute: "/unauthorized",
+      tabRoute: "/agency-workspace",
       isActive: input.isActive ?? true,
     };
 
-    const next = [...agencies, agency];
+    const next = sortAgencies([...agencies, agency]);
     setAgencies(next);
     await persistAgencyOverrides(next);
     await createAuditEvent({
@@ -198,12 +203,55 @@ export function AgencyProvider({ children }: { children: React.ReactNode }) {
     return agency;
   }, [agencies]);
 
+  const updateAgency = useCallback(async (id: AgencyId, updates: AgencyUpdateInput, actorName = "Admin"): Promise<AgencyConfig> => {
+    const target = agencies.find((agency) => agency.id === id);
+    if (!target) throw new Error("Agency was not found.");
+
+    // id and tabRoute are immutable routing keys; everything else is editable.
+    const { id: _omitId, tabRoute: _omitRoute, ...editable } = updates as AgencyUpdateInput & { id?: string; tabRoute?: string };
+    const merged: AgencyConfig = { ...target, ...editable };
+    const normalized: AgencyConfig = {
+      ...merged,
+      name: merged.name.trim(),
+      shortName: merged.shortName.trim().toUpperCase(),
+      fullName: merged.fullName.trim(),
+      description: merged.description.trim(),
+      badgePrefix: merged.badgePrefix.trim().toUpperCase(),
+      icon: merged.icon || "shield",
+      primaryColor: merged.primaryColor || "#344054",
+      secondaryColor: merged.secondaryColor || "#667085",
+    };
+    if (!normalized.shortName) throw new Error("Short name is required.");
+    if (!normalized.name) throw new Error("Display name is required.");
+    if (!normalized.fullName) throw new Error("Full name is required.");
+
+    const next = sortAgencies(agencies.map((agency) => (agency.id === id ? normalized : agency)));
+    setAgencies(next);
+    await persistAgencyOverrides(next);
+    if (selectedAgency?.id === id) setSelectedAgency(normalized);
+
+    const changedKeys = (Object.keys(editable) as Array<keyof AgencyConfig>).filter(
+      (key) => target[key] !== normalized[key],
+    );
+    await createAuditEvent({
+      type: "agency.updated",
+      title: "Agency details updated",
+      detail: `${normalized.shortName} was updated (${changedKeys.join(", ") || "no changes"}).`,
+      actor: { name: actorName, agency: "admin", role: "admin" },
+      agency: normalized.id,
+      targetId: normalized.id,
+      severity: "info",
+      metadata: { changed: changedKeys.join(",") },
+    });
+    return normalized;
+  }, [agencies, selectedAgency]);
+
   const setAgencyActive = useCallback(async (id: AgencyId, isActive: boolean) => {
     const target = agencies.find((agency) => agency.id === id);
     if (!target) throw new Error("Agency was not found.");
     if (target.id === "admin" && !isActive) throw new Error("Admin agency cannot be deactivated.");
 
-    const next = agencies.map((agency) => (agency.id === id ? { ...agency, isActive } : agency));
+    const next = sortAgencies(agencies.map((agency) => (agency.id === id ? { ...agency, isActive } : agency)));
     setAgencies(next);
     await persistAgencyOverrides(next);
 
@@ -228,7 +276,7 @@ export function AgencyProvider({ children }: { children: React.ReactNode }) {
   }, [agencies, selectedAgency]);
 
   return (
-    <AgencyContext.Provider value={{ agencies, selectedAgency, selectAgency, clearAgency, getAgencyById, addAgency, setAgencyActive }}>
+    <AgencyContext.Provider value={{ agencies, selectedAgency, selectAgency, clearAgency, getAgencyById, addAgency, updateAgency, setAgencyActive }}>
       {children}
     </AgencyContext.Provider>
   );
@@ -272,16 +320,40 @@ function mergeAgencies(defaults: AgencyConfig[], stored: AgencyConfig[]) {
       isActive: agency.isActive !== false,
     });
   });
-  return Array.from(merged.values());
+  return sortAgencies(Array.from(merged.values()));
+}
+
+function sortAgencies(agencies: AgencyConfig[]) {
+  return [...agencies].sort((a, b) => {
+    if (a.id === "admin") return 1;
+    if (b.id === "admin") return -1;
+    return 0;
+  });
 }
 
 async function persistAgencyOverrides(agencies: AgencyConfig[]) {
+  // Persist every custom agency, plus any built-in agency that has been edited
+  // in any field (so name/colour/logo/description/active edits survive reload).
   const overrides = agencies.filter((agency) => {
     const seed = DEFAULT_AGENCIES.find((item) => item.id === agency.id);
     if (!seed) return true;
-    return seed.isActive !== agency.isActive;
+    return !agenciesEqual(seed, agency);
   });
   await AsyncStorage.setItem(AGENCY_REGISTRY_KEY, JSON.stringify(overrides));
+}
+
+function agenciesEqual(a: AgencyConfig, b: AgencyConfig) {
+  return (
+    a.name === b.name &&
+    a.shortName === b.shortName &&
+    a.fullName === b.fullName &&
+    a.primaryColor === b.primaryColor &&
+    a.secondaryColor === b.secondaryColor &&
+    a.badgePrefix === b.badgePrefix &&
+    a.description === b.description &&
+    a.icon === b.icon &&
+    a.isActive === b.isActive
+  );
 }
 
 function normalizeAgencyId(value: string) {

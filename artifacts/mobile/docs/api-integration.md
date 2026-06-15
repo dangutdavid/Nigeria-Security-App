@@ -123,6 +123,72 @@ EXPO_PUBLIC_API_BASE_URL=http://<YOUR-MAC-LAN-IP>:8081/api
 - API mode is **disabled by default**: with the vars unset, the app stays fully
   local/offline and every demo flow keeps working.
 
+## Maps, Notifications & Metrics (Phase 3)
+
+Maps, notifications, and dashboard metrics are now backend-ready, all behind the
+same API-first + AsyncStorage fallback.
+
+### Notification endpoints
+
+| Repository method (`notificationRepository.ts`) | Backend endpoint                          | Fallback (`notificationService.ts`)   |
+| ------------------------------------------------ | ----------------------------------------- | -------------------------------------- |
+| `listNotifications`                              | `GET /api/notifications`                  | local list (agency/admin/citizen/user) |
+| `markRead`                                       | `PATCH /api/notifications/:id/read`       | `markNotificationRead`                 |
+| `markAllRead`                                    | `PATCH /api/notifications/read-all`       | `markAllNotificationsRead`             |
+| `unreadCount`                                    | `POST /api/notifications/unread-count`    | `getUnreadNotificationCount`           |
+| `createAppNotification`                          | `POST /api/notifications`                 | `createNotification`                   |
+| `savePushToken`                                  | `POST /api/push-tokens`                   | local push-token save                  |
+
+`GET /api/notifications` accepts `agency`, `audience`, `userId`, and
+`reportReference` query params. The push-token endpoint accepts
+`token`/`platform`/`userId`/`agency`, stores it in-memory, and returns success
+(no real push delivery yet). The Notification Centre now reads through the
+repository, so it shows backend notifications in API mode and local ones
+otherwise. Notification **preferences** remain local only.
+
+### Server-created notifications (event hooks)
+
+The backend creates notifications automatically (no mobile call needed):
+
+- **Report submitted** → citizen confirmation + target-agency notification; a
+  **high-priority** alert too when the report is `high`/`critical`.
+- **Status changed** → citizen notification + owning-agency notification.
+- **Report reassigned** → citizen notification, target-agency notification, and
+  an admin history notification. Timeline entries are unchanged.
+
+### Maps
+
+All agency maps and the admin map load reports through `reportRepository`
+(`listReportsByAgency` / `listReports`), so in API mode they show backend
+reports; agency maps show only that agency's reports, the admin map shows all.
+GPS reports render as markers; coordinate-less reports stay in the tappable
+fallback list; marker/card tap still opens the report summary. Local mode uses
+the same AsyncStorage data as before. The native interactive MapView is
+unchanged.
+
+### Server dashboard metrics
+
+`GET /api/agencies/:agency/dashboard` returns server-computed counts. The
+**NSCDC dashboard** consumes it via `getAgencyMetrics("civil_defence")` and falls
+back to client-side computation when the API is disabled/unavailable. FRSC,
+Police, and VIO dashboards blend citizen reports with local/legacy sources, so
+they keep computing client-side from their already-backend-backed report lists
+(the metrics endpoint is available for them but intentionally not wired, to
+avoid disturbing the blended stats). Admin uses the all-reports list summary.
+
+### Manual API-mode test steps
+
+1. Local mode (no env vars): confirm maps, notifications, and dashboards work.
+2. `nvm use 22 && pnpm --filter @workspace/api-server run dev`.
+3. Set `EXPO_PUBLIC_USE_API=true` + `EXPO_PUBLIC_API_BASE_URL=http://<MAC-LAN-IP>:8081/api`, restart Expo.
+4. Submit a citizen report; note its agency.
+5. Log in as that agency: dashboard metrics reflect it, the agency map shows it
+   (tap a GPS marker and a manual-location fallback item).
+6. Open the Notification Centre — the agency notification appears.
+7. Update status — a status notification is created.
+8. As Admin, reassign — the target agency's map/list/notifications update.
+9. Stop the API server — the app falls back to local data without crashing.
+
 ## Citizen Chat Assistant (Claude + Gemini)
 
 The app has an in-app safety assistant (Public Access → **Ask Assistant** on the

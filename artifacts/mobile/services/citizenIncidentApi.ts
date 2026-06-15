@@ -36,7 +36,8 @@ export type CitizenIncidentType =
   | "other";
 
 export type CitizenEmergencyLevel = "low" | "medium" | "high" | "critical";
-export type CitizenAgencyRoute = "frsc" | "police" | "vio" | "civil_defence";
+export type BuiltInCitizenAgencyRoute = "frsc" | "police" | "vio" | "civil_defence";
+export type CitizenAgencyRoute = BuiltInCitizenAgencyRoute | (string & {});
 export type CitizenLocationSource = "gps" | "manual";
 export type CitizenIncidentStatus =
   | "submitted"
@@ -76,6 +77,12 @@ export interface CitizenIncidentReceipt extends CitizenIncidentSubmission {
   status: CitizenIncidentStatus;
   submittedAt: string;
   timeline?: CitizenIncidentTimelineEntry[];
+}
+
+export interface AgencyDemoReportSeedInput {
+  id: string;
+  shortName: string;
+  fullName: string;
 }
 
 const STORAGE_KEY = "@citizen_incident_reports_v1";
@@ -528,6 +535,66 @@ function makeReference() {
   return `CIR-${stamp.slice(-6)}`;
 }
 
+function makeAgencyReferencePrefix(value: string) {
+  const normalized = value.toUpperCase().replace(/[^A-Z0-9]+/g, "");
+  return (normalized || "AGY").slice(0, 3).padEnd(3, "X");
+}
+
+function makeAgencyDemoReport({
+  agency,
+  index,
+  prefix,
+  incidentType,
+  description,
+  location,
+  latitude,
+  longitude,
+  emergencyLevel,
+  status,
+  submittedAt,
+  timeline,
+}: {
+  agency: AgencyDemoReportSeedInput;
+  index: number;
+  prefix: string;
+  incidentType: CitizenIncidentType;
+  description: string;
+  location: string;
+  latitude: number;
+  longitude: number;
+  emergencyLevel: CitizenEmergencyLevel;
+  status: CitizenIncidentStatus;
+  submittedAt: string;
+  timeline: Array<{ action: string; by: string; minutesAgo: number }>;
+}): CitizenIncidentReceipt {
+  const agencyId = agency.id.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const reference = `CIR-${prefix}${String(index).padStart(3, "0")}`;
+  const now = Date.now();
+  return normalizeCitizenIncidentReport({
+    id: `seed-dynamic-${agencyId}-${index}`,
+    reference,
+    incidentType,
+    description,
+    location,
+    address: location,
+    latitude,
+    longitude,
+    state: location.split(",").slice(-1)[0]?.trim(),
+    locationSource: "gps",
+    accuracy: 22 + index,
+    emergencyLevel,
+    suggestedAgency: agency.id,
+    status,
+    submittedAt,
+    timeline: timeline.map((entry, timelineIndex) => ({
+      id: `${reference.toLowerCase()}-dynamic-tl-${timelineIndex + 1}`,
+      action: entry.action,
+      by: entry.by,
+      timestamp: new Date(now - entry.minutesAgo * 60000).toISOString(),
+    })),
+  });
+}
+
 export async function submitCitizenIncidentMock(
   input: CitizenIncidentSubmission,
 ): Promise<CitizenIncidentReceipt> {
@@ -628,6 +695,95 @@ export async function listCitizenIncidentReports(): Promise<CitizenIncidentRecei
   return readCitizenIncidentReports();
 }
 
+export async function seedCitizenReportsForAgencyMock(
+  agency: AgencyDemoReportSeedInput,
+  actorName = "Admin",
+): Promise<CitizenIncidentReceipt[]> {
+  const reports = await readCitizenIncidentReports();
+  const existing = reports.filter((report) => report.suggestedAgency === agency.id);
+  if (existing.length > 0) return existing;
+
+  const now = new Date();
+  const prefix = makeAgencyReferencePrefix(agency.shortName || agency.id);
+  const created: CitizenIncidentReceipt[] = [
+    makeAgencyDemoReport({
+      agency,
+      index: 1,
+      prefix,
+      incidentType: "security_support_referral",
+      description: `${agency.fullName} has received a security support referral requiring field verification and first-response coordination.`,
+      location: "Central Business District, Abuja FCT",
+      latitude: 9.0579,
+      longitude: 7.4951,
+      emergencyLevel: "high",
+      status: "submitted",
+      submittedAt: new Date(now.getTime() - 45 * 60000).toISOString(),
+      timeline: [{ action: "Demo citizen report routed", by: actorName, minutesAgo: 45 }],
+    }),
+    makeAgencyDemoReport({
+      agency,
+      index: 2,
+      prefix,
+      incidentType: "suspicious_activity",
+      description: `Residents reported suspicious activity near a protected facility. ${agency.shortName} review and patrol assignment are required.`,
+      location: "Garki Area 11, Abuja FCT",
+      latitude: 9.0307,
+      longitude: 7.4957,
+      emergencyLevel: "medium",
+      status: "triaged",
+      submittedAt: new Date(now.getTime() - 3 * 3600000).toISOString(),
+      timeline: [
+        { action: "Demo citizen report routed", by: actorName, minutesAgo: 180 },
+        { action: `${agency.shortName} marked report Triaged`, by: `${agency.shortName} Supervisor`, minutesAgo: 120 },
+      ],
+    }),
+    makeAgencyDemoReport({
+      agency,
+      index: 3,
+      prefix,
+      incidentType: "public_threat",
+      description: `A public safety concern has been escalated for ${agency.shortName} monitoring, documentation, and field team follow-up.`,
+      location: "Ahmadu Bello Way, Kaduna",
+      latitude: 10.5264,
+      longitude: 7.4388,
+      emergencyLevel: "critical",
+      status: "assigned",
+      submittedAt: new Date(now.getTime() - 8 * 3600000).toISOString(),
+      timeline: [
+        { action: "Demo citizen report routed", by: actorName, minutesAgo: 480 },
+        { action: `${agency.shortName} marked report Triaged`, by: `${agency.shortName} Supervisor`, minutesAgo: 420 },
+        { action: `${agency.shortName} marked report Assigned`, by: `${agency.shortName} Commander`, minutesAgo: 360 },
+      ],
+    }),
+  ];
+
+  await writeCitizenIncidentReports([...created, ...reports]);
+  await createAuditEvent({
+    type: "report.submitted",
+    title: "Agency demo reports seeded",
+    detail: `${created.length} operational demo reports were created for ${agency.shortName}.`,
+    actor: { name: actorName, agency: "admin", role: "admin" },
+    agency: agency.id,
+    severity: "info",
+    metadata: {
+      agencyId: agency.id,
+      references: created.map((report) => report.reference).join(", "),
+    },
+  });
+  await createNotification({
+    type: "agency_referral_received",
+    audience: "agency",
+    agency: agency.id,
+    title: "Demo reports ready",
+    message: `${created.length} sample operational reports are ready in ${agency.shortName}.`,
+    route: "/agency-workspace",
+    priority: "normal",
+    sourceAgency: "admin",
+    metadata: { agencyId: agency.id, count: created.length },
+  });
+  return created;
+}
+
 export async function listFrscCitizenIncidentReports(): Promise<CitizenIncidentReceipt[]> {
   return listCitizenIncidentReportsByAgency("frsc");
 }
@@ -641,7 +797,7 @@ export async function listVioCitizenIncidentReports(): Promise<CitizenIncidentRe
 }
 
 export async function listCitizenIncidentReportsByAgency(
-  agency: CitizenAgencyRoute,
+  agency: string,
 ): Promise<CitizenIncidentReceipt[]> {
   const reports = await readCitizenIncidentReports();
   return reports.filter((report) => report.suggestedAgency === agency);
@@ -656,7 +812,7 @@ export async function listReportsWithLocation(): Promise<CitizenIncidentReceipt[
 }
 
 export async function listReportsByAgencyWithLocation(
-  agency: CitizenAgencyRoute,
+  agency: string,
 ): Promise<CitizenIncidentReceipt[]> {
   return listCitizenIncidentReportsByAgency(agency);
 }
@@ -773,7 +929,7 @@ export async function reassignCitizenIncidentAgencyMock({
   actorName,
 }: {
   reference: string;
-  agency: CitizenAgencyRoute;
+  agency: string;
   actorName: string;
 }): Promise<CitizenIncidentReceipt | null> {
   const normalized = reference.trim().toUpperCase();
@@ -907,22 +1063,24 @@ export function getCitizenStatusMessage(status: CitizenIncidentStatus): string {
   return messages[status];
 }
 
-export function formatCitizenAgencyLabel(agency: CitizenAgencyRoute): string {
-  const labels: Record<CitizenAgencyRoute, string> = {
+export function formatCitizenAgencyLabel(agency: string): string {
+  const labels: Record<string, string> = {
     frsc: "FRSC",
     police: "Nigeria Police",
     vio: "VIO",
     civil_defence: "Civil Defence / NSCDC",
+    dss: "DSS",
+    fire_service: "Fire Service",
   };
-  return labels[agency];
+  return labels[agency] ?? agency.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function agencyRouteForReport(agency: CitizenAgencyRoute): string {
-  const routes: Record<CitizenAgencyRoute, string> = {
+function agencyRouteForReport(agency: string): string {
+  const routes: Record<string, string> = {
     frsc: "/(tabs)/cases",
     police: "/(police)/crime-reports",
     vio: "/(vio)/inspections",
     civil_defence: "/(civil-defence)/incidents",
   };
-  return routes[agency];
+  return routes[agency] ?? "/agency-workspace";
 }

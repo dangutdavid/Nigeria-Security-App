@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import type { AgencyType, UserRole } from "@/context/AuthContext";
-import type { CitizenAgencyRoute, CitizenEmergencyLevel } from "@/services/citizenIncidentApi";
+import type { CitizenEmergencyLevel } from "@/services/citizenIncidentApi";
 
 export type AppNotificationType =
   | "citizen_report_submitted"
@@ -31,7 +31,7 @@ export interface AppNotification {
   incidentId?: string;
   route?: string;
   priority: NotificationPriority;
-  sourceAgency?: CitizenAgencyRoute | "admin" | "citizen";
+  sourceAgency?: AgencyType | "admin" | "citizen";
   metadata?: Record<string, string | number | boolean | null>;
 }
 

@@ -21,18 +21,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 import {
+  BuiltInCitizenAgencyRoute,
   CitizenAgencyRoute,
   CitizenEmergencyLevel,
   CitizenLocationSource,
   CitizenIncidentReceipt,
   CitizenIncidentType,
+  formatCitizenAgencyLabel,
   submitCitizenIncidentMock,
 } from "@/services/citizenIncidentApi";
 
 const INCIDENT_TYPES: Array<{
   value: CitizenIncidentType;
   label: string;
-  agency: CitizenAgencyRoute;
+  agency: BuiltInCitizenAgencyRoute;
   icon: keyof typeof Feather.glyphMap;
 }> = [
   { value: "road_crash", label: "Road Crash", agency: "frsc", icon: "truck" },
@@ -78,7 +80,7 @@ const EMERGENCY_LEVELS: Array<{
   { value: "critical", label: "Critical", color: "#C0392B" },
 ];
 
-const AGENCY_LABELS: Record<CitizenAgencyRoute, string> = {
+const AGENCY_LABELS: Record<BuiltInCitizenAgencyRoute, string> = {
   frsc: "FRSC",
   police: "Nigeria Police",
   vio: "VIO",
@@ -109,7 +111,7 @@ export default function CitizenIncidentReportScreen() {
   const [photoUri, setPhotoUri] = useState<string | undefined>();
   const [vehicleRegistration, setVehicleRegistration] = useState("");
   const [emergencyLevel, setEmergencyLevel] = useState<CitizenEmergencyLevel | "">("");
-  const [agencyOverride, setAgencyOverride] = useState<CitizenAgencyRoute | "">("");
+  const [agencyOverride, setAgencyOverride] = useState<BuiltInCitizenAgencyRoute | "">("");
   const [errors, setErrors] = useState<Errors>({});
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -117,7 +119,7 @@ export default function CitizenIncidentReportScreen() {
 
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
 
-  const suggestedAgency = useMemo<CitizenAgencyRoute | "">(() => {
+  const suggestedAgency = useMemo<BuiltInCitizenAgencyRoute | "">(() => {
     if (agencyOverride) return agencyOverride;
     return INCIDENT_TYPES.find((type) => type.value === incidentType)?.agency ?? "";
   }, [agencyOverride, incidentType]);
@@ -236,7 +238,7 @@ export default function CitizenIncidentReportScreen() {
           <Text style={[styles.successTitle, { color: colors.text }]}>Incident Report Submitted</Text>
           <Text style={styles.reference}>{receipt.reference}</Text>
           <Text style={[styles.successText, { color: colors.mutedForeground }]}>
-            Your report has been routed to {AGENCY_LABELS[receipt.suggestedAgency]} for review.
+            Your report has been routed to {formatCitizenAgencyLabel(receipt.suggestedAgency)} for review.
           </Text>
           <View style={[styles.receiptCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <ReceiptRow label="Emergency level" value={receipt.emergencyLevel.toUpperCase()} />
@@ -423,7 +425,7 @@ export default function CitizenIncidentReportScreen() {
             </View>
           </View>
           <View style={styles.agencyRow}>
-            {(Object.keys(AGENCY_LABELS) as CitizenAgencyRoute[]).map((agency) => {
+            {(Object.keys(AGENCY_LABELS) as BuiltInCitizenAgencyRoute[]).map((agency) => {
               const active = suggestedAgency === agency;
               return (
                 <TouchableOpacity

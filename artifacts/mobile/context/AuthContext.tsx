@@ -282,7 +282,7 @@ export function routeForUser(user: User | null | undefined): string {
   if (user.agency === "vio") return "/(vio)";
   if (user.agency === "civil_defence") return "/(civil-defence)";
   if (user.agency === "frsc") return "/(tabs)";
-  return "/unauthorized";
+  return "/agency-workspace";
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

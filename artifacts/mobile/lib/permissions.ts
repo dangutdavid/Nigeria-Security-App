@@ -222,6 +222,20 @@ export function isAdminRole(role: UserRole | undefined): boolean {
   return role === "admin" || role === "super_admin";
 }
 
+/** Admins/super-admins may fully edit any agency in the registry (all fields). */
+export function canManageAgencies(role: UserRole | undefined): boolean {
+  return role === "admin" || role === "super_admin";
+}
+
+/**
+ * Agency "super users" (commander + super_admin) may self-customise their own
+ * agency's branding — theme colours and logo/icon — without full registry edit
+ * rights. Platform admins can customise any agency.
+ */
+export function canCustomizeOwnAgency(role: UserRole | undefined): boolean {
+  return role === "super_admin" || role === "commander" || role === "admin";
+}
+
 /** Limit a list of agency-scoped records to the user's own agency (data tenancy). */
 export function scopeToAgency<T extends { agency?: AgencyType }>(
   user: User | null | undefined,
@@ -251,6 +265,8 @@ export function usePermissions() {
     isOfficer: isOfficerRole(user?.role),
     isSupervisor: isSupervisorRole(user?.role),
     isAdmin: isAdminRole(user?.role),
+    canManageAgencies: canManageAgencies(user?.role),
+    canCustomizeOwnAgency: canCustomizeOwnAgency(user?.role),
     scopeToAgency: <T extends { agency?: AgencyType }>(items: T[]) => scopeToAgency(user, items),
   };
 }

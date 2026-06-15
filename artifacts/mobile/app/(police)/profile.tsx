@@ -32,7 +32,7 @@ export default function PoliceProfile() {
   const router = useRouter();
   const { user } = useAuth();
   const { reports } = useCrimeReports();
-  const { can, roleLabel } = usePermissions();
+  const { can, roleLabel, canCustomizeOwnAgency } = usePermissions();
   const { pendingCountFor } = useReferrals();
   const { isDark, toggleTheme } = useTheme();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -66,6 +66,9 @@ export default function PoliceProfile() {
     { icon: "bar-chart-2", label: "Analytics", sub: "Crime trends and hotspots", onPress: () => router.push("/analytics-police") },
     ...(canManageUsers
       ? [{ icon: "users" as const, label: "Manage Officers", sub: "Create and manage your command", onPress: () => router.push("/users") }]
+      : []),
+    ...(canCustomizeOwnAgency
+      ? [{ icon: "edit-2" as const, label: "Customise Agency", sub: "Theme colours and logo", onPress: () => router.push("/agency-customize" as any) }]
       : []),
     { icon: isDark ? "moon" : "sun", label: "Dark Mode", sub: isDark ? "On" : "Off", toggle: true, toggled: isDark, onToggle: toggleTheme },
     { icon: "lock", label: "Change PIN", sub: "Update your security PIN", onPress: () => router.push("/change-pin" as any) },

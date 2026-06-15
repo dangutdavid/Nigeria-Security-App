@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -10,9 +10,10 @@ import { ToolBackHeader } from "@/components/ToolBackHeader";
 import { AgencyConfig, NewAgencyInput, useAgency } from "@/context/AgencyContext";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
-import { listCitizenIncidentReports } from "@/services/citizenIncidentApi";
+import { listCitizenIncidentReports, seedCitizenReportsForAgencyMock } from "@/services/citizenIncidentApi";
 
 const COLOR_OPTIONS = ["#1B5E3B", "#1A3A6C", "#7B3F00", "#234E2A", "#344054", "#5C6BC0", "#8B1E3F", "#0F766E"];
+const BUILT_IN_AGENCIES = new Set(["frsc", "police", "vio", "civil_defence", "admin"]);
 
 type AgencyForm = Omit<NewAgencyInput, "icon">;
 type AgencyTemplate = AgencyForm & {
@@ -63,6 +64,7 @@ const AGENCY_TEMPLATES: AgencyTemplate[] = [
 export default function AdminAgenciesScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { agencies, addAgency, setAgencyActive } = useAgency();
   const { allUsers, ensureAgencyDemoUsers } = useAuth();
   const [reports, setReports] = useState<Awaited<ReturnType<typeof listCitizenIncidentReports>>>([]);
@@ -70,6 +72,7 @@ export default function AdminAgenciesScreen() {
   const [form, setForm] = useState<AgencyForm>(EMPTY_FORM);
   const [error, setError] = useState("");
   const autoSeededAgencyIds = useRef<Set<string>>(new Set());
+  const autoSeededReportAgencyIds = useRef<Set<string>>(new Set());
   useFocusEffect(useCallback(() => { void listCitizenIncidentReports().then(setReports); }, []));
 
   useEffect(() => {
@@ -84,6 +87,20 @@ export default function AdminAgenciesScreen() {
       void ensureAgencyDemoUsers(agency);
     });
   }, [agencies, allUsers, ensureAgencyDemoUsers]);
+
+  useEffect(() => {
+    const customAgenciesMissingReports = agencies.filter((agency) => {
+      if (BUILT_IN_AGENCIES.has(agency.id)) return false;
+      if (agency.isActive === false) return false;
+      if (autoSeededReportAgencyIds.current.has(agency.id)) return false;
+      return !reports.some((report) => report.suggestedAgency === agency.id);
+    });
+
+    customAgenciesMissingReports.forEach((agency) => {
+      autoSeededReportAgencyIds.current.add(agency.id);
+      void seedCitizenReportsForAgencyMock(agency).then(() => listCitizenIncidentReports().then(setReports));
+    });
+  }, [agencies, reports]);
 
   const rows = useMemo(() => agencies.map((agency) => {
     const agencyReports = reports.filter((r) => r.suggestedAgency === agency.id);
@@ -128,6 +145,8 @@ export default function AdminAgenciesScreen() {
         icon: "shield",
       });
       await ensureAgencyDemoUsers(created);
+      await seedCitizenReportsForAgencyMock(created);
+      setReports(await listCitizenIncidentReports());
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setForm(EMPTY_FORM);
       setShowAdd(false);
@@ -191,9 +210,15 @@ export default function AdminAgenciesScreen() {
             <Stat label="Demo users" value={row.activeUsers} />
           </View>
           <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
-            <Text style={[styles.footerNote, { color: colors.mutedForeground }]}>
-              {row.agency.isActive === false ? "Hidden from agency sign in." : "Available on agency sign in."}
-            </Text>
+            <TouchableOpacity
+              style={[styles.editBtn, { borderColor: colors.border }]}
+              onPress={() => router.push(`/agency-customize?agencyId=${row.agency.id}` as any)}
+              activeOpacity={0.84}
+            >
+              <Feather name="edit-2" size={13} color={row.agency.primaryColor} />
+              <Text style={[styles.editText, { color: row.agency.primaryColor }]}>Edit</Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1 }} />
             <TouchableOpacity
               style={[
                 styles.toggleBtn,
@@ -312,6 +337,8 @@ const styles = StyleSheet.create({
   footerNote: { flex: 1, fontSize: 12, fontFamily: "Inter_600SemiBold" },
   toggleBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 8 },
   toggleText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  editBtn: { flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 999, borderWidth: 1, paddingHorizontal: 11, paddingVertical: 8 },
+  editText: { fontSize: 12, fontFamily: "Inter_700Bold" },
   modalRoot: { flex: 1 },
   modalHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12, paddingBottom: 16, marginBottom: 16, borderBottomWidth: 1 },
   modalTitle: { fontSize: 22, fontFamily: "Inter_700Bold" },

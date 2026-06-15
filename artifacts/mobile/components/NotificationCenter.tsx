@@ -18,16 +18,15 @@ import {
   AppNotification,
   DEFAULT_NOTIFICATION_PREFERENCES,
   getNotificationPreferences,
-  listAdminNotifications,
-  listCitizenNotifications,
-  listNotificationsForAgency,
-  listNotificationsForUser,
-  markAllNotificationsRead,
-  markNotificationRead,
   notificationPreferenceKeyForUser,
   NotificationPreferences,
   updateNotificationPreferences,
 } from "@/services/notificationService";
+import {
+  listNotifications,
+  markAllRead as markAllReadApi,
+  markRead,
+} from "@/services/notificationRepository";
 import { registerForPushNotifications } from "@/services/pushNotificationService";
 
 const PRIORITY_COLORS = {
@@ -57,13 +56,13 @@ export function NotificationCenter({ bottomPadding = 28 }: { bottomPadding?: num
       const prefs = await getNotificationPreferences(prefKey);
       setPreferences(prefs);
       if (!user) {
-        setNotifications(await listCitizenNotifications(reference));
+        setNotifications(await listNotifications({ audience: "citizen", reportReference: reference.trim() || undefined }));
       } else if (user.agency === "admin" || user.role === "admin" || user.role === "super_admin") {
-        setNotifications(await listAdminNotifications());
+        setNotifications(await listNotifications({ audience: "admin", agency: "admin" }));
       } else {
         const [agencyNotifications, userNotifications] = await Promise.all([
-          listNotificationsForAgency(user.agency),
-          listNotificationsForUser(user.id),
+          listNotifications({ agency: user.agency }),
+          listNotifications({ userId: user.id }),
         ]);
         const byId = new Map([...agencyNotifications, ...userNotifications].map((item) => [item.id, item]));
         setNotifications([...byId.values()].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
@@ -78,13 +77,13 @@ export function NotificationCenter({ bottomPadding = 28 }: { bottomPadding?: num
   const unread = useMemo(() => notifications.filter((notification) => !notification.readAt).length, [notifications]);
 
   async function markOneRead(notification: AppNotification) {
-    await markNotificationRead(notification.id);
+    await markRead(notification.id);
     if (notification.route) router.push(notification.route as any);
     await load();
   }
 
   async function markAllRead() {
-    await markAllNotificationsRead(
+    await markAllReadApi(
       user
         ? user.agency === "admin" || user.role === "admin" || user.role === "super_admin"
           ? { agency: "admin" }
