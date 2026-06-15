@@ -50,6 +50,53 @@ screens expect. Persistence is currently an **in-memory store** behind a
 `CitizenReportStore` interface (`artifacts/api-server/src/lib/citizenReportStore.ts`)
 so it can later be swapped for Drizzle without changing route handlers.
 
+## Agency Workflows (Phase 2)
+
+Agency dashboards, report lists, status updates, and admin reassignment are now
+backed by the same in-memory store. The agency list/dashboard screens and the
+admin incidents screen call `reportRepository.ts`, which is API-first with the
+existing AsyncStorage fallback:
+
+| Repository method      | Backend endpoint                          | Fallback (local mock)               |
+| ---------------------- | ----------------------------------------- | ----------------------------------- |
+| `listReports`          | `GET /api/reports`                        | `listCitizenIncidentReports`        |
+| `listReportsByAgency`  | `GET /api/agencies/{agency}/reports`      | `listCitizenIncidentReportsByAgency`|
+| `getReportById`        | `GET /api/reports/{id}`                   | `findCitizenIncidentByReference`    |
+| `updateReportStatus`   | `PATCH /api/reports/{id}/status`          | `updateCitizenIncidentStatusMock`   |
+| `reassignReport`       | `POST /api/reports/{id}/reassign`         | `reassignCitizenIncidentAgencyMock` |
+| `appendTimelineEntry`  | `POST /api/reports/{id}/timeline`         | `appendCitizenIncidentTimelineMock` |
+
+Plus a metrics endpoint for dashboards: `GET /api/agencies/{agency}/dashboard`
+returns `{ total, submitted, triaged, assigned, in_progress, resolved, closed,
+rejected, highPriority, withCoordinates, withoutCoordinates }`. (Mobile
+dashboards currently compute their own counts from `listReportsByAgency`, so the
+metrics endpoint is available but not yet consumed by a screen.)
+
+Notes:
+- Agency filtering uses the report's **current** agency (after any reassignment).
+- `reassignReport` updates the owning agency and the track/list/detail responses
+  report it as `suggestedAgency`, so Citizen Track and the new agency's list both
+  reflect the move.
+- Status accepts `submitted | triaged | assigned | in_progress | resolved | closed | rejected`.
+- Wired screens: FRSC home + cases, Police home + crime-reports, VIO home +
+  inspections, NSCDC home + incidents, Admin home + incidents (status + reassign).
+  Maps and notifications are unchanged (still local) to avoid regressions.
+- Persistence remains **in-memory** (`InMemoryCitizenReportStore`); restarting
+  the API server clears reports. Swapping to Drizzle later does not touch routes
+  or mobile.
+
+### Manual API-mode test flow
+
+1. Local mode (no env vars): confirm FRSC/Police/VIO/NSCDC/Admin lists, status
+   updates, and admin reassignment still work (AsyncStorage).
+2. `nvm use 22 && pnpm --filter @workspace/api-server run dev` to start the API.
+3. Set `EXPO_PUBLIC_USE_API=true` and `EXPO_PUBLIC_API_BASE_URL=http://<MAC-LAN-IP>:8081/api`, restart Expo.
+4. Submit a citizen report; note its reference and routed agency.
+5. Log in as that agency — the report appears in the dashboard/list.
+6. Advance its status; open Citizen Track Report — the status reflects the update.
+7. As Admin, reassign it to another agency; that agency's list now shows it.
+8. Stop the API server — the app falls back to local data without crashing.
+
 ### Start the API server
 
 ```sh

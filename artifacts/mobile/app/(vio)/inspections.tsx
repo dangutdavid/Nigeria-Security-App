@@ -19,9 +19,8 @@ import {
   CitizenIncidentReceipt,
   CitizenIncidentStatus,
   formatCitizenIncidentStatus,
-  listVioCitizenIncidentReports,
-  updateCitizenIncidentStatusMock,
 } from "@/services/citizenIncidentApi";
+import { listReportsByAgency, updateReportStatus } from "@/services/reportRepository";
 
 const PRIMARY = "#7B3F00";
 
@@ -78,7 +77,7 @@ export default function InspectionsScreen() {
   const [search, setSearch] = useState("");
 
   const loadCitizenReports = useCallback(async () => {
-    setCitizenReports(await listVioCitizenIncidentReports());
+    setCitizenReports(await listReportsByAgency("vio"));
   }, []);
 
   useFocusEffect(useCallback(() => { void loadCitizenReports(); }, [loadCitizenReports]));
@@ -118,7 +117,7 @@ export default function InspectionsScreen() {
   async function advanceCitizenReport(report: CitizenIncidentReceipt) {
     const next = CITIZEN_STATUS_FLOW[report.status];
     if (!next) return;
-    await updateCitizenIncidentStatusMock({
+    await updateReportStatus({
       reference: report.reference,
       status: next,
       actorName: user?.name ?? "VIO",

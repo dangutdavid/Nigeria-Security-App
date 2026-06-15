@@ -10,12 +10,14 @@ import { useColors } from "@/hooks/useColors";
 import {
   CitizenIncidentReceipt,
   CitizenIncidentStatus,
-  appendCitizenIncidentTimelineMock,
   formatCitizenAgencyLabel,
   formatCitizenIncidentStatus,
-  listNscdcCitizenIncidentReports,
-  updateCitizenIncidentStatusMock,
 } from "@/services/citizenIncidentApi";
+import {
+  appendTimelineEntry,
+  listReportsByAgency,
+  updateReportStatus,
+} from "@/services/reportRepository";
 
 const STATUS_FLOW: Record<CitizenIncidentStatus, CitizenIncidentStatus | null> = {
   submitted: "triaged",
@@ -44,7 +46,7 @@ export default function CivilDefenceIncidentsScreen() {
   const [note, setNote] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => setReports(await listNscdcCitizenIncidentReports()), []);
+  const load = useCallback(async () => setReports(await listReportsByAgency("civil_defence")), []);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const filtered = useMemo(() => {
@@ -66,7 +68,7 @@ export default function CivilDefenceIncidentsScreen() {
   async function advance(report: CitizenIncidentReceipt) {
     const next = STATUS_FLOW[report.status];
     if (!next) return;
-    const updated = await updateCitizenIncidentStatusMock({
+    const updated = await updateReportStatus({
       reference: report.reference,
       status: next,
       actorName: user?.name ?? "NSCDC",
@@ -79,7 +81,7 @@ export default function CivilDefenceIncidentsScreen() {
 
   async function submitNote() {
     if (!selected || !note.trim()) return;
-    const updated = await appendCitizenIncidentTimelineMock({
+    const updated = await appendTimelineEntry({
       reference: selected.reference,
       action: `NSCDC note: ${note.trim()}`,
       actorName: user?.name ?? "NSCDC",

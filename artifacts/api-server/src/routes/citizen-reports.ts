@@ -3,39 +3,11 @@ import { CitizenReportSubmissionSchema } from "@workspace/api-zod";
 import {
   citizenReportStore,
   citizenStatusMessage,
-  type CitizenReportRecord,
+  currentAgency,
+  toReportPayload,
 } from "../lib/citizenReportStore";
 
 const router: IRouter = Router();
-
-/**
- * Strip the record down to citizen-safe fields. The in-memory record only holds
- * citizen-submitted data plus the public timeline, but this keeps an explicit
- * boundary so officer/admin-only fields can never leak if the model grows.
- */
-function toCitizenSafeReport(report: CitizenReportRecord) {
-  return {
-    id: report.id,
-    reference: report.reference,
-    incidentType: report.incidentType,
-    description: report.description,
-    location: report.location,
-    latitude: report.latitude,
-    longitude: report.longitude,
-    address: report.address,
-    state: report.state,
-    lga: report.lga,
-    locationSource: report.locationSource,
-    accuracy: report.accuracy,
-    photoUri: report.photoUri,
-    vehicleRegistration: report.vehicleRegistration,
-    emergencyLevel: report.emergencyLevel,
-    suggestedAgency: report.suggestedAgency,
-    status: report.status,
-    submittedAt: report.submittedAt,
-    timeline: report.timeline,
-  };
-}
 
 // PART 1 — Submit a citizen report.
 router.post("/citizen-reports", (req, res) => {
@@ -47,7 +19,7 @@ router.post("/citizen-reports", (req, res) => {
 
   const report = citizenReportStore.create(result.data);
   res.status(201).json({
-    report: toCitizenSafeReport(report),
+    report: toReportPayload(report),
     reference: report.reference,
     routedAgency: report.suggestedAgency,
   });
@@ -62,8 +34,9 @@ router.get("/citizen-reports/track/:reference", (req, res) => {
   }
   res.json({
     reference: report.reference,
-    report: toCitizenSafeReport(report),
+    report: toReportPayload(report),
     citizenMessage: citizenStatusMessage(report.status),
+    currentAgency: currentAgency(report),
   });
 });
 

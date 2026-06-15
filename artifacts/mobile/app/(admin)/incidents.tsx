@@ -11,13 +11,15 @@ import {
   CitizenAgencyRoute,
   CitizenIncidentReceipt,
   CitizenIncidentStatus,
-  appendCitizenIncidentTimelineMock,
   formatCitizenAgencyLabel,
   formatCitizenIncidentStatus,
-  listCitizenIncidentReports,
-  reassignCitizenIncidentAgencyMock,
-  updateCitizenIncidentStatusMock,
 } from "@/services/citizenIncidentApi";
+import {
+  appendTimelineEntry,
+  listReports,
+  reassignReport,
+  updateReportStatus,
+} from "@/services/reportRepository";
 
 const AGENCIES: Array<CitizenAgencyRoute | "all"> = ["all", "frsc", "police", "vio", "civil_defence"];
 const STATUSES: Array<CitizenIncidentStatus | "all"> = ["all", "submitted", "triaged", "assigned", "in_progress", "resolved", "closed"];
@@ -35,7 +37,7 @@ export default function AdminIncidentsScreen() {
   const [emergency, setEmergency] = useState<(typeof EMERGENCIES)[number]>("all");
   const [selected, setSelected] = useState<CitizenIncidentReceipt | null>(null);
   const [note, setNote] = useState("");
-  const load = useCallback(async () => setReports(await listCitizenIncidentReports()), []);
+  const load = useCallback(async () => setReports(await listReports()), []);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const filtered = useMemo(() => {
@@ -50,14 +52,14 @@ export default function AdminIncidentsScreen() {
   }, [reports, query, agency, status, emergency]);
 
   async function updateStatus(report: CitizenIncidentReceipt, next: CitizenIncidentStatus) {
-    const updated = await updateCitizenIncidentStatusMock({ reference: report.reference, status: next, actorName: user?.name ?? "Admin", actorAgencyLabel: "Admin" });
+    const updated = await updateReportStatus({ reference: report.reference, status: next, actorName: user?.name ?? "Admin", actorAgencyLabel: "Admin" });
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await load();
     if (updated) setSelected(updated);
   }
 
   async function reassign(report: CitizenIncidentReceipt, nextAgency: CitizenAgencyRoute) {
-    const updated = await reassignCitizenIncidentAgencyMock({ reference: report.reference, agency: nextAgency, actorName: user?.name ?? "Admin" });
+    const updated = await reassignReport({ reference: report.reference, agency: nextAgency, actorName: user?.name ?? "Admin" });
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await load();
     if (updated) setSelected(updated);
@@ -65,7 +67,7 @@ export default function AdminIncidentsScreen() {
 
   async function addNote() {
     if (!selected || !note.trim()) return;
-    const updated = await appendCitizenIncidentTimelineMock({ reference: selected.reference, action: `Admin note: ${note.trim()}`, actorName: user?.name ?? "Admin" });
+    const updated = await appendTimelineEntry({ reference: selected.reference, action: `Admin note: ${note.trim()}`, actorName: user?.name ?? "Admin" });
     setNote("");
     await load();
     if (updated) setSelected(updated);

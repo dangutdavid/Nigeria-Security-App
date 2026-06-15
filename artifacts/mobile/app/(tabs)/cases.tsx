@@ -31,9 +31,8 @@ import {
   CitizenIncidentReceipt,
   CitizenIncidentStatus,
   formatCitizenIncidentStatus,
-  listFrscCitizenIncidentReports,
-  updateCitizenIncidentStatusMock,
 } from "@/services/citizenIncidentApi";
+import { listReportsByAgency, updateReportStatus } from "@/services/reportRepository";
 
 // ---------------------------------------------------------------------------
 // Filter config
@@ -325,7 +324,7 @@ export default function CasesScreen() {
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "severity">("newest");
 
   const loadCitizenReports = useCallback(async () => {
-    setCitizenReports(await listFrscCitizenIncidentReports());
+    setCitizenReports(await listReportsByAgency("frsc"));
   }, []);
 
   useFocusEffect(
@@ -449,7 +448,7 @@ export default function CasesScreen() {
   async function advanceCitizenReport(report: CitizenIncidentReceipt) {
     const nextStatus = CITIZEN_STATUS_FLOW[report.status];
     if (!nextStatus) return;
-    await updateCitizenIncidentStatusMock({
+    await updateReportStatus({
       reference: report.reference,
       status: nextStatus,
       actorName: user?.name ?? "FRSC",

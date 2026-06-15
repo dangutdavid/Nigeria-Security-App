@@ -26,9 +26,8 @@ import {
   CitizenIncidentReceipt,
   CitizenIncidentStatus,
   formatCitizenIncidentStatus,
-  listPoliceCitizenIncidentReports,
-  updateCitizenIncidentStatusMock,
 } from "@/services/citizenIncidentApi";
+import { listReportsByAgency, updateReportStatus } from "@/services/reportRepository";
 
 const PRIMARY = "#1A3A6C";
 
@@ -215,7 +214,7 @@ export default function CrimeReportsScreen() {
   const [showModal, setShowModal] = useState(false);
 
   const loadCitizenReports = useCallback(async () => {
-    setCitizenReports(await listPoliceCitizenIncidentReports());
+    setCitizenReports(await listReportsByAgency("police"));
   }, []);
 
   useFocusEffect(useCallback(() => { void loadCitizenReports(); }, [loadCitizenReports]));
@@ -248,7 +247,7 @@ export default function CrimeReportsScreen() {
   async function advanceCitizenReport(report: CitizenIncidentReceipt) {
     const next = CITIZEN_STATUS_FLOW[report.status];
     if (!next) return;
-    await updateCitizenIncidentStatusMock({
+    await updateReportStatus({
       reference: report.reference,
       status: next,
       actorName: user?.name ?? "Police",

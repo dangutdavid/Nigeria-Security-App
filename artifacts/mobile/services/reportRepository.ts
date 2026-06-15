@@ -82,6 +82,7 @@ export async function listReports(): Promise<CitizenIncidentReceipt[]> {
   });
 
   if (api.ok) return api.data.reports ?? api.data.cases ?? [];
+  logFallback("listReports", api.error);
   return listCitizenIncidentReports();
 }
 
@@ -95,7 +96,22 @@ export async function listReportsByAgency(
   });
 
   if (api.ok) return api.data.reports ?? api.data.cases ?? [];
+  logFallback("listReportsByAgency", api.error);
   return listCitizenIncidentReportsByAgency(agency);
+}
+
+export async function getReportById(
+  idOrReference: string,
+): Promise<CitizenIncidentReceipt | null> {
+  const api = await mobileApiFetch<{ report?: CitizenIncidentReceipt; case?: CitizenIncidentReceipt }>({
+    method: "GET",
+    path: `/reports/${encodeURIComponent(idOrReference)}`,
+    requireAuth: true,
+  });
+
+  if (api.ok) return api.data.report ?? api.data.case ?? null;
+  logFallback("getReportById", api.error);
+  return findCitizenIncidentByReference(idOrReference);
 }
 
 export async function updateReportStatus(
@@ -109,6 +125,7 @@ export async function updateReportStatus(
   });
 
   if (api.ok) return api.data.report ?? api.data.case ?? null;
+  logFallback("updateReportStatus", api.error);
   return updateCitizenIncidentStatusMock(input);
 }
 
@@ -123,6 +140,7 @@ export async function reassignReport(
   });
 
   if (api.ok) return api.data.report ?? api.data.case ?? null;
+  logFallback("reassignReport", api.error);
   return reassignCitizenIncidentAgencyMock(input);
 }
 
@@ -137,5 +155,6 @@ export async function appendTimelineEntry(
   });
 
   if (api.ok) return api.data.report ?? api.data.case ?? null;
+  logFallback("appendTimelineEntry", api.error);
   return appendCitizenIncidentTimelineMock(input);
 }

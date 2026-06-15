@@ -10,10 +10,8 @@ import { useAuth } from "@/context/AuthContext";
 import { IncidentCard } from "@/components/IncidentCard";
 import { NotificationAccessCard } from "@/components/NotificationAccessCard";
 import { formatMinutesAgo, useTheftReports } from "@/context/TheftReportContext";
-import {
-  CitizenIncidentReceipt,
-  listFrscCitizenIncidentReports,
-} from "@/services/citizenIncidentApi";
+import { CitizenIncidentReceipt } from "@/services/citizenIncidentApi";
+import { listReportsByAgency } from "@/services/reportRepository";
 
 function formatElapsed(startTime: string): string {
   const diff = Math.max(0, Date.now() - new Date(startTime).getTime());
@@ -45,7 +43,7 @@ export default function HomeScreen() {
   const [elapsed, setElapsed] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const loadCitizenReports = useCallback(async () => {
-    setCitizenReports(await listFrscCitizenIncidentReports());
+    setCitizenReports(await listReportsByAgency("frsc"));
   }, []);
   const onRefresh = useCallback(() => {
     setRefreshing(true);

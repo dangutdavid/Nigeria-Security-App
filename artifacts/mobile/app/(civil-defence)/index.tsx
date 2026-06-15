@@ -9,7 +9,8 @@ import { NotificationAccessCard } from "@/components/NotificationAccessCard";
 import { useAuth } from "@/context/AuthContext";
 import { useReferrals } from "@/context/ReferralContext";
 import { useColors } from "@/hooks/useColors";
-import { CitizenIncidentReceipt, listNscdcCitizenIncidentReports } from "@/services/citizenIncidentApi";
+import { CitizenIncidentReceipt } from "@/services/citizenIncidentApi";
+import { listReportsByAgency } from "@/services/reportRepository";
 
 export default function CivilDefenceHome() {
   const colors = useColors();
@@ -20,7 +21,7 @@ export default function CivilDefenceHome() {
   const [reports, setReports] = useState<CitizenIncidentReceipt[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => setReports(await listNscdcCitizenIncidentReports()), []);
+  const load = useCallback(async () => setReports(await listReportsByAgency("civil_defence")), []);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
 
   const referrals = user ? inboxFor("civil_defence") : [];

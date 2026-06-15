@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import type {
   CitizenAgencyRoute,
-  CitizenIncidentStatus,
   CitizenReportSubmission,
   CitizenReportTimelineEntry,
+  ReportStatus,
 } from "@workspace/api-zod";
 
 /**
@@ -26,10 +26,27 @@ export interface CitizenReportRecord {
   photoUri?: string;
   vehicleRegistration?: string;
   emergencyLevel: CitizenReportSubmission["emergencyLevel"];
+  /** Agency the report was originally routed to at submission time. */
   suggestedAgency: CitizenAgencyRoute;
-  status: CitizenIncidentStatus;
+  /** Current owning agency after any admin reassignment (may be a custom agency). */
+  assignedAgency?: string;
+  status: ReportStatus;
   submittedAt: string;
   timeline: CitizenReportTimelineEntry[];
+}
+
+export interface AgencyDashboardMetrics {
+  total: number;
+  submitted: number;
+  triaged: number;
+  assigned: number;
+  in_progress: number;
+  resolved: number;
+  closed: number;
+  rejected: number;
+  highPriority: number;
+  withCoordinates: number;
+  withoutCoordinates: number;
 }
 
 /**
@@ -42,26 +59,120 @@ export interface CitizenReportStore {
   findByReference(reference: string): CitizenReportRecord | undefined;
   findByIdOrReference(idOrReference: string): CitizenReportRecord | undefined;
   list(): CitizenReportRecord[];
+  listByAgency(agency: string): CitizenReportRecord[];
+  updateStatus(
+    idOrReference: string,
+    status: ReportStatus,
+    note: string | undefined,
+    actorName: string | undefined,
+  ): CitizenReportRecord | undefined;
+  reassign(
+    idOrReference: string,
+    targetAgency: string,
+    actorName: string | undefined,
+  ): CitizenReportRecord | undefined;
+  appendTimeline(
+    idOrReference: string,
+    action: string,
+    actorName: string | undefined,
+  ): CitizenReportRecord | undefined;
 }
 
-const AGENCY_LABELS: Record<CitizenAgencyRoute, string> = {
+const AGENCY_LABELS: Record<string, string> = {
   frsc: "FRSC",
   police: "Police",
   vio: "VIO",
   civil_defence: "NSCDC",
+  dss: "DSS",
+  fire_service: "Fire Service",
+  custom: "Agency",
 };
 
-const STATUS_MESSAGES: Record<CitizenIncidentStatus, string> = {
+function agencyLabel(agency: string): string {
+  return AGENCY_LABELS[agency] ?? agency.toUpperCase();
+}
+
+const STATUS_LABELS: Record<ReportStatus, string> = {
+  submitted: "Submitted",
+  triaged: "Triaged",
+  assigned: "Assigned",
+  in_progress: "In Progress",
+  resolved: "Resolved",
+  closed: "Closed",
+  rejected: "Rejected",
+};
+
+const STATUS_MESSAGES: Record<ReportStatus, string> = {
   submitted: "Your report has been received and is awaiting triage.",
   triaged: "Your report has been reviewed and prioritised.",
   assigned: "An officer has been assigned to your report.",
   in_progress: "Your report is being actioned by the responding agency.",
   resolved: "Your report has been resolved. Thank you for reporting.",
   closed: "Your report has been closed.",
+  rejected: "Your report was reviewed and could not be actioned.",
 };
 
-export function citizenStatusMessage(status: CitizenIncidentStatus): string {
+export function citizenStatusMessage(status: ReportStatus): string {
   return STATUS_MESSAGES[status] ?? "Your report is being processed.";
+}
+
+/** The agency that currently owns the report (post-reassignment if any). */
+export function currentAgency(report: CitizenReportRecord): string {
+  return report.assignedAgency ?? report.suggestedAgency;
+}
+
+/**
+ * Project a record into the response shape the mobile app maps directly onto
+ * its `CitizenIncidentReceipt` model. `suggestedAgency` reflects the *current*
+ * owning agency so reassignment is visible everywhere (lists, track, detail).
+ */
+export function toReportPayload(report: CitizenReportRecord) {
+  return {
+    id: report.id,
+    reference: report.reference,
+    incidentType: report.incidentType,
+    description: report.description,
+    location: report.location,
+    latitude: report.latitude,
+    longitude: report.longitude,
+    address: report.address,
+    state: report.state,
+    lga: report.lga,
+    locationSource: report.locationSource,
+    accuracy: report.accuracy,
+    photoUri: report.photoUri,
+    vehicleRegistration: report.vehicleRegistration,
+    emergencyLevel: report.emergencyLevel,
+    suggestedAgency: currentAgency(report),
+    status: report.status,
+    submittedAt: report.submittedAt,
+    timeline: report.timeline,
+  };
+}
+
+export function agencyDashboardMetrics(reports: CitizenReportRecord[]): AgencyDashboardMetrics {
+  const metrics: AgencyDashboardMetrics = {
+    total: reports.length,
+    submitted: 0,
+    triaged: 0,
+    assigned: 0,
+    in_progress: 0,
+    resolved: 0,
+    closed: 0,
+    rejected: 0,
+    highPriority: 0,
+    withCoordinates: 0,
+    withoutCoordinates: 0,
+  };
+  for (const report of reports) {
+    metrics[report.status] += 1;
+    if (report.emergencyLevel === "high" || report.emergencyLevel === "critical") {
+      metrics.highPriority += 1;
+    }
+    if (hasCoordinates(report)) metrics.withCoordinates += 1;
+    else metrics.withoutCoordinates += 1;
+  }
+  return metrics;
 }
 
 function nowIso(): string {
@@ -131,6 +242,65 @@ class InMemoryCitizenReportStore implements CitizenReportStore {
 
   list(): CitizenReportRecord[] {
     return [...this.reports];
+  }
+
+  listByAgency(agency: string): CitizenReportRecord[] {
+    const target = agency.trim().toLowerCase();
+    return this.reports.filter((report) => currentAgency(report).toLowerCase() === target);
+  }
+
+  updateStatus(
+    idOrReference: string,
+    status: ReportStatus,
+    note: string | undefined,
+    actorName: string | undefined,
+  ): CitizenReportRecord | undefined {
+    const report = this.findByIdOrReference(idOrReference);
+    if (!report) return undefined;
+    report.status = status;
+    const by = actorName ?? agencyLabel(currentAgency(report));
+    report.timeline.push({
+      id: randomUUID(),
+      action: `${by} marked report ${STATUS_LABELS[status]}${note ? `: ${note}` : ""}`,
+      by,
+      timestamp: nowIso(),
+    });
+    return report;
+  }
+
+  reassign(
+    idOrReference: string,
+    targetAgency: string,
+    actorName: string | undefined,
+  ): CitizenReportRecord | undefined {
+    const report = this.findByIdOrReference(idOrReference);
+    if (!report) return undefined;
+    const from = agencyLabel(currentAgency(report));
+    report.assignedAgency = targetAgency;
+    const by = actorName ?? "Admin";
+    report.timeline.push({
+      id: randomUUID(),
+      action: `${by} reassigned report from ${from} to ${agencyLabel(targetAgency)}`,
+      by,
+      timestamp: nowIso(),
+    });
+    return report;
+  }
+
+  appendTimeline(
+    idOrReference: string,
+    action: string,
+    actorName: string | undefined,
+  ): CitizenReportRecord | undefined {
+    const report = this.findByIdOrReference(idOrReference);
+    if (!report) return undefined;
+    report.timeline.push({
+      id: randomUUID(),
+      action,
+      by: actorName ?? "Agency",
+      timestamp: nowIso(),
+    });
+    return report;
   }
 }
 

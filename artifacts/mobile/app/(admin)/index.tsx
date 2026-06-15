@@ -8,7 +8,8 @@ import { MetricCard } from "@/components/MetricCard";
 import { NotificationAccessCard } from "@/components/NotificationAccessCard";
 import { useReferrals } from "@/context/ReferralContext";
 import { useColors } from "@/hooks/useColors";
-import { CitizenIncidentReceipt, listCitizenIncidentReports } from "@/services/citizenIncidentApi";
+import { CitizenIncidentReceipt } from "@/services/citizenIncidentApi";
+import { listReports } from "@/services/reportRepository";
 
 export default function AdminDashboard() {
   const colors = useColors();
@@ -17,7 +18,7 @@ export default function AdminDashboard() {
   const { referrals } = useReferrals();
   const [reports, setReports] = useState<CitizenIncidentReceipt[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const load = useCallback(async () => setReports(await listCitizenIncidentReports()), []);
+  const load = useCallback(async () => setReports(await listReports()), []);
   useFocusEffect(useCallback(() => { void load(); }, [load]));
   const metrics = useMemo(() => {
     const byAgency = (agency: string) => reports.filter((r) => r.suggestedAgency === agency).length;

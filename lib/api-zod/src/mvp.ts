@@ -203,6 +203,46 @@ export type CitizenIncidentStatus = z.infer<typeof CitizenIncidentStatusSchema>;
 export type CitizenReportSubmission = z.infer<typeof CitizenReportSubmissionSchema>;
 export type CitizenReportTimelineEntry = z.infer<typeof CitizenReportTimelineEntrySchema>;
 
+// ---- Agency workflow requests (status update, reassignment, timeline) ----
+// Report status includes "rejected" in addition to the citizen-facing statuses.
+export const ReportStatusSchema = z.enum([
+  "submitted",
+  "triaged",
+  "assigned",
+  "in_progress",
+  "resolved",
+  "closed",
+  "rejected",
+]);
+export type ReportStatus = z.infer<typeof ReportStatusSchema>;
+
+export const ReportStatusUpdateSchema = z.object({
+  status: ReportStatusSchema,
+  note: z.string().max(2000).optional(),
+  actorName: z.string().optional(),
+  // Tolerated extra field sent by the mobile client; ignored server-side.
+  actorAgencyLabel: z.string().optional(),
+});
+
+// Reassignment accepts any agency id (the four core routes plus dss, fire_service,
+// or dynamically added custom agencies). Mobile sends `agency`; the OpenAPI
+// contract uses `targetAgency` — both are accepted.
+export const ReportReassignSchema = z.object({
+  agency: z.string().min(1).optional(),
+  targetAgency: z.string().min(1).optional(),
+  reason: z.string().max(2000).optional(),
+  actorName: z.string().optional(),
+});
+
+export const ReportTimelineAppendSchema = z.object({
+  action: z.string().min(1).max(2000),
+  actorName: z.string().optional(),
+});
+
+export type ReportStatusUpdate = z.infer<typeof ReportStatusUpdateSchema>;
+export type ReportReassign = z.infer<typeof ReportReassignSchema>;
+export type ReportTimelineAppend = z.infer<typeof ReportTimelineAppendSchema>;
+
 // ---- Citizen chat assistant ----
 export const AssistantChatRoleSchema = z.enum(["user", "assistant"]);
 export const AssistantChatMessageSchema = z.object({

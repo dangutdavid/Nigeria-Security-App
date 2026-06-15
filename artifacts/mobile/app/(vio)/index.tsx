@@ -17,8 +17,8 @@ import { NotificationAccessCard } from "@/components/NotificationAccessCard";
 import {
   CitizenIncidentReceipt,
   formatCitizenIncidentStatus,
-  listVioCitizenIncidentReports,
 } from "@/services/citizenIncidentApi";
+import { listReportsByAgency } from "@/services/reportRepository";
 
 const PRIMARY = "#7B3F00";
 
@@ -58,7 +58,7 @@ export default function VIOHome() {
   const [citizenReports, setCitizenReports] = useState<CitizenIncidentReceipt[]>([]);
 
   const loadCitizenReports = useCallback(async () => {
-    setCitizenReports(await listVioCitizenIncidentReports());
+    setCitizenReports(await listReportsByAgency("vio"));
   }, []);
 
   useFocusEffect(useCallback(() => { void loadCitizenReports(); }, [loadCitizenReports]));

@@ -19,8 +19,8 @@ import { NotificationAccessCard } from "@/components/NotificationAccessCard";
 import {
   CitizenIncidentReceipt,
   formatCitizenIncidentStatus,
-  listPoliceCitizenIncidentReports,
 } from "@/services/citizenIncidentApi";
+import { listReportsByAgency } from "@/services/reportRepository";
 
 const PRIMARY = "#1A3A6C";
 
@@ -70,7 +70,7 @@ export default function PoliceHome() {
   const [citizenReports, setCitizenReports] = useState<CitizenIncidentReceipt[]>([]);
 
   const loadCitizenReports = useCallback(async () => {
-    setCitizenReports(await listPoliceCitizenIncidentReports());
+    setCitizenReports(await listReportsByAgency("police"));
   }, []);
 
   useFocusEffect(useCallback(() => { void loadCitizenReports(); }, [loadCitizenReports]));
