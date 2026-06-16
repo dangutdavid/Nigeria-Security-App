@@ -345,6 +345,103 @@ OTP / PIN-reset endpoints are not implemented server-side yet (the mobile
 - `AUTH_SECRET` must be set on the server in production; the demo PIN auth is for
   development only and should be replaced by DB-backed users + hashed PINs.
 
+## Secure Sessions & Protected Notifications (Phase 6)
+
+This phase moves the bearer token into the device keychain/keystore, makes login
+establish (and startup validate) the backend session safely, and locks down the
+notification endpoints with the same server-enforced RBAC as reports.
+
+### Secure token storage (`services/authToken.ts`)
+
+Token persistence now lives in a dedicated module preferred over AsyncStorage:
+
+- Uses **`expo-secure-store`** (iOS Keychain / Android Keystore) via
+  `SecureStore.isAvailableAsync()`, cached per session.
+- **AsyncStorage is only a fallback** when SecureStore is unavailable (e.g. some
+  web/SSR contexts) or throws; `clearAuthToken` always wipes the AsyncStorage
+  copy too, so no stale token lingers.
+- Key is `security_api_auth_token_v1` (SecureStore keys must be `[A-Za-z0-9._-]`,
+  so no `@` prefix). An in-memory cache avoids repeat reads.
+- Helpers: `saveAuthToken`, `getAuthToken`, `clearAuthToken`, `hasAuthToken`.
+- `apiClient.ts` re-exports these and keeps auto-attaching `Authorization: Bearer
+  <token>` on `requireAuth` calls; `setMobileApiToken(null)` clears on logout.
+- **No API keys are ever stored on device** — only the short-lived session token.
+
+### Awaited login session (login-race fix)
+
+`AuthContext.login()` still resolves the user **locally first** (offline demo is
+never blocked). In API mode it then **awaits** `establishApiSession(badge, pin,
+agency, { timeoutMs: 4000 })` *before returning*, so the token is persisted
+before navigation triggers the first protected call — fixing the prior race
+where the initial agency/dashboard fetch fired before the token existed. A
+slow/unreachable backend is bounded by the 4s timeout and simply leaves the app
+in local mode. The context exposes `apiSessionEstablished: boolean` for
+debugging (true only when a backend token was obtained/validated).
+
+### Startup token restore & validation
+
+On launch, after restoring the stored user, `validateApiSession()`:
+
+- returns early if API mode is off or no token is stored;
+- otherwise calls `GET /api/auth/me` (bearer, 4s timeout);
+- **clears the token only on an explicit `401`/`403`** (expired/invalid);
+- on a network error / unreachable backend it **keeps** the token and leaves the
+  user logged into local mode — startup never logs the demo user out or crashes.
+
+### Protected notification endpoints (server-enforced RBAC)
+
+`artifacts/api-server/src/routes/notifications.ts` now authorizes every
+non-citizen path (same token-claim model as reports — client agency/role headers
+are never trusted):
+
+| Endpoint                              | Access rule                                                        |
+| ------------------------------------- | ------------------------------------------------------------------ |
+| `GET /api/notifications`              | **Public only** when `reportReference` is set (forced to citizen audience). Otherwise requires auth. |
+| `POST /api/notifications/unread-count`| Same scoping as list (citizen-by-reference public, else auth).     |
+| `PATCH /api/notifications/read-all`   | Same scoping as list.                                              |
+| `PATCH /api/notifications/:id/read`   | Requires an authenticated user.                                    |
+| `POST /api/notifications`             | Requires auth (server creates report notifications via hooks).     |
+| `POST /api/push-tokens`               | Requires auth; `userId`/`agency` are taken from the **token claims**, not the body. |
+
+For authenticated, non-admin users the filter is scoped: requesting
+`audience=admin` (or `agency=admin`) → `403`, and a cross-agency `agency` filter
+→ `403`. **Admin / super_admin** may query any agency/audience. The citizen
+report submit/track flow stays fully public, and citizen notification lookup by
+report reference needs no token.
+
+### Mobile repository behaviour (unchanged contract)
+
+`notificationRepository.ts` already sends the bearer token on the protected
+calls (`requireAuth` is set for everything except citizen / by-reference reads)
+and **falls back to the local `notificationService` on any non-2xx (incl.
+401/403)**, so the Notification Centre keeps working in local mode and when a
+token is missing/expired. Notification **preferences** remain local-only.
+
+### iPhone / Expo Go notes
+
+- SecureStore works in Expo Go on a physical iPhone; no extra native build is
+  required for the demo. The `expo-secure-store` config plugin is registered.
+- API-mode env vars and the `localhost`-vs-LAN-IP rule from Phase 2/3 still
+  apply (`EXPO_PUBLIC_USE_API`, `EXPO_PUBLIC_API_BASE_URL=http://<MAC-LAN-IP>:8081/api`).
+- Do not use Expo web mode for this workflow.
+
+### Manual API-mode test steps
+
+1. Local mode (no env vars): log in, open Notification Centre, mark read —
+   everything works offline (token never created).
+2. `nvm use 22 && pnpm --filter @workspace/api-server run dev`.
+3. Set `EXPO_PUBLIC_USE_API=true` + `EXPO_PUBLIC_API_BASE_URL=http://<MAC-LAN-IP>:8081/api`, restart Expo.
+4. Log in as an agency user — `apiSessionEstablished` is true; the first
+   dashboard/list call carries the token (no 401 race).
+5. Open the Notification Centre — agency notifications load over the bearer token.
+6. Kill and relaunch the app — the session is restored from SecureStore and
+   validated via `/auth/me`; you stay logged in.
+7. Hit `GET /api/notifications?audience=admin` as a non-admin token → `403`;
+   without a token → `401`; with `?reportReference=...` and no token → returns
+   the citizen notifications for that reference.
+8. Stop the API server — the app falls back to local notifications without
+   crashing and the stored token is kept (no spurious logout).
+
 ## Backend Notes
 
 The repository already has:

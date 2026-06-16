@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 import { createAuditEvent } from "@/services/auditLogService";
-import { clearApiSession, establishApiSession } from "@/services/authRepository";
+import { clearApiSession, establishApiSession, validateApiSession } from "@/services/authRepository";
 
 export type UserRole = "citizen" | "officer" | "supervisor" | "commander" | "admin" | "super_admin";
 export type UserStatus = "active" | "inactive" | "suspended";
@@ -54,6 +54,8 @@ type StoredUserRecord = Omit<UserRecord, "user"> & { user: StoredUser };
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  /** Debug/diagnostic: whether a backend bearer session is active (API mode). */
+  apiSessionEstablished: boolean;
   login: (badgeNumber: string, pin: string, agency?: AgencyType) => Promise<LoginResult>;
   logout: () => Promise<void>;
   allUsers: User[];
@@ -71,6 +73,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isLoading: true,
+  apiSessionEstablished: false,
   login: async () => "invalid",
   logout: async () => {},
   allUsers: [],
@@ -289,6 +292,7 @@ export function routeForUser(user: User | null | undefined): string {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [apiSessionEstablished, setApiSessionEstablished] = useState(false);
   const [records, setRecords] = useState<UserRecord[]>(SEED_RECORDS);
 
   useEffect(() => {
@@ -304,6 +308,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (storedUser) {
         const parsed: StoredUser = JSON.parse(storedUser);
         setUser(normalizeUser(parsed));
+        // Best-effort: validate any persisted backend token (API mode only).
+        // A network failure leaves the token in place; only an explicit
+        // 401/403 clears it. Never logs the user out of local/mock mode.
+        try {
+          setApiSessionEstablished(await validateApiSession());
+        } catch {
+          setApiSessionEstablished(false);
+        }
       }
       if (storedUsers) {
         const parsed: StoredUserRecord[] = JSON.parse(storedUsers);
@@ -354,10 +366,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(entry.user));
     setUser(entry.user);
-    // Best-effort: in API mode, obtain a backend session token so protected
-    // report/agency calls authenticate. Fire-and-forget so local login is never
-    // blocked or failed by backend availability.
-    void establishApiSession(badgeNumber, pin, entry.user.agency);
+    // In API mode, establish the backend session BEFORE returning so the first
+    // protected call after navigation already has the token (fixes the race).
+    // establishApiSession has a short internal timeout and returns false if the
+    // backend is unreachable, so local login is never blocked or failed.
+    setApiSessionEstablished(await establishApiSession(badgeNumber, pin, entry.user.agency));
     await createAuditEvent({
       type: "auth.login",
       title: "User signed in",
@@ -373,6 +386,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const previousUser = user;
     await AsyncStorage.multiRemove([AUTH_STORAGE_KEY, OTP_STORAGE_KEY, OTP_VERIFIED_KEY]);
     void clearApiSession();
+    setApiSessionEstablished(false);
     setUser(null);
     if (previousUser) {
       await createAuditEvent({
@@ -580,7 +594,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      user, isLoading, login, logout,
+      user, isLoading, apiSessionEstablished, login, logout,
       allUsers, addUser, updateUser, deleteUser, resetPin, getUserById,
       ensureAgencyDemoUsers, requestOtp, verifyOtp, resetPinWithOtp,
     }}>

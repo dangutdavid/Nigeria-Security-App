@@ -58,6 +58,7 @@
   "dependencies": {
     "expo-clipboard": "~8.0.8",
     "expo-network": "^8.0.8",
+    "expo-secure-store": "~15.0.8",
     "react-native-maps": "1.18.0"
   }
 }

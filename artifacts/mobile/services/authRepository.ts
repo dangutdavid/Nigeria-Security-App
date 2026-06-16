@@ -5,7 +5,7 @@ import type {
   OtpVerifyResult,
   User,
 } from "@/context/AuthContext";
-import { mobileApiFetch, setMobileApiToken } from "@/services/apiClient";
+import { hasAuthToken, mobileApiFetch, setMobileApiToken } from "@/services/apiClient";
 import { shouldUseApi } from "@/services/apiConfig";
 
 export interface AuthRepositoryLocalAdapter {
@@ -32,12 +32,15 @@ export async function establishApiSession(
   badgeNumber: string,
   pin: string,
   agency?: AgencyType,
+  options: { timeoutMs?: number } = {},
 ): Promise<boolean> {
   if (!shouldUseApi()) return false;
   const api = await mobileApiFetch<LoginResponse, { badgeNumber: string; pin: string; agency?: AgencyType }>({
     method: "POST",
     path: "/auth/login",
     body: { badgeNumber, pin, agency },
+    // Short timeout so a slow/unreachable backend never blocks local login.
+    timeoutMs: options.timeoutMs ?? 4000,
   });
   if (api.ok && api.data.token) {
     await setMobileApiToken(api.data.token);
@@ -46,10 +49,32 @@ export async function establishApiSession(
   return false;
 }
 
+/**
+ * On startup, if API mode is on and a token is stored, validate it against
+ * /api/auth/me. Clears the token only when the server says it is invalid
+ * (401/403); a network error / unreachable backend leaves the token in place so
+ * the user is not logged out of local mode unnecessarily.
+ */
+export async function validateApiSession(): Promise<boolean> {
+  if (!shouldUseApi()) return false;
+  if (!(await hasAuthToken())) return false;
+  const api = await mobileApiFetch<{ user?: User }>({
+    method: "GET",
+    path: "/auth/me",
+    requireAuth: true,
+    timeoutMs: 4000,
+  });
+  if (api.ok) return true;
+  if (api.status === 401 || api.status === 403) {
+    await setMobileApiToken(null);
+  }
+  return false;
+}
+
 /** Clear the persisted backend session (best-effort logout + token wipe). */
 export async function clearApiSession(): Promise<void> {
   if (shouldUseApi()) {
-    await mobileApiFetch<{ ok: boolean }>({ method: "POST", path: "/auth/logout", requireAuth: true });
+    await mobileApiFetch<{ ok: boolean }>({ method: "POST", path: "/auth/logout", requireAuth: true, timeoutMs: 4000 });
   }
   await setMobileApiToken(null);
 }
