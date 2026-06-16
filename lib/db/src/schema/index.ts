@@ -137,6 +137,39 @@ export const users = pgTable(
   }),
 );
 
+/**
+ * Backend auth users — a flat, self-contained mirror of the mobile/backend auth
+ * model (agency stored as a plain id so DSS / Fire Service / custom agencies
+ * work without a tenant row, exactly like `citizen_reports`). Kept separate from
+ * the tenant-scoped `users` table (UUID FKs, NOT NULL email/tenant), which is
+ * referenced by cases/evidence/referrals and is left unchanged. PINs are never
+ * stored in plaintext — only a salted scrypt hash in `pin_hash`.
+ */
+export const authUsers = pgTable(
+  "auth_users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    badgeNumber: text("badge_number").notNull(),
+    displayName: text("display_name").notNull(),
+    /** Plain agency id (frsc | police | vio | civil_defence | admin | dss | fire_service | custom…). */
+    agency: text("agency").notNull(),
+    role: userRole("role").notNull(),
+    pinHash: text("pin_hash").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  },
+  (table) => ({
+    badgeNumberIdx: uniqueIndex("auth_users_badge_number_idx").on(table.badgeNumber),
+    agencyIdx: index("auth_users_agency_idx").on(table.agency),
+  }),
+);
+
 export const citizenProfiles = pgTable("citizen_profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
   fullName: text("full_name").notNull(),

@@ -5,18 +5,24 @@ import { getAuth } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
 
-// POST /api/auth/login — demo badge + PIN login. Returns a bearer token + user.
-router.post("/auth/login", (req, res) => {
+// POST /api/auth/login — badge + PIN login (DB-backed or demo). Returns a bearer
+// token + user. PIN hashes are never returned.
+router.post("/auth/login", async (req, res) => {
   const result = AuthLoginSchema.safeParse(req.body);
   if (!result.success) {
     res.status(400).json({ error: "Validation failed", issues: result.error.flatten() });
     return;
   }
-  const user = authenticate(result.data.badgeNumber, result.data.pin, result.data.agency);
-  if (!user) {
+  const outcome = await authenticate(result.data.badgeNumber, result.data.pin, result.data.agency);
+  if (!outcome.ok) {
+    if (outcome.reason === "inactive") {
+      res.status(403).json({ error: "This account is inactive. Contact an administrator." });
+      return;
+    }
     res.status(401).json({ error: "Invalid badge number or PIN." });
     return;
   }
+  const { user } = outcome;
   res.json({
     token: signToken(user),
     user,

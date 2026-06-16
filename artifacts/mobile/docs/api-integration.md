@@ -339,11 +339,11 @@ OTP / PIN-reset endpoints are not implemented server-side yet (the mobile
 
 - **No API keys live in the mobile bundle.** Only a short-lived session token is
   stored on-device, obtained from the backend after login.
-- The token is currently kept in **AsyncStorage**; migrate to
-  `expo-secure-store` (device keychain/keystore) before production — noted in
-  `apiClient.ts`.
-- `AUTH_SECRET` must be set on the server in production; the demo PIN auth is for
-  development only and should be replaced by DB-backed users + hashed PINs.
+- The token is stored via **expo-secure-store** (keychain/keystore) as of
+  Phase 6, with an AsyncStorage fallback only when SecureStore is unavailable.
+- `AUTH_SECRET` must be set on the server in production. DB-backed users with
+  hashed (scrypt) PINs landed in Phase 7 (below); the demo in-memory repository
+  remains the fallback when `DATABASE_URL` is unset.
 
 ## Secure Sessions & Protected Notifications (Phase 6)
 
@@ -441,6 +441,97 @@ token is missing/expired. Notification **preferences** remain local-only.
    the citizen notifications for that reference.
 8. Stop the API server — the app falls back to local notifications without
    crashing and the stored token is kept (no spurious logout).
+
+## DB-Backed Auth Users (Phase 7)
+
+Backend authentication now resolves users from a repository that is **DB-backed
+when `DATABASE_URL` is set** and **demo/in-memory otherwise**. PINs are stored
+only as salted hashes; the mobile local/mock login fallback is unchanged.
+
+### Auth repository selection
+
+Chosen once at startup (mirrors the report/notification stores), logged clearly:
+
+- **`DATABASE_URL` set** → `Auth repository: PostgreSQL (Drizzle)`. Users live in
+  the new `auth_users` table.
+- **`DATABASE_URL` unset** → `Auth repository: demo in-memory fallback …`
+  (a `WARN`). Local dev never crashes when Postgres is absent.
+
+### `auth_users` table (`lib/db/src/schema/index.ts`)
+
+A flat, self-contained table (like `citizen_reports`) — agency is a plain id so
+DSS / Fire Service / custom agencies need no tenant row. The existing
+tenant-scoped `users` table (referenced by cases/evidence/referrals) is left
+unchanged.
+
+| Column | Notes |
+| --- | --- |
+| `id` | uuid PK |
+| `badge_number` | unique login identifier (uppercased) |
+| `display_name` | shown to the user |
+| `agency` | plain agency id (`frsc`/`police`/`vio`/`civil_defence`/`admin`/`dss`/`fire_service`/`custom`…) |
+| `role` | `userRole` enum (citizen…super_admin) |
+| `pin_hash` | salted **scrypt** hash — never plaintext |
+| `is_active` | inactive users are rejected at login |
+| `created_at`/`updated_at`/`last_login_at` | timestamps |
+
+### PIN hashing
+
+`artifacts/api-server/src/lib/password.ts` uses Node's built-in **scrypt**
+(`node:crypto`, no new dependency). Format: `scrypt$<N>$<saltHex>$<hashHex>`,
+fresh 16-byte salt per hash, constant-time verification via `timingSafeEqual`.
+**`pin_hash` is never returned by any endpoint.**
+
+### Demo user seeding (DB mode)
+
+On startup `initAuth()` idempotently seeds the documented demo users
+(`onConflictDoNothing` on the unique badge index — **never duplicates on
+restart**; logs `created: N`):
+
+`ADMIN-001` (admin), `SUPER-001` (super_admin), `FO-001` (frsc),
+`NPF-001` (police), `VIO-001` (vio), `NSCDC-001` (civil_defence) — all PIN `1234`.
+
+**Dynamic agencies** (`{PREFIX}-001 | -SV | -CMD` → officer/supervisor/commander)
+are open-ended (custom agencies can't all be pre-seeded), so they're resolved by
+a **demo-pattern fallback** when there's no `auth_users` row, with the demo PIN —
+in both repository modes. This preserves DSS / Fire Service / custom agency demo
+logins. Replace this fallback with real seeded/managed users before production.
+
+### Endpoints (unchanged contract)
+
+- `POST /api/auth/login` — authenticates against the active repository. Invalid
+  PIN → `401`; **inactive account → `403`**. Returns `{ token, user, agency,
+  role, capabilities }` (no `pin_hash`). Token claims still carry `sub`,
+  `badgeNumber`, `agency`, `role`, `exp`.
+- `GET /api/auth/me` and `POST /api/auth/logout` — unchanged; RBAC on report /
+  notification routes works without any route change.
+
+### Admin user management (next phase)
+
+The DB repository exposes backend-safe helpers — `createUser`, `updateUser`,
+`setActive` (deactivate/reactivate), `resetPin` — ready to wire up. The OpenAPI
+contract already defines `/admin/users` (list/create) and
+`/admin/users/{userId}` (patch), but those HTTP endpoints are **not implemented
+this phase** (no admin-user UI is wired yet, and they need admin-only RBAC +
+request schemas). Wiring them is the next phase; the helpers and table are ready.
+
+### Running & testing DB-backed auth
+
+```sh
+export DATABASE_URL="postgresql://localhost:5432/nsa"
+export AUTH_SECRET="<a strong secret>"   # required in production
+nvm use 22
+pnpm --filter @workspace/db run push-force   # creates auth_users (+ other tables)
+pnpm --filter @workspace/api-server run dev   # logs "Auth repository: PostgreSQL (Drizzle)"
+```
+
+- Login: `curl -X POST $BASE/api/auth/login -H 'Content-Type: application/json'
+  -d '{"badgeNumber":"ADMIN-001","pin":"1234"}'` → token + user.
+- Wrong PIN → `401`; an `is_active=false` user → `403`.
+- **Fallback:** with `DATABASE_URL` unset the server uses the demo repository and
+  the same demo credentials work — local dev/demo never needs a database.
+- Mobile is unchanged: API-mode login still hits `/auth/login`; with API disabled
+  or the backend down, the app keeps its local/mock login.
 
 ## Backend Notes
 
