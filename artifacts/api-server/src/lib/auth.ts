@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, type SQL } from "drizzle-orm";
 import { getDb, isDbConfigured, authUsers, type Database } from "@workspace/db";
 import { hashPin, verifyPin } from "./password";
 import { logger } from "./logger";
@@ -116,13 +116,33 @@ export interface UpdateUserInput {
   isActive?: boolean;
 }
 
+/** Safe admin-user view — never carries the PIN hash. */
+export interface AdminUserView {
+  id: string;
+  badgeNumber: string;
+  displayName: string;
+  agency: string;
+  role: Role;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  lastLoginAt?: string | null;
+}
+
+export interface AdminUserFilter {
+  agency?: string;
+  role?: Role;
+  isActive?: boolean;
+}
+
 export interface UserRepository {
   readonly kind: "db" | "demo";
   authenticate(badgeNumber: string, pin: string, agency?: string): Promise<AuthOutcome>;
-  // Management helpers (PART 6) — backend-safe, ready for an admin-users phase.
-  createUser(input: CreateUserInput): Promise<AuthUser>;
-  updateUser(id: string, patch: UpdateUserInput): Promise<AuthUser | null>;
-  setActive(id: string, isActive: boolean): Promise<AuthUser | null>;
+  // Admin user management (returns safe views; never a PIN hash).
+  listUsers(filter?: AdminUserFilter): Promise<AdminUserView[]>;
+  createUser(input: CreateUserInput): Promise<AdminUserView>;
+  updateUser(id: string, patch: UpdateUserInput): Promise<AdminUserView | null>;
+  setActive(id: string, isActive: boolean): Promise<AdminUserView | null>;
   resetPin(id: string, newPin: string): Promise<boolean>;
   /** Idempotently seed the documented demo users (no-op in demo mode). */
   seedDefaults(): Promise<void>;
@@ -193,13 +213,30 @@ class DemoUserRepository implements UserRepository {
     return { ok: false, reason: "invalid" };
   }
 
-  async createUser(): Promise<AuthUser> {
+  async listUsers(filter?: AdminUserFilter): Promise<AdminUserView[]> {
+    // Read-only: surface the seeded demo users so the admin screen still renders
+    // in API mode without a database (mutations remain unsupported below).
+    return SEED_USERS.filter(
+      (u) =>
+        (!filter?.agency || u.agency === filter.agency) &&
+        (!filter?.role || u.role === filter.role) &&
+        (filter?.isActive === undefined || filter.isActive === true),
+    ).map((u) => ({
+      id: u.id,
+      badgeNumber: u.badgeNumber,
+      displayName: u.name,
+      agency: u.agency,
+      role: u.role,
+      isActive: true,
+    }));
+  }
+  async createUser(): Promise<AdminUserView> {
     throw new Error(MANAGEMENT_UNSUPPORTED);
   }
-  async updateUser(): Promise<AuthUser | null> {
+  async updateUser(): Promise<AdminUserView | null> {
     throw new Error(MANAGEMENT_UNSUPPORTED);
   }
-  async setActive(): Promise<AuthUser | null> {
+  async setActive(): Promise<AdminUserView | null> {
     throw new Error(MANAGEMENT_UNSUPPORTED);
   }
   async resetPin(): Promise<boolean> {
@@ -221,6 +258,20 @@ function rowToAuthUser(row: AuthUserRow): AuthUser {
     badgeNumber: row.badgeNumber,
     agency: row.agency,
     role: row.role as Role,
+  };
+}
+
+function rowToAdminView(row: AuthUserRow): AdminUserView {
+  return {
+    id: row.id,
+    badgeNumber: row.badgeNumber,
+    displayName: row.displayName,
+    agency: row.agency,
+    role: row.role as Role,
+    isActive: row.isActive,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    lastLoginAt: row.lastLoginAt ? row.lastLoginAt.toISOString() : null,
   };
 }
 
@@ -255,7 +306,20 @@ class DbUserRepository implements UserRepository {
     return { ok: false, reason: "invalid" };
   }
 
-  async createUser(input: CreateUserInput): Promise<AuthUser> {
+  async listUsers(filter?: AdminUserFilter): Promise<AdminUserView[]> {
+    const conditions: SQL[] = [];
+    if (filter?.agency) conditions.push(eq(authUsers.agency, filter.agency));
+    if (filter?.role) conditions.push(eq(authUsers.role, filter.role));
+    if (filter?.isActive !== undefined) conditions.push(eq(authUsers.isActive, filter.isActive));
+    const rows = await this.db
+      .select()
+      .from(authUsers)
+      .where(conditions.length ? and(...conditions) : undefined)
+      .orderBy(authUsers.agency, authUsers.badgeNumber);
+    return rows.map(rowToAdminView);
+  }
+
+  async createUser(input: CreateUserInput): Promise<AdminUserView> {
     const [row] = await this.db
       .insert(authUsers)
       .values({
@@ -267,10 +331,10 @@ class DbUserRepository implements UserRepository {
         isActive: input.isActive ?? true,
       })
       .returning();
-    return rowToAuthUser(row);
+    return rowToAdminView(row);
   }
 
-  async updateUser(id: string, patch: UpdateUserInput): Promise<AuthUser | null> {
+  async updateUser(id: string, patch: UpdateUserInput): Promise<AdminUserView | null> {
     const [row] = await this.db
       .update(authUsers)
       .set({
@@ -282,10 +346,10 @@ class DbUserRepository implements UserRepository {
       })
       .where(eq(authUsers.id, id))
       .returning();
-    return row ? rowToAuthUser(row) : null;
+    return row ? rowToAdminView(row) : null;
   }
 
-  async setActive(id: string, isActive: boolean): Promise<AuthUser | null> {
+  async setActive(id: string, isActive: boolean): Promise<AdminUserView | null> {
     return this.updateUser(id, { isActive });
   }
 

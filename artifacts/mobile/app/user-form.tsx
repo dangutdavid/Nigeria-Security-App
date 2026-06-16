@@ -18,6 +18,7 @@ import { useAgency } from "@/context/AgencyContext";
 import { useAuth, UserRole, UserStatus } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { assignableRoles } from "@/lib/permissions";
+import * as userRepo from "@/services/userRepository";
 
 const ROLE_OPTIONS: { label: string; value: UserRole; color: string }[] = [
   { label: "Officer", value: "officer", color: "#2C7BE5" },
@@ -64,7 +65,17 @@ export default function UserFormScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id, agency } = useLocalSearchParams<{ id?: string; agency?: string }>();
-  const { user: currentUser, getUserById, addUser, updateUser, deleteUser, resetPin, allUsers } = useAuth();
+  const { user: currentUser, getUserById, addUser, updateUser, deleteUser, resetPin, mergeApiUsers, allUsers } = useAuth();
+
+  // Repository falls back to these local primitives when API mode is off/unavailable.
+  const adapter: userRepo.UserRepositoryLocalAdapter = {
+    list: () => allUsers,
+    merge: mergeApiUsers,
+    create: addUser,
+    update: updateUser,
+    remove: deleteUser,
+    resetPin,
+  };
 
   const isEditing = !!id;
   const editTarget = id ? getUserById(id) : undefined;
@@ -118,10 +129,12 @@ export default function UserFormScreen() {
   function validate(): string | null {
     if (!form.name.trim()) return "Name is required.";
     if (!form.badgeNumber.trim()) return "Badge number is required.";
-    if (!form.sector.trim()) return "Sector is required.";
-    if (!form.station.trim()) return "Station is required.";
-    if (!form.phone.trim()) return "Phone number is required.";
     if (!isEditing) {
+      // Contact fields are local-only; required when creating, optional when
+      // editing (a backend-sourced user may not have them populated).
+      if (!form.sector.trim()) return "Sector is required.";
+      if (!form.station.trim()) return "Station is required.";
+      if (!form.phone.trim()) return "Phone number is required.";
       if (!form.pin) return "PIN is required.";
       if (form.pin.length < 4) return "PIN must be at least 4 digits.";
       if (form.pin !== form.confirmPin) return "PINs do not match.";
@@ -142,20 +155,24 @@ export default function UserFormScreen() {
     setSaving(true);
     try {
       if (isEditing && editTarget) {
-        await updateUser(editTarget.id, {
-          name: form.name.trim(),
-          badgeNumber: form.badgeNumber.trim().toUpperCase(),
-          email: form.email.trim().toLowerCase(),
-          role: form.role,
-          sector: form.sector.trim(),
-          station: form.station.trim(),
-          phone: form.phone.trim(),
-          status: form.status,
-        });
+        await userRepo.updateUser(
+          editTarget.id,
+          {
+            name: form.name.trim(),
+            badgeNumber: form.badgeNumber.trim().toUpperCase(),
+            email: form.email.trim().toLowerCase(),
+            role: form.role,
+            sector: form.sector.trim(),
+            station: form.station.trim(),
+            phone: form.phone.trim(),
+            status: form.status,
+          },
+          adapter,
+        );
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.back();
       } else {
-        await addUser(
+        await userRepo.createUser(
           {
             name: form.name.trim(),
             badgeNumber: form.badgeNumber.trim().toUpperCase(),
@@ -167,7 +184,8 @@ export default function UserFormScreen() {
             status: form.status,
             agency: targetAgency ?? currentUser?.agency ?? "frsc",
           },
-          form.pin
+          form.pin,
+          adapter,
         );
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.back();
@@ -194,7 +212,7 @@ export default function UserFormScreen() {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            await deleteUser(editTarget.id);
+            await userRepo.removeUser(editTarget.id, adapter);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             router.back();
           },
@@ -209,7 +227,7 @@ export default function UserFormScreen() {
       Alert.alert("Error", "New PIN must be at least 4 digits.");
       return;
     }
-    await resetPin(editTarget.id, newPin);
+    await userRepo.resetPin(editTarget.id, newPin, adapter);
     setNewPin("");
     setShowResetPin(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

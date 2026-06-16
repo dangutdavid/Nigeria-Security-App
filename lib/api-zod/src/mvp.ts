@@ -212,6 +212,51 @@ export const AuthLoginSchema = z.object({
 });
 export type AuthLogin = z.infer<typeof AuthLoginSchema>;
 
+// ---- Admin user management ----
+// The backend auth model is lean (badge + displayName + agency + role + PIN +
+// active). Agency is a free string so built-in AND dynamic/custom agency ids are
+// accepted. PIN is demo-friendly (>= 4) and never returned in responses.
+export const AdminUserCreateSchema = z.object({
+  badgeNumber: z.string().min(1),
+  displayName: z.string().min(1),
+  agency: z.string().min(1),
+  role: RoleSchema,
+  pin: z.string().min(4).max(12),
+  isActive: z.boolean().optional(),
+});
+export type AdminUserCreate = z.infer<typeof AdminUserCreateSchema>;
+
+export const AdminUserUpdateSchema = z
+  .object({
+    displayName: z.string().min(1).optional(),
+    agency: z.string().min(1).optional(),
+    role: RoleSchema.optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, {
+    message: "At least one field must be provided.",
+  });
+export type AdminUserUpdate = z.infer<typeof AdminUserUpdateSchema>;
+
+export const AdminUserResetPinSchema = z.object({
+  pin: z.string().min(4).max(12),
+});
+export type AdminUserResetPin = z.infer<typeof AdminUserResetPinSchema>;
+
+/** Safe admin-user view (never includes the PIN hash). */
+export const AdminUserSchema = z.object({
+  id: z.string(),
+  badgeNumber: z.string(),
+  displayName: z.string(),
+  agency: z.string(),
+  role: RoleSchema,
+  isActive: z.boolean(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  lastLoginAt: z.string().nullable().optional(),
+});
+export type AdminUser = z.infer<typeof AdminUserSchema>;
+
 // ---- Agency workflow requests (status update, reassignment, timeline) ----
 // Report status includes "rejected" in addition to the citizen-facing statuses.
 export const ReportStatusSchema = z.enum([

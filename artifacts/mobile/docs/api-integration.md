@@ -533,6 +533,67 @@ pnpm --filter @workspace/api-server run dev   # logs "Auth repository: PostgreSQ
 - Mobile is unchanged: API-mode login still hits `/auth/login`; with API disabled
   or the backend down, the app keeps its local/mock login.
 
+## Admin User Management (Phase 8)
+
+Admin / super_admin can manage backend users through the API while the local
+demo Manage Users screen keeps working offline.
+
+### Endpoints (admin/super_admin only — server-enforced RBAC)
+
+| Method | Endpoint | Notes |
+| --- | --- | --- |
+| GET | `/api/admin/users` | List users. Optional `agency`, `role`, `status` filters. **Never returns the PIN hash.** |
+| POST | `/api/admin/users` | Create user (`badgeNumber`, `displayName`, `agency`, `role`, `pin`, optional `isActive`). `409` on duplicate badge. |
+| PATCH | `/api/admin/users/:userId` | Update safe fields (`displayName`, `agency`, `role`, `isActive`). |
+| DELETE | `/api/admin/users/:userId` | **Deactivate** (soft delete — sets `isActive=false`); never a hard delete. Cannot deactivate your own account (`400`). |
+| POST | `/api/admin/users/:userId/reset-pin` | Hash and store a new PIN. |
+
+- **Unauthenticated → `401`; non-admin → `403`.** A new/updated user appears in
+  the list immediately; a deactivated user is rejected at login (`403`).
+- **Demo (no `DATABASE_URL`) mode:** `GET` returns the seeded demo users
+  (read-only) so the screen still renders; write operations return **`501`**
+  (user management requires the database).
+- Validation: `AdminUserCreateSchema` / `AdminUserUpdateSchema` /
+  `AdminUserResetPinSchema` in `lib/api-zod`. `agency` is a free string so
+  built-in **and** dynamic/custom agency ids (DSS, Fire Service, custom) are
+  accepted; PIN is `4–12` chars (demo-friendly).
+
+### Mobile Manage Users behaviour
+
+`artifacts/mobile/services/userRepository.ts` is API-first with local fallback
+(bearer token attached automatically via `apiClient`):
+
+| Repository method | Backend endpoint | Local fallback |
+| --- | --- | --- |
+| `listUsers` | `GET /admin/users` | local `allUsers` |
+| `createUser` | `POST /admin/users` | `AuthContext.addUser` |
+| `updateUser` | `PATCH /admin/users/:id` | `AuthContext.updateUser` |
+| `deactivateUser` / `reactivateUser` | `DELETE` / `PATCH isActive` | local status update |
+| `removeUser` (form Delete) | `DELETE /admin/users/:id` (soft) | local hard delete |
+| `resetPin` | `POST /admin/users/:id/reset-pin` | `AuthContext.resetPin` |
+
+- **API mode:** the Manage Users screen (`app/(admin)/users.tsx`) fetches backend
+  users on focus and merges them into the in-memory store for display/edit
+  (`AuthContext.mergeApiUsers` — **not persisted**, so the offline demo store is
+  never polluted). Create/edit/deactivate/reactivate/reset-PIN call the backend.
+- **Local mode or API failure/401/403:** the same screen and form fall back to
+  the existing local user management — the offline demo is never broken.
+- The backend auth model is lean: contact fields (email/phone/sector/station)
+  are **local-only** and not sent to the API. The user form requires them only
+  when creating a local user; they're optional when editing a backend user.
+- iPhone safe-area layout is unchanged.
+
+### Security & audit
+
+- **PIN hashes are never returned** by any endpoint, and the mobile app never
+  receives or stores them.
+- Mobile audit events (`user.created` / `updated` / `deleted` / `pin_reset`) are
+  recorded by the local user-management path (local mode and on API fallback).
+  **Follow-up:** backend-side audit logging for API-mode mutations is not wired
+  yet — the lean `auth_users` model isn't linked to the tenant-scoped
+  `audit_logs` table (whose `actor_id` references the tenant `users` table). Add
+  a flat audit writer in a later phase.
+
 ## Backend Notes
 
 The repository already has:

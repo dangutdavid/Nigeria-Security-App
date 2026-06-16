@@ -500,7 +500,9 @@ paths:
     get:
       operationId: listUsers
       tags: [admin-users]
-      summary: List users
+      summary: List users (admin only)
+      security:
+        - bearerAuth: []
       parameters:
         - $ref: "#/components/parameters/AgencyQuery"
         - name: role
@@ -513,7 +515,7 @@ paths:
             $ref: "#/components/schemas/UserStatus"
       responses:
         "200":
-          description: User list
+          description: User list (PIN hashes are never returned)
           content:
             application/json:
               schema:
@@ -522,31 +524,49 @@ paths:
                   users:
                     type: array
                     items:
-                      $ref: "#/components/schemas/User"
+                      $ref: "#/components/schemas/AdminUser"
                 required: [users]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
     post:
       operationId: createUser
       tags: [admin-users]
-      summary: Create user
+      summary: Create user (admin only)
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UserCreateRequest"
+              $ref: "#/components/schemas/AdminUserCreateRequest"
       responses:
         "201":
           description: User created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/AdminUser"
+                required: [user]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Badge number already in use
 
   /admin/users/{userId}:
     patch:
       operationId: updateUser
       tags: [admin-users]
-      summary: Update user
+      summary: Update user safe fields (admin only)
+      security:
+        - bearerAuth: []
       parameters:
         - name: userId
           in: path
@@ -558,14 +578,92 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UserUpdateRequest"
+              $ref: "#/components/schemas/AdminUserUpdateRequest"
       responses:
         "200":
           description: User updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/AdminUser"
+                required: [user]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User not found
+    delete:
+      operationId: deactivateUser
+      tags: [admin-users]
+      summary: Deactivate user (soft delete, admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User deactivated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  user:
+                    $ref: "#/components/schemas/AdminUser"
+                required: [ok, user]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User not found
+
+  /admin/users/{userId}/reset-pin:
+    post:
+      operationId: resetUserPin
+      tags: [admin-users]
+      summary: Reset a user's PIN (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserResetPinRequest"
+      responses:
+        "200":
+          description: PIN reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                required: [ok]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User not found
 
   /audit-logs:
     get:
@@ -1200,6 +1298,73 @@ components:
           type: string
           minLength: 4
           maxLength: 12
+    AdminUser:
+      type: object
+      description: Lean backend auth user. Never includes the PIN hash.
+      properties:
+        id:
+          type: string
+        badgeNumber:
+          type: string
+        displayName:
+          type: string
+        agency:
+          type: string
+          description: Built-in or dynamic/custom agency id.
+        role:
+          $ref: "#/components/schemas/UserRole"
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [id, badgeNumber, displayName, agency, role, isActive]
+    AdminUserCreateRequest:
+      type: object
+      properties:
+        badgeNumber:
+          type: string
+        displayName:
+          type: string
+        agency:
+          type: string
+          description: Built-in or dynamic/custom agency id.
+        role:
+          $ref: "#/components/schemas/UserRole"
+        pin:
+          type: string
+          minLength: 4
+          maxLength: 12
+        isActive:
+          type: boolean
+      required: [badgeNumber, displayName, agency, role, pin]
+    AdminUserUpdateRequest:
+      type: object
+      description: At least one field is required.
+      properties:
+        displayName:
+          type: string
+        agency:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        isActive:
+          type: boolean
+    AdminUserResetPinRequest:
+      type: object
+      properties:
+        pin:
+          type: string
+          minLength: 4
+          maxLength: 12
+      required: [pin]
     AuditSeverity:
       type: string
       enum: [info, warning, critical]

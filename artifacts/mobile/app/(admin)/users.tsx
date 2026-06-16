@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useMemo } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useMemo } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -10,20 +10,47 @@ import { useAgency } from "@/context/AgencyContext";
 import { User, useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { roleLabel } from "@/lib/permissions";
+import * as userRepo from "@/services/userRepository";
 
 export default function AdminUsersScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { agencies } = useAgency();
-  const { allUsers, updateUser } = useAuth();
+  const { allUsers, updateUser, deleteUser, resetPin, mergeApiUsers } = useAuth();
+
+  // Local adapter the repository falls back to (and merges API users into).
+  const adapter = useMemo<userRepo.UserRepositoryLocalAdapter>(
+    () => ({
+      list: () => allUsers,
+      merge: mergeApiUsers,
+      create: async () => {},
+      update: updateUser,
+      remove: deleteUser,
+      resetPin,
+    }),
+    [allUsers, mergeApiUsers, updateUser, deleteUser, resetPin],
+  );
+
+  // Load through the repository: backend users in API mode (merged in for
+  // display/edit), local users otherwise. Refresh whenever the screen focuses.
+  useFocusEffect(
+    useCallback(() => {
+      void userRepo.listUsers(adapter);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [mergeApiUsers]),
+  );
+
   const grouped = useMemo(
     () => agencies.map((agency) => ({ agency, users: allUsers.filter((u) => u.agency === agency.id) })),
     [agencies, allUsers],
   );
 
   async function updateStatus(user: User, status: User["status"]) {
-    await updateUser(user.id, { status });
+    if (status === "active") await userRepo.reactivateUser(user.id, adapter);
+    else await userRepo.deactivateUser(user.id, adapter);
+    // Re-sync from the backend (API mode) so the new status is reflected.
+    void userRepo.listUsers(adapter);
   }
 
   return (

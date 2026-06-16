@@ -64,6 +64,8 @@ interface AuthContextType {
   deleteUser: (id: string) => Promise<void>;
   resetPin: (id: string, newPin: string) => Promise<void>;
   getUserById: (id: string) => User | undefined;
+  /** Display-only merge of backend users into the in-memory store (API mode; not persisted). */
+  mergeApiUsers: (users: User[]) => void;
   ensureAgencyDemoUsers: (agency: AgencyDemoSeedInput) => Promise<User[]>;
   requestOtp: (badgeNumber: string, email: string) => Promise<{ result: OtpResult; code?: string }>;
   verifyOtp: (badgeNumber: string, code: string) => Promise<OtpVerifyResult>;
@@ -82,6 +84,7 @@ const AuthContext = createContext<AuthContextType>({
   deleteUser: async () => {},
   resetPin: async () => {},
   getUserById: () => undefined,
+  mergeApiUsers: () => {},
   ensureAgencyDemoUsers: async () => [],
   requestOtp: async () => ({ result: "not_found" }),
   verifyOtp: async () => "invalid",
@@ -490,6 +493,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return records.find((r) => r.user.id === id)?.user;
   }
 
+  /**
+   * Merge backend (API-mode) users into the in-memory store for display/edit.
+   * Upserts by badge number — existing local records keep their PIN, id, and
+   * contact fields (only display fields update); unknown backend users are added
+   * with an empty PIN (display-only). NOT persisted to AsyncStorage, so the
+   * offline/local demo store is never polluted by API-mode data.
+   */
+  function mergeApiUsers(apiUsers: User[]): void {
+    if (apiUsers.length === 0) return;
+    setRecords((prev) => {
+      const next = [...prev];
+      for (const u of apiUsers) {
+        const idx = next.findIndex(
+          (r) => r.user.badgeNumber.toUpperCase() === u.badgeNumber.toUpperCase(),
+        );
+        if (idx >= 0) {
+          next[idx] = {
+            ...next[idx],
+            user: { ...next[idx].user, name: u.name, role: u.role, agency: u.agency, status: u.status },
+          };
+        } else {
+          next.push({ pin: "", user: u });
+        }
+      }
+      return next;
+    });
+  }
+
   async function ensureAgencyDemoUsers(agency: AgencyDemoSeedInput): Promise<User[]> {
     const currentRecords = await readStoredUserRecords(records);
     const agencyId = agency.id;
@@ -596,7 +627,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{
       user, isLoading, apiSessionEstablished, login, logout,
       allUsers, addUser, updateUser, deleteUser, resetPin, getUserById,
-      ensureAgencyDemoUsers, requestOtp, verifyOtp, resetPinWithOtp,
+      mergeApiUsers, ensureAgencyDemoUsers, requestOtp, verifyOtp, resetPinWithOtp,
     }}>
       {children}
     </AuthContext.Provider>
