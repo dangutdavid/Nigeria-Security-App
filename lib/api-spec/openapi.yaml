@@ -777,7 +777,45 @@ components:
       properties:
         status:
           type: string
+          enum: [ok, degraded]
+        db:
+          type: string
+          enum: [postgres, in-memory, error]
       required: [status]
+    AgencyDashboardMetrics:
+      type: object
+      properties:
+        agency:
+          type: string
+        metrics:
+          type: object
+          properties:
+            total: { type: integer }
+            submitted: { type: integer }
+            triaged: { type: integer }
+            assigned: { type: integer }
+            in_progress: { type: integer }
+            resolved: { type: integer }
+            closed: { type: integer }
+            rejected: { type: integer }
+            highPriority: { type: integer }
+            withCoordinates: { type: integer }
+            withoutCoordinates: { type: integer }
+          required:
+            [
+              total,
+              submitted,
+              triaged,
+              assigned,
+              in_progress,
+              resolved,
+              closed,
+              rejected,
+              highPriority,
+              withCoordinates,
+              withoutCoordinates,
+            ]
+      required: [agency, metrics]
     ErrorResponse:
       type: object
       properties:

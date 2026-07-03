@@ -123,6 +123,34 @@ The API is served under `/api`, for example:
 GET /api/healthz
 ```
 
+## Database Setup (Postgres Persistence)
+
+The server persists to PostgreSQL when `DATABASE_URL` is set. Without it, the
+server falls back to in-memory stores — this is an explicit local-dev/demo
+fallback only; data resets on every restart.
+
+```sh
+createdb nigeria_security
+export DATABASE_URL=postgres://YOUR-USER@localhost:5432/nigeria_security
+
+# Generate migrations after schema changes in lib/db/src/schema
+pnpm --filter @workspace/db run generate
+
+# Apply migrations (tracked in lib/db/migrations)
+pnpm --filter @workspace/db run migrate
+
+# Start the server with persistence enabled
+DATABASE_URL=$DATABASE_URL pnpm --filter @workspace/api-server run dev
+```
+
+`GET /api/healthz` reports the active persistence mode:
+`{"status":"ok","db":"postgres"}` or `{"status":"ok","db":"in-memory"}`, and
+returns HTTP 503 with `db: "error"` when the database is unreachable.
+
+Rollback note: migrations are forward-only SQL files in `lib/db/migrations`.
+To roll back a bad migration in development, drop and recreate the database,
+then re-run `migrate`.
+
 ## Enable API Mode in the Mobile App
 
 The app is local/mock first. To enable API-first calls:
