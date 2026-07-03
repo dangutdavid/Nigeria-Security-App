@@ -10,7 +10,8 @@ import { ToolBackHeader } from "@/components/ToolBackHeader";
 import { AgencyConfig, NewAgencyInput, useAgency } from "@/context/AgencyContext";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
-import { listCitizenIncidentReports, seedCitizenReportsForAgencyMock } from "@/services/citizenIncidentApi";
+import { seedCitizenReportsForAgencyMock } from "@/services/citizenIncidentApi";
+import { listReports } from "@/services/reportRepository";
 
 const COLOR_OPTIONS = ["#1B5E3B", "#1A3A6C", "#7B3F00", "#234E2A", "#344054", "#5C6BC0", "#8B1E3F", "#0F766E"];
 const BUILT_IN_AGENCIES = new Set(["frsc", "police", "vio", "civil_defence", "admin"]);
@@ -67,13 +68,13 @@ export default function AdminAgenciesScreen() {
   const router = useRouter();
   const { agencies, addAgency, setAgencyActive } = useAgency();
   const { allUsers, ensureAgencyDemoUsers } = useAuth();
-  const [reports, setReports] = useState<Awaited<ReturnType<typeof listCitizenIncidentReports>>>([]);
+  const [reports, setReports] = useState<Awaited<ReturnType<typeof listReports>>>([]);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState<AgencyForm>(EMPTY_FORM);
   const [error, setError] = useState("");
   const autoSeededAgencyIds = useRef<Set<string>>(new Set());
   const autoSeededReportAgencyIds = useRef<Set<string>>(new Set());
-  useFocusEffect(useCallback(() => { void listCitizenIncidentReports().then(setReports); }, []));
+  useFocusEffect(useCallback(() => { void listReports().then(setReports); }, []));
 
   useEffect(() => {
     const agenciesMissingUsers = agencies.filter((agency) => {
@@ -98,7 +99,7 @@ export default function AdminAgenciesScreen() {
 
     customAgenciesMissingReports.forEach((agency) => {
       autoSeededReportAgencyIds.current.add(agency.id);
-      void seedCitizenReportsForAgencyMock(agency).then(() => listCitizenIncidentReports().then(setReports));
+      void seedCitizenReportsForAgencyMock(agency).then(() => listReports().then(setReports));
     });
   }, [agencies, reports]);
 
@@ -146,7 +147,7 @@ export default function AdminAgenciesScreen() {
       });
       await ensureAgencyDemoUsers(created);
       await seedCitizenReportsForAgencyMock(created);
-      setReports(await listCitizenIncidentReports());
+      setReports(await listReports());
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setForm(EMPTY_FORM);
       setShowAdd(false);

@@ -19,13 +19,13 @@ import { useColors } from "@/hooks/useColors";
 import {
   CitizenIncidentReceipt,
   CitizenIncidentType,
-  findCitizenIncidentByReference,
   formatCitizenAgencyLabel,
   formatCitizenIncidentStatus,
   getCitizenReportCoordinatesText,
   getCitizenReportLocationText,
   getCitizenStatusMessage,
 } from "@/services/citizenIncidentApi";
+import { trackCitizenReportByReference } from "@/services/reportRepository";
 
 const INCIDENT_TYPE_LABELS: Record<CitizenIncidentType, string> = {
   road_crash: "Road Crash",
@@ -86,7 +86,7 @@ export default function TrackReportScreen() {
     setError("");
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      const result = await findCitizenIncidentByReference(normalized);
+      const result = await trackCitizenReportByReference(normalized);
       setReport(result);
       setSearched(true);
       if (result) {

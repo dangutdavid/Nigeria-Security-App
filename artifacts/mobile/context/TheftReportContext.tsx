@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
+import { submitCitizenReport } from "@/services/reportRepository";
 import React, {
   createContext,
   useCallback,
@@ -27,6 +28,8 @@ export interface TheftReport {
   reporterName?: string;
   contactPhone?: string;
   status: "active" | "recovered" | "false_alarm";
+  /** Backend citizen-report reference when the theft was submitted via API. */
+  citizenReportReference?: string;
 }
 
 export interface NearbyTheftAlert extends TheftReport {
@@ -376,11 +379,38 @@ export function TheftReportProvider({
     async (
       data: Omit<TheftReport, "id" | "reportedAt" | "status">,
     ): Promise<TheftReport> => {
+      // API-first: file the theft with the police via the citizen-report
+      // pipeline so it lands in the backend. The local record below stays as
+      // the cache that powers offline viewing and nearby-alert radius maths.
+      let citizenReportReference: string | undefined;
+      try {
+        const vehicle = [data.year, data.color, data.make, data.model]
+          .filter(Boolean)
+          .join(" ");
+        const receipt = await submitCitizenReport({
+          incidentType: "vehicle_theft",
+          description: `Stolen vehicle: ${vehicle} (${data.plate}). ${data.description}`.trim(),
+          location: data.location,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          address: data.location,
+          locationSource: data.latitude != null ? "gps" : "manual",
+          photoUri: data.photoUri,
+          vehicleRegistration: data.plate,
+          emergencyLevel: "high",
+          suggestedAgency: "police",
+        });
+        citizenReportReference = receipt.reference;
+      } catch {
+        // Submission falls back to local-only; the record is still saved.
+      }
+
       const report: TheftReport = {
         ...data,
         id: `theft-${Date.now()}`,
         reportedAt: new Date().toISOString(),
         status: "active",
+        citizenReportReference,
       };
       setReports((prev) => {
         const next = [report, ...prev];

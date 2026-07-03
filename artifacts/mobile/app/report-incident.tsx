@@ -28,8 +28,8 @@ import {
   CitizenIncidentReceipt,
   CitizenIncidentType,
   formatCitizenAgencyLabel,
-  submitCitizenIncidentMock,
 } from "@/services/citizenIncidentApi";
+import { submitCitizenReport } from "@/services/reportRepository";
 
 const INCIDENT_TYPES: Array<{
   value: CitizenIncidentType;
@@ -203,7 +203,7 @@ export default function CitizenIncidentReportScreen() {
     setSubmitting(true);
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      const result = await submitCitizenIncidentMock({
+      const result = await submitCitizenReport({
         incidentType: incidentType as CitizenIncidentType,
         description: description.trim(),
         location: location.trim(),

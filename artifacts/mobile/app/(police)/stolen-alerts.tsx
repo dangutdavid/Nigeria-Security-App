@@ -14,9 +14,11 @@ import { useColors } from "@/hooks/useColors";
 import {
   CitizenIncidentReceipt,
   formatCitizenIncidentStatus,
-  listPoliceCitizenIncidentReports,
-  updateCitizenIncidentStatusMock,
 } from "@/services/citizenIncidentApi";
+import {
+  listReportsByAgency,
+  updateReportStatus as updateCitizenReportStatus,
+} from "@/services/reportRepository";
 import { useAuth } from "@/context/AuthContext";
 
 const PRIMARY = "#1A3A6C";
@@ -30,7 +32,7 @@ export default function PoliceStolenAlertsScreen() {
   const [citizenAlerts, setCitizenAlerts] = useState<CitizenIncidentReceipt[]>([]);
 
   const loadCitizenAlerts = useCallback(async () => {
-    const reports = await listPoliceCitizenIncidentReports();
+    const reports = await listReportsByAgency("police");
     setCitizenAlerts(reports.filter((r) => r.incidentType === "vehicle_theft" || r.incidentType === "missing_vehicle_alert"));
   }, []);
 
@@ -47,7 +49,7 @@ export default function PoliceStolenAlertsScreen() {
 
   async function triageCitizenAlert(report: CitizenIncidentReceipt) {
     if (report.status !== "submitted") return;
-    await updateCitizenIncidentStatusMock({
+    await updateCitizenReportStatus({
       reference: report.reference,
       status: "triaged",
       actorName: user?.name ?? "Police",
