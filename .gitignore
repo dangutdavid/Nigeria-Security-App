@@ -55,3 +55,9 @@ Thumbs.db
 
 # Local evidence binary storage (api-server local-disk backend)
 artifacts/api-server/data/
+
+# Claude Code local session settings
+.claude/
+
+# Vitest evidence-upload artifacts
+.vitest-evidence/
