@@ -7,8 +7,17 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "node": "22.14.0",
+      "pnpm": "9.12.0",
       "env": {
-        "EXPO_PUBLIC_USE_API": "true"
+        "EXPO_PUBLIC_USE_API": "true",
+        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.146:8081/api"
+      }
+    },
+    "ios-simulator": {
+      "extends": "development",
+      "ios": {
+        "simulator": true
       }
     },
     "preview": {

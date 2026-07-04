@@ -38,6 +38,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5ca14ec0-f8b8-493a-b347-be07e5fcd2b1"
+      }
+    },
+    "owner": "dangutdavid"
   }
 }
