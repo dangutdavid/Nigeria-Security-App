@@ -260,17 +260,46 @@ This is a security system, so the intended production direction is:
 - Secure evidence/photo upload with metadata, size/type validation, and signed URLs.
 - PostgreSQL persistence with migrations and backups.
 
-## Remaining Production Work
+## Production Status
 
-- Complete real backend persistence for every flow.
-- Regenerate and adopt generated API clients after OpenAPI changes.
-- Replace AsyncStorage flows feature by feature with backend calls.
-- Add full dynamic agency configuration and routing rules.
-- Add production push notification delivery.
-- Add secure evidence upload.
-- Add automated mobile regression tests.
-- Add deployment configuration for staging and production.
-- Perform real-device QA on iPhone and Android.
+Completed (July 2026 build-out):
+
+- PostgreSQL persistence with real Drizzle migrations (`lib/db/migrations`);
+  healthz reports live DB connectivity.
+- Citizen mobile flows (report, theft, track, stolen alerts) go through the
+  API-first repository layer; AsyncStorage remains only as the offline cache.
+- Evidence pipeline: metadata + binary upload (validated, checksummed) behind
+  a swappable storage interface, with HMAC-signed expiring download links.
+- Agency registry CRUD backed by the database and synced with the mobile
+  admin flows; audit trail persisted with query + CSV export endpoints;
+  duty sessions, case types, agency units, and DB referrals exposed.
+- Auth hardening: AUTH_SECRET required in production, token refresh rotation,
+  server-side revocation on logout, rate limiting, OTP-gated self-service PIN
+  reset.
+- Push notifications end to end (Expo push tokens, server-side delivery on
+  every notification, tap-to-navigate deep links).
+- Offline sync actually submits queued incidents (retry, last-write-wins).
+- Production plumbing: consistent JSON error surface, security headers,
+  request correlation ids, `.env.example`.
+- Vitest suites: API server (auth/RBAC/lifecycle/evidence/rate limits) and
+  mobile repository fallback logic. Run with `pnpm --filter @workspace/api-server test`
+  and `pnpm --filter @workspace/mobile test`.
+- EAS build profiles in `artifacts/mobile/eas.json`.
+
+## Release Follow-Ups (require accounts/devices — not automatable here)
+
+- Create the EAS project (`eas init`) so `extra.eas.projectId` lands in
+  app.json — required for real push tokens in development builds; Expo Go
+  (SDK 53+) cannot receive remote pushes.
+- iOS signing (Apple Developer team, provisioning) and Android keystore via
+  `eas credentials`; confirm the `ng.gov.securityapp` bundle id / package.
+- Real-device QA pass on iPhone and Android (login, report, push, offline
+  sync, evidence upload).
+- Production infrastructure: managed Postgres + backups, AUTH_SECRET secret
+  management, TLS/reverse proxy, S3/GCS evidence storage implementation of
+  the existing `EvidenceBinaryStorage` interface.
+- Optional: shared (Redis) rate limiting and revocation cache if the API is
+  scaled beyond one instance; SMS/email OTP delivery provider.
 
 ## Important Scope Note
 

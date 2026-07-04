@@ -14,9 +14,12 @@
       "backgroundColor": "#0F1B2D"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "ng.gov.securityapp"
     },
-    "android": {},
+    "android": {
+      "package": "ng.gov.securityapp"
+    },
     "web": {
       "favicon": "./assets/images/app-icon.png"
     },
@@ -29,7 +32,8 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,
