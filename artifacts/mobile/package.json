@@ -57,7 +57,9 @@
   },
   "dependencies": {
     "expo-clipboard": "~8.0.8",
+    "expo-device": "~8.0.10",
     "expo-network": "^8.0.8",
+    "expo-notifications": "~0.32.17",
     "expo-secure-store": "~15.0.8",
     "react-native-maps": "1.18.0"
   }

@@ -1,4 +1,3 @@
-import { notificationStore } from "./notificationStore";
 import { logger } from "./logger";
 
 /**
@@ -68,30 +67,3 @@ export async function sendPushToTokens(tokens: string[], message: PushMessage): 
   return delivered;
 }
 
-/** Push to every device registered for a user id. */
-export async function sendPushToUser(userId: string, message: PushMessage): Promise<number> {
-  const tokens = await notificationStore.listPushTokens({ userId });
-  return sendPushToTokens(tokens.map((t) => t.token), message);
-}
-
-/** Push to every device registered under an agency. */
-export async function sendPushToAgency(agency: string, message: PushMessage): Promise<number> {
-  const tokens = await notificationStore.listPushTokens({ agency });
-  return sendPushToTokens(tokens.map((t) => t.token), message);
-}
-
-/**
- * Deliver a PIN-reset OTP to the user's own registered devices. Falls back to
- * the server log so the flow remains operable before push registration —
- * never delivered to a caller-supplied address.
- */
-export async function deliverOtp(userId: string, badgeNumber: string, code: string): Promise<"push" | "log"> {
-  const delivered = await sendPushToUser(userId, {
-    title: "Your PIN reset code",
-    body: `Use code ${code} to reset your PIN. It expires in 10 minutes.`,
-    data: { type: "otp" },
-  });
-  if (delivered > 0) return "push";
-  logger.info({ badgeNumber }, "OTP issued (no push tokens registered — see demo response/logs)");
-  return "log";
-}

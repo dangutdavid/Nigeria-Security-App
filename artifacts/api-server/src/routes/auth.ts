@@ -13,7 +13,7 @@ import {
 import { recordAuditEvent } from "../lib/auditStore";
 import { consumeResetGrant, issueOtp, verifyOtp } from "../lib/otpStore";
 import { rateLimit } from "../lib/rateLimit";
-import { deliverOtp } from "../lib/pushSender";
+import { deliverOtp } from "../lib/pushDispatch";
 import { getAuth } from "../middlewares/authMiddleware";
 import { logger } from "../lib/logger";
 

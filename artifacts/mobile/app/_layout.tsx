@@ -6,7 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -23,12 +23,27 @@ import { PatrolProvider } from "@/context/PatrolContext";
 import { ReferralProvider } from "@/context/ReferralContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { TheftReportProvider } from "@/context/TheftReportContext";
+import { addNotificationRouting } from "@/services/pushNotificationService";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
+  const router = useRouter();
+
+  // Route notification taps (foreground, background, and cold start) to the
+  // screen carried in the push payload.
+  useEffect(() => {
+    return addNotificationRouting((route) => {
+      try {
+        router.push(route as Parameters<typeof router.push>[0]);
+      } catch {
+        router.push("/notifications");
+      }
+    });
+  }, [router]);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />

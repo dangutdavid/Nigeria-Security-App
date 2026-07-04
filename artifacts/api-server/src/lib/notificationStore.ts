@@ -327,7 +327,29 @@ function createNotificationStore(): NotificationStore {
   return new InMemoryNotificationStore();
 }
 
-export const notificationStore: NotificationStore = createNotificationStore();
+const baseNotificationStore = createNotificationStore();
+
+/**
+ * Public store: persists the notification, then mirrors it as an Expo push to
+ * the matching registered devices (fire-and-forget; a push failure never
+ * breaks the request). pushDispatch is imported lazily to avoid a module
+ * cycle (pushDispatch reads tokens from this store).
+ */
+export const notificationStore: NotificationStore = {
+  create: async (input) => {
+    const record = await baseNotificationStore.create(input);
+    void import("./pushDispatch")
+      .then((m) => m.dispatchPushForNotification(record))
+      .catch((err) => logger.warn({ err }, "Push dispatch import failed"));
+    return record;
+  },
+  list: (filter) => baseNotificationStore.list(filter),
+  markRead: (id) => baseNotificationStore.markRead(id),
+  markAllRead: (filter) => baseNotificationStore.markAllRead(filter),
+  unreadCount: (filter) => baseNotificationStore.unreadCount(filter),
+  savePushToken: (input) => baseNotificationStore.savePushToken(input),
+  listPushTokens: (filter) => baseNotificationStore.listPushTokens(filter),
+};
 
 // ---- Report event hooks (PART 5) ----------------------------------------------
 

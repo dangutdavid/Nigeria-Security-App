@@ -26,6 +26,7 @@ import {
   listNotifications,
   markAllRead as markAllReadApi,
   markRead,
+  savePushToken as savePushTokenApi,
 } from "@/services/notificationRepository";
 import { registerForPushNotifications } from "@/services/pushNotificationService";
 
@@ -99,6 +100,10 @@ export function NotificationCenter({ bottomPadding = 28 }: { bottomPadding?: num
 
   async function tryPushRegistration() {
     const result = await registerForPushNotifications();
+    if (result.ok && result.token) {
+      // Register the device token with the backend so it receives real pushes.
+      await savePushTokenApi(result.token);
+    }
     setPushMessage(result.ok ? "Push notifications are ready." : result.reason ?? "Push notification setup is not available yet.");
   }
 
