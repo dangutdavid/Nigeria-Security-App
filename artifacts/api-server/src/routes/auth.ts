@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { AuthLoginSchema } from "@workspace/api-zod";
 import { authenticate, capabilitiesForRole, signToken } from "../lib/auth";
+import { recordAuditEvent } from "../lib/auditStore";
 import { getAuth } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
@@ -15,6 +16,12 @@ router.post("/auth/login", async (req, res) => {
   }
   const outcome = await authenticate(result.data.badgeNumber, result.data.pin, result.data.agency);
   if (!outcome.ok) {
+    recordAuditEvent({
+      type: "auth",
+      title: "Login failed",
+      detail: `Failed login for badge ${result.data.badgeNumber.toUpperCase()} (${outcome.reason})`,
+      severity: "warning",
+    });
     if (outcome.reason === "inactive") {
       res.status(403).json({ error: "This account is inactive. Contact an administrator." });
       return;
@@ -23,6 +30,13 @@ router.post("/auth/login", async (req, res) => {
     return;
   }
   const { user } = outcome;
+  recordAuditEvent({
+    type: "auth",
+    title: "Login",
+    detail: `${user.name} (${user.badgeNumber}) signed in`,
+    actorUserId: user.id,
+    actorAgency: user.agency,
+  });
   res.json({
     token: signToken(user),
     user,

@@ -571,6 +571,12 @@ export type ListReportEvidence200 = {
   evidence: EvidenceMetadata[];
 };
 
+export type CreateEvidenceDownloadUrl200 = {
+  /** Relative API path incl. signature query params */
+  path: string;
+  expiresAt: string;
+};
+
 export type ListNotificationsParams = {
   unreadOnly?: boolean;
   agency?: AgencyQueryParameter;
@@ -627,4 +633,81 @@ export type ListAuditLogsParams = {
 
 export type ListAuditLogs200 = {
   auditLogs: AuditLog[];
+};
+
+export type ExportAuditLogsParams = {
+  agency?: AgencyQueryParameter;
+  type?: string;
+  severity?: AuditSeverity;
+};
+
+export type ListAgencyUnitsParams = {
+  agency: string;
+};
+
+export type CreateAgencyUnitBody = {
+  agency: string;
+  name: string;
+  level: string;
+  state?: string;
+  lga?: string;
+  parentUnitId?: string;
+};
+
+export type ListCaseTypesParams = {
+  agency: string;
+};
+
+export type CreateCaseTypeBody = {
+  agency: string;
+  code: string;
+  name: string;
+  workflow?: string[];
+  requiredFields?: string[];
+  slaMinutes?: number;
+};
+
+export type ListDutySessionsParams = {
+  agency?: string;
+};
+
+export type StartDutySessionBodyLocation = { [key: string]: unknown };
+
+export type StartDutySessionBody = {
+  location?: StartDutySessionBodyLocation;
+};
+
+export type EndDutySessionBodyLocation = { [key: string]: unknown };
+
+export type EndDutySessionBodyPatrolLogItem = { [key: string]: unknown };
+
+export type EndDutySessionBody = {
+  location?: EndDutySessionBodyLocation;
+  patrolLog?: EndDutySessionBodyPatrolLogItem[];
+};
+
+export type ListReferralsParams = {
+  agency?: string;
+};
+
+export type CreateReferralBody = {
+  reportReference: string;
+  toAgency: string;
+  reason: string;
+  dueAt?: string;
+};
+
+export type UpdateReferralStatusBodyStatus =
+  (typeof UpdateReferralStatusBodyStatus)[keyof typeof UpdateReferralStatusBodyStatus];
+
+export const UpdateReferralStatusBodyStatus = {
+  pending: "pending",
+  acknowledged: "acknowledged",
+  actioned: "actioned",
+  closed: "closed",
+} as const;
+
+export type UpdateReferralStatusBody = {
+  status: UpdateReferralStatusBodyStatus;
+  note?: string;
 };

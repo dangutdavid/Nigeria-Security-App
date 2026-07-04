@@ -28,10 +28,16 @@ import type {
   BadRequestResponse,
   CitizenReportSubmitRequest,
   CitizenReportTracking,
+  CreateAgencyUnitBody,
+  CreateCaseTypeBody,
+  CreateEvidenceDownloadUrl200,
+  CreateReferralBody,
   CreateUser201,
   DeactivateUser200,
+  EndDutySessionBody,
   EvidenceCreateRequest,
   EvidenceMetadata,
+  ExportAuditLogsParams,
   ForbiddenResponse,
   GetCitizenReportTimeline200,
   HealthStatus,
@@ -39,10 +45,14 @@ import type {
   ListAgenciesParams,
   ListAgencyReports200,
   ListAgencyReportsParams,
+  ListAgencyUnitsParams,
   ListAuditLogs200,
   ListAuditLogsParams,
+  ListCaseTypesParams,
+  ListDutySessionsParams,
   ListNotifications200,
   ListNotificationsParams,
+  ListReferralsParams,
   ListReportEvidence200,
   ListReportTimeline200,
   ListReports200,
@@ -59,7 +69,9 @@ import type {
   ReportStatusUpdateRequest,
   ReportSubmissionResponse,
   ResetUserPin200,
+  StartDutySessionBody,
   UnauthorizedResponse,
+  UpdateReferralStatusBody,
   UpdateUser200,
 } from "./api.schemas";
 
@@ -1608,6 +1620,220 @@ export const useCreateReportEvidenceMetadata = <
 };
 
 /**
+ * Raw binary upload (max 15 MB) for previously created evidence metadata. Content-Type must be an allowed image/video/audio/pdf type.
+ * @summary Upload the evidence binary
+ */
+export const getUploadReportEvidenceContentUrl = (
+  reportId: string,
+  evidenceId: string,
+) => {
+  return `/api/reports/${reportId}/evidence/${evidenceId}/content`;
+};
+
+export const uploadReportEvidenceContent = async (
+  reportId: string,
+  evidenceId: string,
+  uploadReportEvidenceContentBody: Blob,
+  options?: RequestInit,
+): Promise<EvidenceMetadata> => {
+  return customFetch<EvidenceMetadata>(
+    getUploadReportEvidenceContentUrl(reportId, evidenceId),
+    {
+      ...options,
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        ...options?.headers,
+      },
+      body: JSON.stringify(uploadReportEvidenceContentBody),
+    },
+  );
+};
+
+export const getUploadReportEvidenceContentMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadReportEvidenceContent>>,
+    TError,
+    { reportId: string; evidenceId: string; data: BodyType<Blob> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof uploadReportEvidenceContent>>,
+  TError,
+  { reportId: string; evidenceId: string; data: BodyType<Blob> },
+  TContext
+> => {
+  const mutationKey = ["uploadReportEvidenceContent"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof uploadReportEvidenceContent>>,
+    { reportId: string; evidenceId: string; data: BodyType<Blob> }
+  > = (props) => {
+    const { reportId, evidenceId, data } = props ?? {};
+
+    return uploadReportEvidenceContent(
+      reportId,
+      evidenceId,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UploadReportEvidenceContentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof uploadReportEvidenceContent>>
+>;
+export type UploadReportEvidenceContentMutationBody = BodyType<Blob>;
+export type UploadReportEvidenceContentMutationError = ErrorType<void>;
+
+/**
+ * @summary Upload the evidence binary
+ */
+export const useUploadReportEvidenceContent = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadReportEvidenceContent>>,
+    TError,
+    { reportId: string; evidenceId: string; data: BodyType<Blob> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof uploadReportEvidenceContent>>,
+  TError,
+  { reportId: string; evidenceId: string; data: BodyType<Blob> },
+  TContext
+> => {
+  return useMutation(getUploadReportEvidenceContentMutationOptions(options));
+};
+
+/**
+ * @summary Mint a short-lived signed download URL
+ */
+export const getCreateEvidenceDownloadUrlUrl = (
+  reportId: string,
+  evidenceId: string,
+) => {
+  return `/api/reports/${reportId}/evidence/${evidenceId}/download-url`;
+};
+
+export const createEvidenceDownloadUrl = async (
+  reportId: string,
+  evidenceId: string,
+  options?: RequestInit,
+): Promise<CreateEvidenceDownloadUrl200> => {
+  return customFetch<CreateEvidenceDownloadUrl200>(
+    getCreateEvidenceDownloadUrlUrl(reportId, evidenceId),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getCreateEvidenceDownloadUrlQueryKey = (
+  reportId: string,
+  evidenceId: string,
+) => {
+  return [
+    `/api/reports/${reportId}/evidence/${evidenceId}/download-url`,
+  ] as const;
+};
+
+export const getCreateEvidenceDownloadUrlQueryOptions = <
+  TData = Awaited<ReturnType<typeof createEvidenceDownloadUrl>>,
+  TError = ErrorType<void>,
+>(
+  reportId: string,
+  evidenceId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof createEvidenceDownloadUrl>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ??
+    getCreateEvidenceDownloadUrlQueryKey(reportId, evidenceId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof createEvidenceDownloadUrl>>
+  > = ({ signal }) =>
+    createEvidenceDownloadUrl(reportId, evidenceId, {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!(reportId && evidenceId),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof createEvidenceDownloadUrl>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type CreateEvidenceDownloadUrlQueryResult = NonNullable<
+  Awaited<ReturnType<typeof createEvidenceDownloadUrl>>
+>;
+export type CreateEvidenceDownloadUrlQueryError = ErrorType<void>;
+
+/**
+ * @summary Mint a short-lived signed download URL
+ */
+
+export function useCreateEvidenceDownloadUrl<
+  TData = Awaited<ReturnType<typeof createEvidenceDownloadUrl>>,
+  TError = ErrorType<void>,
+>(
+  reportId: string,
+  evidenceId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof createEvidenceDownloadUrl>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getCreateEvidenceDownloadUrlQueryOptions(
+    reportId,
+    evidenceId,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
  * @summary List notifications for the current user or agency
  */
 export const getListNotificationsUrl = (params?: ListNotificationsParams) => {
@@ -2848,3 +3074,995 @@ export function useListAuditLogs<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Export audit logs as CSV (admin only)
+ */
+export const getExportAuditLogsUrl = (params?: ExportAuditLogsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/audit-logs/export?${stringifiedParams}`
+    : `/api/audit-logs/export`;
+};
+
+export const exportAuditLogs = async (
+  params?: ExportAuditLogsParams,
+  options?: RequestInit,
+): Promise<string> => {
+  return customFetch<string>(getExportAuditLogsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getExportAuditLogsQueryKey = (params?: ExportAuditLogsParams) => {
+  return [`/api/audit-logs/export`, ...(params ? [params] : [])] as const;
+};
+
+export const getExportAuditLogsQueryOptions = <
+  TData = Awaited<ReturnType<typeof exportAuditLogs>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ExportAuditLogsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportAuditLogs>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getExportAuditLogsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof exportAuditLogs>>> = ({
+    signal,
+  }) => exportAuditLogs(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof exportAuditLogs>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ExportAuditLogsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof exportAuditLogs>>
+>;
+export type ExportAuditLogsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Export audit logs as CSV (admin only)
+ */
+
+export function useExportAuditLogs<
+  TData = Awaited<ReturnType<typeof exportAuditLogs>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ExportAuditLogsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof exportAuditLogs>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getExportAuditLogsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary List units for an agency (DB mode only)
+ */
+export const getListAgencyUnitsUrl = (params: ListAgencyUnitsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/agency-units?${stringifiedParams}`
+    : `/api/agency-units`;
+};
+
+export const listAgencyUnits = async (
+  params: ListAgencyUnitsParams,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getListAgencyUnitsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAgencyUnitsQueryKey = (params?: ListAgencyUnitsParams) => {
+  return [`/api/agency-units`, ...(params ? [params] : [])] as const;
+};
+
+export const getListAgencyUnitsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAgencyUnits>>,
+  TError = ErrorType<unknown>,
+>(
+  params: ListAgencyUnitsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAgencyUnits>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAgencyUnitsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAgencyUnits>>> = ({
+    signal,
+  }) => listAgencyUnits(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAgencyUnits>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAgencyUnitsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAgencyUnits>>
+>;
+export type ListAgencyUnitsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List units for an agency (DB mode only)
+ */
+
+export function useListAgencyUnits<
+  TData = Awaited<ReturnType<typeof listAgencyUnits>>,
+  TError = ErrorType<unknown>,
+>(
+  params: ListAgencyUnitsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listAgencyUnits>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAgencyUnitsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a unit for an agency (DB mode only)
+ */
+export const getCreateAgencyUnitUrl = () => {
+  return `/api/agency-units`;
+};
+
+export const createAgencyUnit = async (
+  createAgencyUnitBody: CreateAgencyUnitBody,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getCreateAgencyUnitUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createAgencyUnitBody),
+  });
+};
+
+export const getCreateAgencyUnitMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAgencyUnit>>,
+    TError,
+    { data: BodyType<CreateAgencyUnitBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createAgencyUnit>>,
+  TError,
+  { data: BodyType<CreateAgencyUnitBody> },
+  TContext
+> => {
+  const mutationKey = ["createAgencyUnit"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createAgencyUnit>>,
+    { data: BodyType<CreateAgencyUnitBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createAgencyUnit(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateAgencyUnitMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createAgencyUnit>>
+>;
+export type CreateAgencyUnitMutationBody = BodyType<CreateAgencyUnitBody>;
+export type CreateAgencyUnitMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a unit for an agency (DB mode only)
+ */
+export const useCreateAgencyUnit = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAgencyUnit>>,
+    TError,
+    { data: BodyType<CreateAgencyUnitBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createAgencyUnit>>,
+  TError,
+  { data: BodyType<CreateAgencyUnitBody> },
+  TContext
+> => {
+  return useMutation(getCreateAgencyUnitMutationOptions(options));
+};
+
+/**
+ * @summary List case types for an agency (DB mode only)
+ */
+export const getListCaseTypesUrl = (params: ListCaseTypesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/case-types?${stringifiedParams}`
+    : `/api/case-types`;
+};
+
+export const listCaseTypes = async (
+  params: ListCaseTypesParams,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getListCaseTypesUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListCaseTypesQueryKey = (params?: ListCaseTypesParams) => {
+  return [`/api/case-types`, ...(params ? [params] : [])] as const;
+};
+
+export const getListCaseTypesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listCaseTypes>>,
+  TError = ErrorType<unknown>,
+>(
+  params: ListCaseTypesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCaseTypes>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListCaseTypesQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listCaseTypes>>> = ({
+    signal,
+  }) => listCaseTypes(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listCaseTypes>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListCaseTypesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listCaseTypes>>
+>;
+export type ListCaseTypesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List case types for an agency (DB mode only)
+ */
+
+export function useListCaseTypes<
+  TData = Awaited<ReturnType<typeof listCaseTypes>>,
+  TError = ErrorType<unknown>,
+>(
+  params: ListCaseTypesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listCaseTypes>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListCaseTypesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a case type (admin, DB mode only)
+ */
+export const getCreateCaseTypeUrl = () => {
+  return `/api/case-types`;
+};
+
+export const createCaseType = async (
+  createCaseTypeBody: CreateCaseTypeBody,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getCreateCaseTypeUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createCaseTypeBody),
+  });
+};
+
+export const getCreateCaseTypeMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCaseType>>,
+    TError,
+    { data: BodyType<CreateCaseTypeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createCaseType>>,
+  TError,
+  { data: BodyType<CreateCaseTypeBody> },
+  TContext
+> => {
+  const mutationKey = ["createCaseType"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createCaseType>>,
+    { data: BodyType<CreateCaseTypeBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createCaseType(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateCaseTypeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createCaseType>>
+>;
+export type CreateCaseTypeMutationBody = BodyType<CreateCaseTypeBody>;
+export type CreateCaseTypeMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a case type (admin, DB mode only)
+ */
+export const useCreateCaseType = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createCaseType>>,
+    TError,
+    { data: BodyType<CreateCaseTypeBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createCaseType>>,
+  TError,
+  { data: BodyType<CreateCaseTypeBody> },
+  TContext
+> => {
+  return useMutation(getCreateCaseTypeMutationOptions(options));
+};
+
+/**
+ * @summary List duty sessions for an agency (DB mode only)
+ */
+export const getListDutySessionsUrl = (params?: ListDutySessionsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/duty-sessions?${stringifiedParams}`
+    : `/api/duty-sessions`;
+};
+
+export const listDutySessions = async (
+  params?: ListDutySessionsParams,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getListDutySessionsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListDutySessionsQueryKey = (
+  params?: ListDutySessionsParams,
+) => {
+  return [`/api/duty-sessions`, ...(params ? [params] : [])] as const;
+};
+
+export const getListDutySessionsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDutySessions>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListDutySessionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDutySessions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListDutySessionsQueryKey(params);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listDutySessions>>
+  > = ({ signal }) => listDutySessions(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDutySessions>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDutySessionsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDutySessions>>
+>;
+export type ListDutySessionsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List duty sessions for an agency (DB mode only)
+ */
+
+export function useListDutySessions<
+  TData = Awaited<ReturnType<typeof listDutySessions>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListDutySessionsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDutySessions>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDutySessionsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Start a duty session for the authenticated officer (DB mode only)
+ */
+export const getStartDutySessionUrl = () => {
+  return `/api/duty-sessions/start`;
+};
+
+export const startDutySession = async (
+  startDutySessionBody?: StartDutySessionBody,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getStartDutySessionUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(startDutySessionBody),
+  });
+};
+
+export const getStartDutySessionMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startDutySession>>,
+    TError,
+    { data: BodyType<StartDutySessionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof startDutySession>>,
+  TError,
+  { data: BodyType<StartDutySessionBody> },
+  TContext
+> => {
+  const mutationKey = ["startDutySession"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof startDutySession>>,
+    { data: BodyType<StartDutySessionBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return startDutySession(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type StartDutySessionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof startDutySession>>
+>;
+export type StartDutySessionMutationBody = BodyType<StartDutySessionBody>;
+export type StartDutySessionMutationError = ErrorType<void>;
+
+/**
+ * @summary Start a duty session for the authenticated officer (DB mode only)
+ */
+export const useStartDutySession = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof startDutySession>>,
+    TError,
+    { data: BodyType<StartDutySessionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof startDutySession>>,
+  TError,
+  { data: BodyType<StartDutySessionBody> },
+  TContext
+> => {
+  return useMutation(getStartDutySessionMutationOptions(options));
+};
+
+/**
+ * @summary End a duty session (owner or admin, DB mode only)
+ */
+export const getEndDutySessionUrl = (dutySessionId: string) => {
+  return `/api/duty-sessions/${dutySessionId}/end`;
+};
+
+export const endDutySession = async (
+  dutySessionId: string,
+  endDutySessionBody?: EndDutySessionBody,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getEndDutySessionUrl(dutySessionId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(endDutySessionBody),
+  });
+};
+
+export const getEndDutySessionMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof endDutySession>>,
+    TError,
+    { dutySessionId: string; data: BodyType<EndDutySessionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof endDutySession>>,
+  TError,
+  { dutySessionId: string; data: BodyType<EndDutySessionBody> },
+  TContext
+> => {
+  const mutationKey = ["endDutySession"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof endDutySession>>,
+    { dutySessionId: string; data: BodyType<EndDutySessionBody> }
+  > = (props) => {
+    const { dutySessionId, data } = props ?? {};
+
+    return endDutySession(dutySessionId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type EndDutySessionMutationResult = NonNullable<
+  Awaited<ReturnType<typeof endDutySession>>
+>;
+export type EndDutySessionMutationBody = BodyType<EndDutySessionBody>;
+export type EndDutySessionMutationError = ErrorType<unknown>;
+
+/**
+ * @summary End a duty session (owner or admin, DB mode only)
+ */
+export const useEndDutySession = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof endDutySession>>,
+    TError,
+    { dutySessionId: string; data: BodyType<EndDutySessionBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof endDutySession>>,
+  TError,
+  { dutySessionId: string; data: BodyType<EndDutySessionBody> },
+  TContext
+> => {
+  return useMutation(getEndDutySessionMutationOptions(options));
+};
+
+/**
+ * @summary List referrals sent/received by an agency (DB mode)
+ */
+export const getListReferralsUrl = (params?: ListReferralsParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/referrals?${stringifiedParams}`
+    : `/api/referrals`;
+};
+
+export const listReferrals = async (
+  params?: ListReferralsParams,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getListReferralsUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListReferralsQueryKey = (params?: ListReferralsParams) => {
+  return [`/api/referrals`, ...(params ? [params] : [])] as const;
+};
+
+export const getListReferralsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listReferrals>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListReferralsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listReferrals>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListReferralsQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listReferrals>>> = ({
+    signal,
+  }) => listReferrals(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listReferrals>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListReferralsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listReferrals>>
+>;
+export type ListReferralsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List referrals sent/received by an agency (DB mode)
+ */
+
+export function useListReferrals<
+  TData = Awaited<ReturnType<typeof listReferrals>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: ListReferralsParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listReferrals>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListReferralsQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Refer a citizen report to another agency (DB mode)
+ */
+export const getCreateReferralUrl = () => {
+  return `/api/referrals`;
+};
+
+export const createReferral = async (
+  createReferralBody: CreateReferralBody,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getCreateReferralUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(createReferralBody),
+  });
+};
+
+export const getCreateReferralMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createReferral>>,
+    TError,
+    { data: BodyType<CreateReferralBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createReferral>>,
+  TError,
+  { data: BodyType<CreateReferralBody> },
+  TContext
+> => {
+  const mutationKey = ["createReferral"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createReferral>>,
+    { data: BodyType<CreateReferralBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createReferral(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateReferralMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createReferral>>
+>;
+export type CreateReferralMutationBody = BodyType<CreateReferralBody>;
+export type CreateReferralMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Refer a citizen report to another agency (DB mode)
+ */
+export const useCreateReferral = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createReferral>>,
+    TError,
+    { data: BodyType<CreateReferralBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createReferral>>,
+  TError,
+  { data: BodyType<CreateReferralBody> },
+  TContext
+> => {
+  return useMutation(getCreateReferralMutationOptions(options));
+};
+
+/**
+ * @summary Update referral status (receiving agency or admin, DB mode)
+ */
+export const getUpdateReferralStatusUrl = (referralId: string) => {
+  return `/api/referrals/${referralId}/status`;
+};
+
+export const updateReferralStatus = async (
+  referralId: string,
+  updateReferralStatusBody: UpdateReferralStatusBody,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getUpdateReferralStatusUrl(referralId), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(updateReferralStatusBody),
+  });
+};
+
+export const getUpdateReferralStatusMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateReferralStatus>>,
+    TError,
+    { referralId: string; data: BodyType<UpdateReferralStatusBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateReferralStatus>>,
+  TError,
+  { referralId: string; data: BodyType<UpdateReferralStatusBody> },
+  TContext
+> => {
+  const mutationKey = ["updateReferralStatus"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateReferralStatus>>,
+    { referralId: string; data: BodyType<UpdateReferralStatusBody> }
+  > = (props) => {
+    const { referralId, data } = props ?? {};
+
+    return updateReferralStatus(referralId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateReferralStatusMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateReferralStatus>>
+>;
+export type UpdateReferralStatusMutationBody =
+  BodyType<UpdateReferralStatusBody>;
+export type UpdateReferralStatusMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Update referral status (receiving agency or admin, DB mode)
+ */
+export const useUpdateReferralStatus = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateReferralStatus>>,
+    TError,
+    { referralId: string; data: BodyType<UpdateReferralStatusBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateReferralStatus>>,
+  TError,
+  { referralId: string; data: BodyType<UpdateReferralStatusBody> },
+  TContext
+> => {
+  return useMutation(getUpdateReferralStatusMutationOptions(options));
+};

@@ -35,6 +35,26 @@ if (!process.env.AUTH_SECRET) {
   logger.warn("AUTH_SECRET is not set — using an insecure development secret. Set AUTH_SECRET in production.");
 }
 
+/**
+ * HMAC-sign an arbitrary payload with the shared auth secret. Used for
+ * short-lived signed artifacts beyond login tokens (e.g. evidence download
+ * URLs) so they all rotate with AUTH_SECRET.
+ */
+export function signPayload(payload: string): string {
+  return createHmac("sha256", AUTH_SECRET).update(payload).digest("base64url");
+}
+
+/** Constant-time comparison of a signature against the expected value. */
+export function verifyPayloadSignature(payload: string, signature: string): boolean {
+  const expected = signPayload(payload);
+  if (signature.length !== expected.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
 // ---- Stateless HMAC token (no session store; survives restart while secret is stable) ----
 
 export function signToken(user: AuthUser): string {

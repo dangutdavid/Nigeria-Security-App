@@ -1509,6 +1509,59 @@ export const CreateReportEvidenceMetadataBody = zod.object({
 });
 
 /**
+ * Raw binary upload (max 15 MB) for previously created evidence metadata. Content-Type must be an allowed image/video/audio/pdf type.
+ * @summary Upload the evidence binary
+ */
+export const uploadReportEvidenceContentPathReportIdMin = 3;
+
+export const UploadReportEvidenceContentParams = zod.object({
+  reportId: zod.coerce.string().min(uploadReportEvidenceContentPathReportIdMin),
+  evidenceId: zod.coerce.string(),
+});
+
+export const UploadReportEvidenceContentResponse = zod
+  .object({
+    kind: zod.enum([
+      "photo",
+      "video",
+      "audio",
+      "document",
+      "statement",
+      "other",
+    ]),
+    uri: zod.string(),
+    fileName: zod.string().optional(),
+    mimeType: zod.string().optional(),
+    sizeBytes: zod.number().optional(),
+    checksum: zod.string().optional(),
+    capturedAt: zod.coerce.date().optional(),
+    metadata: zod.record(zod.string(), zod.unknown()).optional(),
+  })
+  .and(
+    zod.object({
+      id: zod.string(),
+      reportId: zod.string(),
+      uploadedByUserId: zod.string().optional(),
+      createdAt: zod.coerce.date(),
+    }),
+  );
+
+/**
+ * @summary Mint a short-lived signed download URL
+ */
+export const createEvidenceDownloadUrlPathReportIdMin = 3;
+
+export const CreateEvidenceDownloadUrlParams = zod.object({
+  reportId: zod.coerce.string().min(createEvidenceDownloadUrlPathReportIdMin),
+  evidenceId: zod.coerce.string(),
+});
+
+export const CreateEvidenceDownloadUrlResponse = zod.object({
+  path: zod.string().describe("Relative API path incl. signature query params"),
+  expiresAt: zod.coerce.date(),
+});
+
+/**
  * @summary List notifications for the current user or agency
  */
 export const ListNotificationsQueryParams = zod.object({
@@ -1995,4 +2048,118 @@ export const ListAuditLogsResponse = zod.object({
       createdAt: zod.coerce.date(),
     }),
   ),
+});
+
+/**
+ * @summary Export audit logs as CSV (admin only)
+ */
+export const ExportAuditLogsQueryParams = zod.object({
+  agency: zod
+    .enum([
+      "frsc",
+      "police",
+      "vio",
+      "civil_defence",
+      "admin",
+      "citizen",
+      "dss",
+      "fire_service",
+      "custom",
+    ])
+    .optional(),
+  type: zod.coerce.string().optional(),
+  severity: zod.enum(["info", "warning", "critical"]).optional(),
+});
+
+/**
+ * @summary List units for an agency (DB mode only)
+ */
+export const ListAgencyUnitsQueryParams = zod.object({
+  agency: zod.coerce.string(),
+});
+
+/**
+ * @summary Create a unit for an agency (DB mode only)
+ */
+export const CreateAgencyUnitBody = zod.object({
+  agency: zod.string(),
+  name: zod.string(),
+  level: zod.string(),
+  state: zod.string().optional(),
+  lga: zod.string().optional(),
+  parentUnitId: zod.string().optional(),
+});
+
+/**
+ * @summary List case types for an agency (DB mode only)
+ */
+export const ListCaseTypesQueryParams = zod.object({
+  agency: zod.coerce.string(),
+});
+
+/**
+ * @summary Create a case type (admin, DB mode only)
+ */
+export const CreateCaseTypeBody = zod.object({
+  agency: zod.string(),
+  code: zod.string(),
+  name: zod.string(),
+  workflow: zod.array(zod.string()).optional(),
+  requiredFields: zod.array(zod.string()).optional(),
+  slaMinutes: zod.number().optional(),
+});
+
+/**
+ * @summary List duty sessions for an agency (DB mode only)
+ */
+export const ListDutySessionsQueryParams = zod.object({
+  agency: zod.coerce.string().optional(),
+});
+
+/**
+ * @summary Start a duty session for the authenticated officer (DB mode only)
+ */
+export const StartDutySessionBody = zod.object({
+  location: zod.record(zod.string(), zod.unknown()).optional(),
+});
+
+/**
+ * @summary End a duty session (owner or admin, DB mode only)
+ */
+export const EndDutySessionParams = zod.object({
+  dutySessionId: zod.coerce.string(),
+});
+
+export const EndDutySessionBody = zod.object({
+  location: zod.record(zod.string(), zod.unknown()).optional(),
+  patrolLog: zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+});
+
+/**
+ * @summary List referrals sent/received by an agency (DB mode)
+ */
+export const ListReferralsQueryParams = zod.object({
+  agency: zod.coerce.string().optional(),
+});
+
+/**
+ * @summary Refer a citizen report to another agency (DB mode)
+ */
+export const CreateReferralBody = zod.object({
+  reportReference: zod.string(),
+  toAgency: zod.string(),
+  reason: zod.string(),
+  dueAt: zod.coerce.date().optional(),
+});
+
+/**
+ * @summary Update referral status (receiving agency or admin, DB mode)
+ */
+export const UpdateReferralStatusParams = zod.object({
+  referralId: zod.coerce.string(),
+});
+
+export const UpdateReferralStatusBody = zod.object({
+  status: zod.enum(["pending", "acknowledged", "actioned", "closed"]),
+  note: zod.string().optional(),
 });

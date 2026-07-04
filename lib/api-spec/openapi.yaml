@@ -354,6 +354,66 @@ paths:
               schema:
                 $ref: "#/components/schemas/EvidenceMetadata"
 
+  /reports/{reportId}/evidence/{evidenceId}/content:
+    put:
+      operationId: uploadReportEvidenceContent
+      tags: [evidence]
+      summary: Upload the evidence binary
+      description: Raw binary upload (max 15 MB) for previously created evidence metadata. Content-Type must be an allowed image/video/audio/pdf type.
+      parameters:
+        - $ref: "#/components/parameters/ReportIdParam"
+        - name: evidenceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Binary stored; metadata updated with checksum and size
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceMetadata"
+        "415":
+          description: Unsupported content type
+
+  /reports/{reportId}/evidence/{evidenceId}/download-url:
+    get:
+      operationId: createEvidenceDownloadUrl
+      tags: [evidence]
+      summary: Mint a short-lived signed download URL
+      parameters:
+        - $ref: "#/components/parameters/ReportIdParam"
+        - name: evidenceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Signed download link (valid ~15 minutes)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                    description: Relative API path incl. signature query params
+                  expiresAt:
+                    type: string
+                    format: date-time
+                required: [path, expiresAt]
+        "409":
+          description: No binary uploaded yet
+
   /notifications:
     get:
       operationId: listNotifications
@@ -693,6 +753,232 @@ paths:
                     items:
                       $ref: "#/components/schemas/AuditLog"
                 required: [auditLogs]
+
+  /audit-logs/export:
+    get:
+      operationId: exportAuditLogs
+      tags: [audit]
+      summary: Export audit logs as CSV (admin only)
+      parameters:
+        - $ref: "#/components/parameters/AgencyQuery"
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: severity
+          in: query
+          schema:
+            $ref: "#/components/schemas/AuditSeverity"
+      responses:
+        "200":
+          description: CSV export (up to 1000 rows)
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /agency-units:
+    get:
+      operationId: listAgencyUnits
+      tags: [agencies]
+      summary: List units for an agency (DB mode only)
+      parameters:
+        - name: agency
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Unit list
+    post:
+      operationId: createAgencyUnit
+      tags: [agencies]
+      summary: Create a unit for an agency (DB mode only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agency: { type: string }
+                name: { type: string }
+                level: { type: string }
+                state: { type: string }
+                lga: { type: string }
+                parentUnitId: { type: string }
+              required: [agency, name, level]
+      responses:
+        "201":
+          description: Unit created
+
+  /case-types:
+    get:
+      operationId: listCaseTypes
+      tags: [agencies]
+      summary: List case types for an agency (DB mode only)
+      parameters:
+        - name: agency
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Case type list
+    post:
+      operationId: createCaseType
+      tags: [agencies]
+      summary: Create a case type (admin, DB mode only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agency: { type: string }
+                code: { type: string }
+                name: { type: string }
+                workflow:
+                  type: array
+                  items: { type: string }
+                requiredFields:
+                  type: array
+                  items: { type: string }
+                slaMinutes: { type: integer }
+              required: [agency, code, name]
+      responses:
+        "201":
+          description: Case type created
+
+  /duty-sessions:
+    get:
+      operationId: listDutySessions
+      tags: [agencies]
+      summary: List duty sessions for an agency (DB mode only)
+      parameters:
+        - name: agency
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Duty session list
+
+  /duty-sessions/start:
+    post:
+      operationId: startDutySession
+      tags: [agencies]
+      summary: Start a duty session for the authenticated officer (DB mode only)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                location:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "201":
+          description: Duty session started
+        "409":
+          description: An open duty session already exists
+
+  /duty-sessions/{dutySessionId}/end:
+    patch:
+      operationId: endDutySession
+      tags: [agencies]
+      summary: End a duty session (owner or admin, DB mode only)
+      parameters:
+        - name: dutySessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                location:
+                  type: object
+                  additionalProperties: true
+                patrolLog:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+      responses:
+        "200":
+          description: Duty session ended
+
+  /referrals:
+    get:
+      operationId: listReferrals
+      tags: [agencies]
+      summary: List referrals sent/received by an agency (DB mode)
+      parameters:
+        - name: agency
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Referrals grouped as received and sent
+    post:
+      operationId: createReferral
+      tags: [agencies]
+      summary: Refer a citizen report to another agency (DB mode)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reportReference: { type: string }
+                toAgency: { type: string }
+                reason: { type: string }
+                dueAt:
+                  type: string
+                  format: date-time
+              required: [reportReference, toAgency, reason]
+      responses:
+        "201":
+          description: Referral created
+
+  /referrals/{referralId}/status:
+    patch:
+      operationId: updateReferralStatus
+      tags: [agencies]
+      summary: Update referral status (receiving agency or admin, DB mode)
+      parameters:
+        - name: referralId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [pending, acknowledged, actioned, closed]
+                note: { type: string }
+              required: [status]
+      responses:
+        "200":
+          description: Referral updated
 
 components:
   securitySchemes:

@@ -2,6 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { AgencyType } from "@/context/AuthContext";
 import { createAuditEvent } from "@/services/auditLogService";
+import {
+  createAgencyOnApi,
+  listAgenciesFromApi,
+  updateAgencyOnApi,
+} from "@/services/agencyRepository";
 
 export type AgencyId = AgencyType | string;
 
@@ -156,7 +161,16 @@ export function AgencyProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.getItem(AGENCY_REGISTRY_KEY),
       ]);
       const storedAgencies = parseStoredAgencies(registry);
-      const merged = sortAgencies(mergeAgencies(DEFAULT_AGENCIES, storedAgencies));
+      let merged = sortAgencies(mergeAgencies(DEFAULT_AGENCIES, storedAgencies));
+
+      // API-first: adopt the backend registry when available; the local copy
+      // above stays as the offline cache.
+      const serverAgencies = await listAgenciesFromApi();
+      if (serverAgencies && serverAgencies.length > 0) {
+        merged = sortAgencies(mergeAgencies(merged, serverAgencies));
+        await persistAgencyOverrides(merged);
+      }
+
       setAgencies(merged);
       if (selected) {
         const agency = merged.find((a) => a.id === selected && a.isActive !== false);
@@ -205,6 +219,8 @@ export function AgencyProvider({ children }: { children: React.ReactNode }) {
     const next = sortAgencies([...agencies, agency]);
     setAgencies(next);
     await persistAgencyOverrides(next);
+    // Best-effort backend registry sync; local registry remains the offline cache.
+    void createAgencyOnApi(agency);
     await createAuditEvent({
       type: "agency.created",
       title: "Agency registry entry created",
@@ -247,6 +263,16 @@ export function AgencyProvider({ children }: { children: React.ReactNode }) {
     const next = sortAgencies(agencies.map((agency) => (agency.id === id ? normalized : agency)));
     setAgencies(next);
     await persistAgencyOverrides(next);
+    void updateAgencyOnApi(id, {
+      name: normalized.name,
+      shortName: normalized.shortName,
+      fullName: normalized.fullName,
+      primaryColor: normalized.primaryColor,
+      secondaryColor: normalized.secondaryColor,
+      badgePrefix: normalized.badgePrefix,
+      description: normalized.description,
+      icon: normalized.icon,
+    });
     if (selectedAgency?.id === id) setSelectedAgency(normalized);
 
     const changedKeys = (Object.keys(editable) as Array<keyof AgencyConfig>).filter(
@@ -273,6 +299,7 @@ export function AgencyProvider({ children }: { children: React.ReactNode }) {
     const next = sortAgencies(agencies.map((agency) => (agency.id === id ? { ...agency, isActive } : agency)));
     setAgencies(next);
     await persistAgencyOverrides(next);
+    void updateAgencyOnApi(id, { isActive });
 
     if (!isActive && selectedAgency?.id === id) {
       setSelectedAgency(null);

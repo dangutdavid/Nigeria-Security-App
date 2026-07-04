@@ -401,6 +401,97 @@ export const citizenReports = pgTable(
   }),
 );
 
+/**
+ * Evidence attached to citizen reports. A flat mirror of the OpenAPI
+ * `EvidenceMetadata` shape, keyed by citizen_reports.id. Kept separate from
+ * the tenant-scoped `evidence` table (which references `cases`).
+ */
+export const citizenReportEvidence = pgTable(
+  "citizen_report_evidence",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reportId: uuid("report_id")
+      .notNull()
+      .references(() => citizenReports.id),
+    kind: evidenceKind("kind").notNull(),
+    /** Client-supplied source uri or the server storage key once uploaded. */
+    uri: text("uri").notNull(),
+    /** Storage key when the binary lives in server-side evidence storage. */
+    storageKey: text("storage_key"),
+    fileName: text("file_name"),
+    mimeType: text("mime_type"),
+    sizeBytes: integer("size_bytes"),
+    checksum: text("checksum"),
+    uploadedBy: text("uploaded_by"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    capturedAt: timestamp("captured_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    reportIdx: index("citizen_report_evidence_report_idx").on(table.reportId),
+  }),
+);
+
+/**
+ * Agency registry mirroring the mobile `AgencyConfig` model — plain text id
+ * (frsc | police | dss | custom-…) so dynamic agencies work without a tenant
+ * row, consistent with `auth_users` and `citizen_reports`.
+ */
+export const agencies = pgTable(
+  "agencies",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    shortName: text("short_name").notNull(),
+    fullName: text("full_name").notNull(),
+    primaryColor: text("primary_color").notNull(),
+    secondaryColor: text("secondary_color").notNull(),
+    badgePrefix: text("badge_prefix").notNull(),
+    description: text("description").notNull(),
+    icon: text("icon"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+);
+
+/**
+ * Flat audit trail matching the OpenAPI `AuditLog` shape (type/title/detail/
+ * severity, plain agency ids). Kept separate from the tenant-scoped
+ * `audit_logs` table, which is left unchanged.
+ */
+export const auditEvents = pgTable(
+  "audit_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    type: text("type").notNull(),
+    title: text("title").notNull(),
+    detail: text("detail").notNull(),
+    severity: text("severity").notNull().default("info"),
+    actorUserId: text("actor_user_id"),
+    actorAgency: text("actor_agency"),
+    targetId: text("target_id"),
+    reportReference: text("report_reference"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    typeCreatedIdx: index("audit_events_type_created_idx").on(
+      table.type,
+      table.createdAt,
+    ),
+    agencyIdx: index("audit_events_agency_idx").on(table.actorAgency),
+  }),
+);
+
 /** In-app notifications mirroring the mobile `AppNotification` model. */
 export const citizenNotifications = pgTable(
   "citizen_notifications",

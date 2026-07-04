@@ -11,6 +11,7 @@ import {
   toReportPayload,
 } from "../lib/citizenReportStore";
 import { notifyReassigned, notifyStatusChanged } from "../lib/notificationStore";
+import { recordAuditEvent } from "../lib/auditStore";
 import { logger } from "../lib/logger";
 import { isAdminRole } from "../lib/auth";
 import {
@@ -109,6 +110,14 @@ router.patch("/reports/:id/status", async (req, res) => {
       return;
     }
     await notifyStatusChanged(report, result.data.actorName);
+    recordAuditEvent({
+      type: "report",
+      title: "Report status updated",
+      detail: `${report.reference} moved to ${result.data.status}`,
+      actorUserId: auth.sub,
+      actorAgency: auth.agency,
+      reportReference: report.reference,
+    });
     res.json({ report: toReportPayload(report) });
   } catch (error) {
     fail(res, error);
@@ -117,7 +126,8 @@ router.patch("/reports/:id/status", async (req, res) => {
 
 // PART 5 — Reassignment: admin / super_admin only.
 router.post("/reports/:id/reassign", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  const adminAuth = requireAdmin(req, res);
+  if (!adminAuth) return;
   const result = ReportReassignSchema.safeParse(req.body);
   if (!result.success) {
     res.status(400).json({ error: "Validation failed", issues: result.error.flatten() });
@@ -137,6 +147,15 @@ router.post("/reports/:id/reassign", async (req, res) => {
       return;
     }
     await notifyReassigned(report, fromAgency, result.data.actorName);
+    recordAuditEvent({
+      type: "report",
+      title: "Report reassigned",
+      detail: `${report.reference} reassigned from ${fromAgency} to ${targetAgency}`,
+      severity: "warning",
+      actorUserId: adminAuth.sub,
+      actorAgency: adminAuth.agency,
+      reportReference: report.reference,
+    });
     res.json({ report: toReportPayload(report) });
   } catch (error) {
     fail(res, error);
