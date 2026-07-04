@@ -16,14 +16,17 @@ export interface PushRegistrationResult {
 }
 
 // Show incoming pushes as banners while the app is foregrounded.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+// expo-notifications is native-only; every entry point below no-ops on web.
+if (Platform.OS !== "web") {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
 
 /**
  * Register this device for Expo push notifications: ask permission, create the
@@ -78,6 +81,8 @@ export async function registerForPushNotifications(): Promise<PushRegistrationRe
  * unsubscribe function. Also handles the cold-start tap.
  */
 export function addNotificationRouting(navigate: (route: string) => void): () => void {
+  if (Platform.OS === "web") return () => {};
+
   const handleResponse = (response: Notifications.NotificationResponse) => {
     const data = response.notification.request.content.data as { route?: string } | undefined;
     if (data?.route && typeof data.route === "string") navigate(data.route);
