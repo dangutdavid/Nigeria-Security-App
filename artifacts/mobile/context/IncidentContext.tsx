@@ -1,9 +1,26 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Network from "expo-network";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import { submitCitizenReport } from "@/services/reportRepository";
+import type { CitizenEmergencyLevel, CitizenIncidentType } from "@/services/citizenIncidentApi";
 
 export type IncidentType = "crash" | "breakdown" | "hazard" | "flooding";
 export type SeverityLevel = "fatal" | "serious" | "minor" | "property_only";
+
+/** Mapping into the backend citizen-report vocabulary for offline sync. */
+const INCIDENT_TYPE_TO_REPORT_TYPE: Record<IncidentType, CitizenIncidentType> = {
+  crash: "road_crash",
+  breakdown: "vehicle_breakdown",
+  hazard: "road_hazard",
+  flooding: "road_hazard",
+};
+
+const SEVERITY_TO_EMERGENCY: Record<SeverityLevel, CitizenEmergencyLevel> = {
+  fatal: "critical",
+  serious: "high",
+  minor: "medium",
+  property_only: "low",
+};
 export type IncidentStatus =
   | "draft"
   | "submitted"
@@ -549,10 +566,49 @@ export function IncidentProvider({ children }: { children: React.ReactNode }) {
     return incidents.find((incident) => incident.id === id);
   }
 
+  /**
+   * Push queued (pendingSync) incidents to the backend through the citizen
+   * report pipeline, routed to FRSC. Each incident is retried once; only
+   * successfully submitted incidents lose their pendingSync flag, so failures
+   * stay queued for the next sync. Conflict handling is last-write-wins: the
+   * device's current copy is what gets submitted.
+   */
   async function syncPending() {
-    const next = incidents.map((incident) => (incident.pendingSync ? { ...incident, pendingSync: false } : incident));
+    const pending = incidents.filter((incident) => incident.pendingSync);
+    if (pending.length === 0) {
+      setIsOffline(false);
+      return;
+    }
+
+    const syncedIds = new Set<string>();
+    for (const incident of pending) {
+      for (let attempt = 0; attempt < 2 && !syncedIds.has(incident.id); attempt += 1) {
+        try {
+          await submitCitizenReport({
+            incidentType: INCIDENT_TYPE_TO_REPORT_TYPE[incident.type] ?? "road_crash",
+            description: `${incident.title}. ${incident.description}`.trim(),
+            location: incident.location,
+            latitude: incident.latitude,
+            longitude: incident.longitude,
+            address: incident.location,
+            state: incident.state,
+            lga: incident.lga,
+            locationSource: "gps",
+            emergencyLevel: SEVERITY_TO_EMERGENCY[incident.severity] ?? "medium",
+            suggestedAgency: "frsc",
+          });
+          syncedIds.add(incident.id);
+        } catch {
+          // Leave pendingSync set; the incident stays queued.
+        }
+      }
+    }
+
+    const next = incidents.map((incident) =>
+      syncedIds.has(incident.id) ? { ...incident, pendingSync: false } : incident,
+    );
     await persist(next);
-    setIsOffline(false);
+    if (syncedIds.size === pending.length) setIsOffline(false);
   }
 
   function updateDraft(updates: Partial<DraftReport>) {
