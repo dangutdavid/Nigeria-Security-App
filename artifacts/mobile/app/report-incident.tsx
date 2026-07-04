@@ -31,6 +31,30 @@ import {
 } from "@/services/citizenIncidentApi";
 import { submitCitizenReport } from "@/services/reportRepository";
 
+// Broad, citizen-friendly categories shown first; the detailed type grid is
+// filtered by the chosen category so a stressed reporter never faces all
+// thirty types at once.
+type TypeCategory = "road" | "crime" | "emergency" | "vehicle";
+
+const TYPE_CATEGORIES: Array<{
+  key: TypeCategory;
+  label: string;
+  hint: string;
+  icon: keyof typeof Feather.glyphMap;
+}> = [
+  { key: "road", label: "Road & Traffic", hint: "Crash, hazard, breakdown", icon: "truck" },
+  { key: "crime", label: "Crime & Security", hint: "Theft, assault, suspicious activity", icon: "shield" },
+  { key: "emergency", label: "Fire & Emergency", hint: "Fire, disaster, medical", icon: "alert-octagon" },
+  { key: "vehicle", label: "Vehicle & Documents", hint: "Unsafe vehicle, certificates", icon: "clipboard" },
+];
+
+const CATEGORY_FOR_AGENCY: Record<BuiltInCitizenAgencyRoute, TypeCategory> = {
+  frsc: "road",
+  police: "crime",
+  civil_defence: "emergency",
+  vio: "vehicle",
+};
+
 const INCIDENT_TYPES: Array<{
   value: CitizenIncidentType;
   label: string;
@@ -99,6 +123,7 @@ export default function CitizenIncidentReportScreen() {
   const scrollRef = useRef<ScrollView>(null);
 
   const [incidentType, setIncidentType] = useState<CitizenIncidentType | "">("");
+  const [typeCategory, setTypeCategory] = useState<TypeCategory | "">("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [latitude, setLatitude] = useState<number | undefined>();
@@ -279,29 +304,63 @@ export default function CitizenIncidentReportScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Incident type</Text>
-          <View style={styles.typeGrid}>
-            {INCIDENT_TYPES.map((item) => {
-              const active = incidentType === item.value;
-              return (
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            {typeCategory ? "Incident type" : "What happened?"}
+          </Text>
+          {!typeCategory ? (
+            <View style={styles.typeGrid}>
+              {TYPE_CATEGORIES.map((cat) => (
                 <TouchableOpacity
-                  key={item.value}
-                  style={[
-                    styles.typeCard,
-                    { backgroundColor: active ? "#0F4C81" : colors.card, borderColor: active ? "#0F4C81" : colors.border },
-                  ]}
-                  onPress={() => {
-                    setIncidentType(item.value);
-                    setAgencyOverride("");
-                    setErrors((next) => ({ ...next, incidentType: undefined, suggestedAgency: undefined }));
-                  }}
+                  key={cat.key}
+                  style={[styles.categoryCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={() => setTypeCategory(cat.key)}
                 >
-                  <Feather name={item.icon} size={18} color={active ? "#fff" : "#0F4C81"} />
-                  <Text style={[styles.typeText, { color: active ? "#fff" : colors.text }]}>{item.label}</Text>
+                  <Feather name={cat.icon} size={20} color="#0F4C81" />
+                  <Text style={[styles.typeText, { color: colors.text }]}>{cat.label}</Text>
+                  <Text style={[styles.categoryHint, { color: colors.mutedForeground }]}>{cat.hint}</Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
+              ))}
+            </View>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={styles.categoryBack}
+                onPress={() => {
+                  setTypeCategory("");
+                  setIncidentType("");
+                }}
+              >
+                <Feather name="chevron-left" size={14} color="#0F4C81" />
+                <Text style={styles.categoryBackText}>
+                  {TYPE_CATEGORIES.find((c) => c.key === typeCategory)?.label} · change category
+                </Text>
+              </TouchableOpacity>
+              <View style={styles.typeGrid}>
+                {INCIDENT_TYPES.filter(
+                  (item) => CATEGORY_FOR_AGENCY[item.agency] === typeCategory || item.value === "other",
+                ).map((item) => {
+                  const active = incidentType === item.value;
+                  return (
+                    <TouchableOpacity
+                      key={item.value}
+                      style={[
+                        styles.typeCard,
+                        { backgroundColor: active ? "#0F4C81" : colors.card, borderColor: active ? "#0F4C81" : colors.border },
+                      ]}
+                      onPress={() => {
+                        setIncidentType(item.value);
+                        setAgencyOverride("");
+                        setErrors((next) => ({ ...next, incidentType: undefined, suggestedAgency: undefined }));
+                      }}
+                    >
+                      <Feather name={item.icon} size={18} color={active ? "#fff" : "#0F4C81"} />
+                      <Text style={[styles.typeText, { color: active ? "#fff" : colors.text }]}>{item.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
           <ErrorText message={errors.incidentType} />
         </View>
 
@@ -523,6 +582,23 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   typeText: { fontFamily: "Inter_700Bold", fontSize: 13, lineHeight: 17 },
+  categoryCard: {
+    width: "47.9%",
+    minHeight: 96,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    gap: 6,
+    justifyContent: "space-between",
+  },
+  categoryHint: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 14 },
+  categoryBack: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 10,
+  },
+  categoryBackText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#0F4C81" },
   card: { borderWidth: 1, borderRadius: 16, padding: 16, gap: 16 },
   field: { gap: 8 },
   fieldLabel: { fontFamily: "Inter_700Bold", fontSize: 13, color: "#4B5563" },

@@ -40,9 +40,9 @@ export function NotificationAccessCard({
         <Feather name="bell" size={18} color={accentColor} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.title, { color: colors.text }]}>Notifications</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Notification Centre</Text>
         <Text style={[styles.sub, { color: colors.mutedForeground }]}>
-          {unread > 0 ? `${unread} unread alert${unread === 1 ? "" : "s"}` : "All caught up"}
+          {unread > 0 ? `${unread} unread message${unread === 1 ? "" : "s"}` : "No unread messages"}
         </Text>
       </View>
       {unread > 0 ? (

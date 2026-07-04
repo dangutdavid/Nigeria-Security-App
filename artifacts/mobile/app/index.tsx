@@ -18,6 +18,8 @@ import { useAgency } from "@/context/AgencyContext";
 import { AgencyEmblem, AgencyEmblemId } from "@/components/AgencyEmblem";
 import { useColors } from "@/hooks/useColors";
 
+// Ordered citizen-first: the urgent actions (report, emergency lines, track)
+// lead; secondary tools follow.
 const PUBLIC_ACTIONS = [
   {
     icon: "edit-3" as const,
@@ -26,22 +28,16 @@ const PUBLIC_ACTIONS = [
     color: "#0F4C81",
   },
   {
+    icon: "life-buoy" as const,
+    label: "Emergency Contacts",
+    route: "/emergency",
+    color: "#D35400",
+  },
+  {
     icon: "search" as const,
     label: "Track Report",
     route: "/track-report",
     color: "#2E7D52",
-  },
-  {
-    icon: "message-circle" as const,
-    label: "Ask Assistant",
-    route: "/assistant",
-    color: "#0F4C81",
-  },
-  {
-    icon: "bell" as const,
-    label: "Notifications",
-    route: "/notifications",
-    color: "#0F4C81",
   },
   {
     icon: "alert-triangle" as const,
@@ -56,10 +52,16 @@ const PUBLIC_ACTIONS = [
     color: "#8B4513",
   },
   {
-    icon: "life-buoy" as const,
-    label: "Emergency Contacts",
-    route: "/emergency",
-    color: "#D35400",
+    icon: "message-circle" as const,
+    label: "Ask Assistant",
+    route: "/assistant",
+    color: "#0F4C81",
+  },
+  {
+    icon: "bell" as const,
+    label: "Notifications",
+    route: "/notifications",
+    color: "#0F4C81",
   },
 ];
 
@@ -132,9 +134,42 @@ export default function AgencySelectScreen() {
           </Text>
         </View>
 
+        {/* Public access first: citizens reporting an emergency are the most
+            time-critical users and must not scroll past the agency list. */}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionLabel}>NEED HELP? PUBLIC ACCESS</Text>
+        </View>
+        <View style={styles.publicRow}>
+          {PUBLIC_ACTIONS.map((a) => (
+            <TouchableOpacity
+              key={a.route}
+              style={[styles.publicBtn, { borderColor: a.color + "55" }]}
+              onPress={() => handlePublic(a.route)}
+              activeOpacity={0.85}
+            >
+              <View
+                style={[styles.publicIcon, { backgroundColor: a.color + "22" }]}
+              >
+                <Feather name={a.icon} size={20} color={a.color} />
+              </View>
+              <Text style={[styles.publicLabel, { color: "#e8e8e8" }]}>
+                {a.label}
+              </Text>
+              <Feather name="chevron-right" size={14} color={a.color} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Divider */}
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>AGENCY SIGN IN</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
         {/* Agency Login */}
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionLabel}>AGENCY SIGN IN</Text>
+          <Text style={styles.sectionLabel}>SELECT YOUR AGENCY</Text>
           <Text style={styles.agencyCount}>{activeAgencies.length} active agencies</Text>
         </View>
         <View style={styles.agencySelector}>
@@ -214,35 +249,6 @@ export default function AgencySelectScreen() {
               </TouchableOpacity>
             </View>
           ) : null}
-        </View>
-
-        {/* Divider */}
-        <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>PUBLIC ACCESS</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        {/* Public Actions */}
-        <View style={styles.publicRow}>
-          {PUBLIC_ACTIONS.map((a) => (
-            <TouchableOpacity
-              key={a.route}
-              style={[styles.publicBtn, { borderColor: a.color + "55" }]}
-              onPress={() => handlePublic(a.route)}
-              activeOpacity={0.85}
-            >
-              <View
-                style={[styles.publicIcon, { backgroundColor: a.color + "22" }]}
-              >
-                <Feather name={a.icon} size={20} color={a.color} />
-              </View>
-              <Text style={[styles.publicLabel, { color: "#e8e8e8" }]}>
-                {a.label}
-              </Text>
-              <Feather name="chevron-right" size={14} color={a.color} />
-            </TouchableOpacity>
-          ))}
         </View>
 
         <Text style={[styles.footer, { color: colors.mutedForeground }]}>

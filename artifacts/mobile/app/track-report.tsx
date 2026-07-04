@@ -60,6 +60,22 @@ const INCIDENT_TYPE_LABELS: Record<CitizenIncidentType, string> = {
   other: "Other",
 };
 
+// Citizens see plain-language progress, not internal workflow vocabulary
+// ("triaged", "assigned"). Agency screens keep the internal terms.
+const CITIZEN_STATUS_LABELS: Record<string, string> = {
+  submitted: "Received",
+  triaged: "Being reviewed",
+  assigned: "Team assigned",
+  in_progress: "In progress",
+  resolved: "Resolved",
+  closed: "Closed",
+  rejected: "Could not be actioned",
+};
+
+function citizenStatusLabel(status: string): string {
+  return CITIZEN_STATUS_LABELS[status] ?? formatCitizenIncidentStatus(status as never);
+}
+
 export default function TrackReportScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -211,16 +227,16 @@ function ReportDetails({
       </View>
 
       <View style={styles.statusPill}>
-        <Text style={styles.statusPillText}>{formatCitizenIncidentStatus(report.status)}</Text>
+        <Text style={styles.statusPillText}>{citizenStatusLabel(report.status)}</Text>
       </View>
 
       <View style={styles.infoList}>
         <InfoRow label="Reference number" value={report.reference} />
         <InfoRow label="Incident type" value={INCIDENT_TYPE_LABELS[report.incidentType]} />
         <InfoRow label="Submitted" value={submittedAt} />
-        <InfoRow label="Suggested agency" value={formatCitizenAgencyLabel(report.suggestedAgency)} />
+        <InfoRow label="Handling agency" value={formatCitizenAgencyLabel(report.suggestedAgency)} />
         <InfoRow label="Emergency level" value={report.emergencyLevel.toUpperCase()} />
-        <InfoRow label="Current status" value={formatCitizenIncidentStatus(report.status)} />
+        <InfoRow label="Current status" value={citizenStatusLabel(report.status)} />
         <InfoRow label="Location" value={getCitizenReportLocationText(report)} />
         {area ? <InfoRow label="Area" value={area} /> : null}
         {coordinates ? <InfoRow label="Coordinates" value={coordinates} /> : null}
