@@ -76,6 +76,55 @@ export const LoginResponse = zod.object({
 });
 
 /**
+ * Issues a fresh token and revokes the presented one. Expired or revoked tokens cannot refresh.
+ * @summary Rotate a still-valid session token
+ */
+export const RefreshTokenResponse = zod.object({
+  token: zod.string(),
+});
+
+/**
+ * Delivers a 6-digit code to the user's own registered devices (push) — never to the caller-supplied email. Outside production the code is echoed for demo/testing.
+ * @summary Request a PIN-reset OTP
+ */
+export const RequestPinResetOtpBody = zod.object({
+  badgeNumber: zod.string(),
+  email: zod.string().optional(),
+});
+
+export const RequestPinResetOtpResponse = zod.object({
+  result: zod.enum(["sent", "not_found", "email_mismatch"]),
+  code: zod
+    .string()
+    .optional()
+    .describe("Demo-mode only — never present in production"),
+});
+
+/**
+ * @summary Verify a PIN-reset OTP
+ */
+export const VerifyPinResetOtpBody = zod.object({
+  badgeNumber: zod.string(),
+  code: zod.string(),
+});
+
+export const VerifyPinResetOtpResponse = zod.object({
+  result: zod.enum(["ok", "invalid", "expired"]),
+});
+
+/**
+ * @summary Reset PIN after OTP verification
+ */
+export const ResetPinSelfServiceBody = zod.object({
+  badgeNumber: zod.string(),
+  newPin: zod.string(),
+});
+
+export const ResetPinSelfServiceResponse = zod.object({
+  ok: zod.boolean(),
+});
+
+/**
  * @summary Get current authenticated user
  */
 export const GetCurrentUserResponse = zod.object({

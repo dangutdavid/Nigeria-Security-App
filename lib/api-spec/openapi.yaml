@@ -73,9 +73,122 @@ paths:
       operationId: logout
       tags: [auth]
       summary: Logout current session
+      description: Revokes the presented bearer token server-side.
       responses:
         "204":
           description: Logout accepted
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [auth]
+      summary: Rotate a still-valid session token
+      description: Issues a fresh token and revokes the presented one. Expired or revoked tokens cannot refresh.
+      responses:
+        "200":
+          description: New token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                required: [token]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/otp/request:
+    post:
+      operationId: requestPinResetOtp
+      tags: [auth]
+      summary: Request a PIN-reset OTP
+      description: Delivers a 6-digit code to the user's own registered devices (push) — never to the caller-supplied email. Outside production the code is echoed for demo/testing.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                badgeNumber: { type: string }
+                email: { type: string }
+              required: [badgeNumber]
+      responses:
+        "200":
+          description: Request outcome
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: string
+                    enum: [sent, not_found, email_mismatch]
+                  code:
+                    type: string
+                    description: Demo-mode only — never present in production
+                required: [result]
+
+  /auth/otp/verify:
+    post:
+      operationId: verifyPinResetOtp
+      tags: [auth]
+      summary: Verify a PIN-reset OTP
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                badgeNumber: { type: string }
+                code: { type: string }
+              required: [badgeNumber, code]
+      responses:
+        "200":
+          description: Verification outcome (success grants a one-shot PIN reset)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: string
+                    enum: [ok, invalid, expired]
+                required: [result]
+
+  /auth/pin/reset:
+    post:
+      operationId: resetPinSelfService
+      tags: [auth]
+      summary: Reset PIN after OTP verification
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                badgeNumber: { type: string }
+                newPin: { type: string }
+              required: [badgeNumber, newPin]
+      responses:
+        "200":
+          description: Reset outcome
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                required: [ok]
+        "403":
+          description: OTP verification required first
 
   /auth/me:
     get:

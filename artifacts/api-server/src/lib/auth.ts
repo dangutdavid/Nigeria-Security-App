@@ -1,6 +1,6 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
-import { and, eq, type SQL } from "drizzle-orm";
-import { getDb, isDbConfigured, authUsers, type Database } from "@workspace/db";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { and, eq, lt, type SQL } from "drizzle-orm";
+import { getDb, isDbConfigured, authUsers, revokedTokens, type Database } from "@workspace/db";
 import { hashPin, verifyPin } from "./password";
 import { logger } from "./logger";
 
@@ -23,6 +23,8 @@ export interface AuthClaims {
   agency: string;
   role: Role;
   name: string;
+  /** Token id — enables revocation (logout / refresh rotation). */
+  jti: string;
   /** Expiry as epoch milliseconds. */
   exp: number;
 }
@@ -30,10 +32,23 @@ export interface AuthClaims {
 const DEMO_PIN = "1234";
 const TOKEN_TTL_MS = 1000 * 60 * 60 * 12; // 12h
 
-const AUTH_SECRET = process.env.AUTH_SECRET || "dev-insecure-auth-secret-change-me";
-if (!process.env.AUTH_SECRET) {
+// AUTH_SECRET is required in production — refuse to start with the dev
+// fallback there. In development a stable insecure fallback keeps local
+// setups working, with a loud warning.
+const AUTH_SECRET = (() => {
+  const secret = process.env.AUTH_SECRET;
+  if (secret) {
+    if (secret.length < 16) {
+      throw new Error("AUTH_SECRET must be at least 16 characters.");
+    }
+    return secret;
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("AUTH_SECRET must be set in production — refusing to start with the insecure development secret.");
+  }
   logger.warn("AUTH_SECRET is not set — using an insecure development secret. Set AUTH_SECRET in production.");
-}
+  return "dev-insecure-auth-secret-change-me";
+})();
 
 /**
  * HMAC-sign an arbitrary payload with the shared auth secret. Used for
@@ -64,6 +79,7 @@ export function signToken(user: AuthUser): string {
     agency: user.agency,
     role: user.role,
     name: user.name,
+    jti: randomUUID(),
     exp: Date.now() + TOKEN_TTL_MS,
   };
   const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
@@ -88,6 +104,52 @@ export function verifyToken(token: string): AuthClaims | null {
   } catch {
     return null;
   }
+}
+
+// ---- Token revocation (logout / refresh rotation) ---------------------------
+// DB-backed when DATABASE_URL is set so revocation survives restarts and is
+// shared across instances; in-memory fallback for local/demo development.
+
+const revokedInMemory = new Map<string, number>();
+
+export async function revokeToken(claims: AuthClaims): Promise<void> {
+  if (!claims.jti) return; // Legacy tokens (pre-jti) expire naturally.
+  const db = getDb();
+  if (db && isDbConfigured()) {
+    try {
+      await db
+        .insert(revokedTokens)
+        .values({ jti: claims.jti, expiresAt: new Date(claims.exp) })
+        .onConflictDoNothing({ target: revokedTokens.jti });
+      // Opportunistic cleanup of rows for tokens that have expired anyway.
+      await db.delete(revokedTokens).where(lt(revokedTokens.expiresAt, new Date()));
+      return;
+    } catch (err) {
+      logger.warn({ err }, "Failed to persist token revocation — falling back to in-memory");
+    }
+  }
+  revokedInMemory.set(claims.jti, claims.exp);
+}
+
+export async function isTokenRevoked(claims: AuthClaims): Promise<boolean> {
+  if (!claims.jti) return false;
+  const local = revokedInMemory.get(claims.jti);
+  if (local !== undefined) return true;
+  const db = getDb();
+  if (db && isDbConfigured()) {
+    try {
+      const [row] = await db
+        .select({ jti: revokedTokens.jti })
+        .from(revokedTokens)
+        .where(eq(revokedTokens.jti, claims.jti))
+        .limit(1);
+      return Boolean(row);
+    } catch (err) {
+      logger.warn({ err }, "Token revocation check failed — treating token as valid");
+      return false;
+    }
+  }
+  return false;
 }
 
 // ---- Capabilities (coarse, useful for the client; RBAC is still enforced server-side) ----
@@ -158,6 +220,10 @@ export interface AdminUserFilter {
 export interface UserRepository {
   readonly kind: "db" | "demo";
   authenticate(badgeNumber: string, pin: string, agency?: string): Promise<AuthOutcome>;
+  /** Look up an active user by badge (for OTP/PIN-reset flows). */
+  findByBadge(badgeNumber: string): Promise<(AuthUser & { email?: string | null }) | null>;
+  /** Self-service PIN reset by badge (after OTP verification). */
+  resetPinByBadge(badgeNumber: string, newPin: string): Promise<boolean>;
   // Admin user management (returns safe views; never a PIN hash).
   listUsers(filter?: AdminUserFilter): Promise<AdminUserView[]>;
   createUser(input: CreateUserInput): Promise<AdminUserView>;
@@ -231,6 +297,19 @@ class DemoUserRepository implements UserRepository {
     const dynamic = synthesizeDynamicUser(badge, pin, agency);
     if (dynamic) return { ok: true, user: dynamic };
     return { ok: false, reason: "invalid" };
+  }
+
+  async findByBadge(badgeNumber: string): Promise<(AuthUser & { email?: string | null }) | null> {
+    const badge = badgeNumber.trim().toUpperCase();
+    const user = SEED_USERS.find((u) => u.badgeNumber === badge);
+    if (!user) return null;
+    const { pin: _pin, ...safe } = user;
+    return safe;
+  }
+
+  async resetPinByBadge(): Promise<boolean> {
+    // Demo users have a fixed PIN; self-service reset needs DB-backed auth.
+    return false;
   }
 
   async listUsers(filter?: AdminUserFilter): Promise<AdminUserView[]> {
@@ -324,6 +403,27 @@ class DbUserRepository implements UserRepository {
     const dynamic = synthesizeDynamicUser(badge, pin, agency);
     if (dynamic) return { ok: true, user: dynamic };
     return { ok: false, reason: "invalid" };
+  }
+
+  async findByBadge(badgeNumber: string): Promise<(AuthUser & { email?: string | null }) | null> {
+    const badge = badgeNumber.trim().toUpperCase();
+    const [row] = await this.db
+      .select()
+      .from(authUsers)
+      .where(eq(authUsers.badgeNumber, badge))
+      .limit(1);
+    if (!row || !row.isActive) return null;
+    return { ...rowToAuthUser(row), email: row.email ?? undefined };
+  }
+
+  async resetPinByBadge(badgeNumber: string, newPin: string): Promise<boolean> {
+    const badge = badgeNumber.trim().toUpperCase();
+    const [row] = await this.db
+      .update(authUsers)
+      .set({ pinHash: hashPin(newPin), updatedAt: new Date() })
+      .where(and(eq(authUsers.badgeNumber, badge), eq(authUsers.isActive, true)))
+      .returning();
+    return Boolean(row);
   }
 
   async listUsers(filter?: AdminUserFilter): Promise<AdminUserView[]> {

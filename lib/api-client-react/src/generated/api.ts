@@ -64,15 +64,22 @@ import type {
   NotFoundResponse,
   Notification,
   NotificationCreateRequest,
+  RefreshToken200,
   ReportDetail,
   ReportReassignmentRequest,
   ReportStatusUpdateRequest,
   ReportSubmissionResponse,
+  RequestPinResetOtp200,
+  RequestPinResetOtpBody,
+  ResetPinSelfService200,
+  ResetPinSelfServiceBody,
   ResetUserPin200,
   StartDutySessionBody,
   UnauthorizedResponse,
   UpdateReferralStatusBody,
   UpdateUser200,
+  VerifyPinResetOtp200,
+  VerifyPinResetOtpBody,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -249,6 +256,7 @@ export const useLogin = <
 };
 
 /**
+ * Revokes the presented bearer token server-side.
  * @summary Logout current session
  */
 export const getLogoutUrl = () => {
@@ -325,6 +333,347 @@ export const useLogout = <
   TContext
 > => {
   return useMutation(getLogoutMutationOptions(options));
+};
+
+/**
+ * Issues a fresh token and revokes the presented one. Expired or revoked tokens cannot refresh.
+ * @summary Rotate a still-valid session token
+ */
+export const getRefreshTokenUrl = () => {
+  return `/api/auth/refresh`;
+};
+
+export const refreshToken = async (
+  options?: RequestInit,
+): Promise<RefreshToken200> => {
+  return customFetch<RefreshToken200>(getRefreshTokenUrl(), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getRefreshTokenMutationOptions = <
+  TError = ErrorType<UnauthorizedResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof refreshToken>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof refreshToken>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["refreshToken"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof refreshToken>>,
+    void
+  > = () => {
+    return refreshToken(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RefreshTokenMutationResult = NonNullable<
+  Awaited<ReturnType<typeof refreshToken>>
+>;
+
+export type RefreshTokenMutationError = ErrorType<UnauthorizedResponse>;
+
+/**
+ * @summary Rotate a still-valid session token
+ */
+export const useRefreshToken = <
+  TError = ErrorType<UnauthorizedResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof refreshToken>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof refreshToken>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getRefreshTokenMutationOptions(options));
+};
+
+/**
+ * Delivers a 6-digit code to the user's own registered devices (push) — never to the caller-supplied email. Outside production the code is echoed for demo/testing.
+ * @summary Request a PIN-reset OTP
+ */
+export const getRequestPinResetOtpUrl = () => {
+  return `/api/auth/otp/request`;
+};
+
+export const requestPinResetOtp = async (
+  requestPinResetOtpBody: RequestPinResetOtpBody,
+  options?: RequestInit,
+): Promise<RequestPinResetOtp200> => {
+  return customFetch<RequestPinResetOtp200>(getRequestPinResetOtpUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(requestPinResetOtpBody),
+  });
+};
+
+export const getRequestPinResetOtpMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestPinResetOtp>>,
+    TError,
+    { data: BodyType<RequestPinResetOtpBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof requestPinResetOtp>>,
+  TError,
+  { data: BodyType<RequestPinResetOtpBody> },
+  TContext
+> => {
+  const mutationKey = ["requestPinResetOtp"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof requestPinResetOtp>>,
+    { data: BodyType<RequestPinResetOtpBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return requestPinResetOtp(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RequestPinResetOtpMutationResult = NonNullable<
+  Awaited<ReturnType<typeof requestPinResetOtp>>
+>;
+export type RequestPinResetOtpMutationBody = BodyType<RequestPinResetOtpBody>;
+export type RequestPinResetOtpMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Request a PIN-reset OTP
+ */
+export const useRequestPinResetOtp = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof requestPinResetOtp>>,
+    TError,
+    { data: BodyType<RequestPinResetOtpBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof requestPinResetOtp>>,
+  TError,
+  { data: BodyType<RequestPinResetOtpBody> },
+  TContext
+> => {
+  return useMutation(getRequestPinResetOtpMutationOptions(options));
+};
+
+/**
+ * @summary Verify a PIN-reset OTP
+ */
+export const getVerifyPinResetOtpUrl = () => {
+  return `/api/auth/otp/verify`;
+};
+
+export const verifyPinResetOtp = async (
+  verifyPinResetOtpBody: VerifyPinResetOtpBody,
+  options?: RequestInit,
+): Promise<VerifyPinResetOtp200> => {
+  return customFetch<VerifyPinResetOtp200>(getVerifyPinResetOtpUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(verifyPinResetOtpBody),
+  });
+};
+
+export const getVerifyPinResetOtpMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof verifyPinResetOtp>>,
+    TError,
+    { data: BodyType<VerifyPinResetOtpBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof verifyPinResetOtp>>,
+  TError,
+  { data: BodyType<VerifyPinResetOtpBody> },
+  TContext
+> => {
+  const mutationKey = ["verifyPinResetOtp"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof verifyPinResetOtp>>,
+    { data: BodyType<VerifyPinResetOtpBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return verifyPinResetOtp(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type VerifyPinResetOtpMutationResult = NonNullable<
+  Awaited<ReturnType<typeof verifyPinResetOtp>>
+>;
+export type VerifyPinResetOtpMutationBody = BodyType<VerifyPinResetOtpBody>;
+export type VerifyPinResetOtpMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Verify a PIN-reset OTP
+ */
+export const useVerifyPinResetOtp = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof verifyPinResetOtp>>,
+    TError,
+    { data: BodyType<VerifyPinResetOtpBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof verifyPinResetOtp>>,
+  TError,
+  { data: BodyType<VerifyPinResetOtpBody> },
+  TContext
+> => {
+  return useMutation(getVerifyPinResetOtpMutationOptions(options));
+};
+
+/**
+ * @summary Reset PIN after OTP verification
+ */
+export const getResetPinSelfServiceUrl = () => {
+  return `/api/auth/pin/reset`;
+};
+
+export const resetPinSelfService = async (
+  resetPinSelfServiceBody: ResetPinSelfServiceBody,
+  options?: RequestInit,
+): Promise<ResetPinSelfService200> => {
+  return customFetch<ResetPinSelfService200>(getResetPinSelfServiceUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(resetPinSelfServiceBody),
+  });
+};
+
+export const getResetPinSelfServiceMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resetPinSelfService>>,
+    TError,
+    { data: BodyType<ResetPinSelfServiceBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof resetPinSelfService>>,
+  TError,
+  { data: BodyType<ResetPinSelfServiceBody> },
+  TContext
+> => {
+  const mutationKey = ["resetPinSelfService"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof resetPinSelfService>>,
+    { data: BodyType<ResetPinSelfServiceBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return resetPinSelfService(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ResetPinSelfServiceMutationResult = NonNullable<
+  Awaited<ReturnType<typeof resetPinSelfService>>
+>;
+export type ResetPinSelfServiceMutationBody = BodyType<ResetPinSelfServiceBody>;
+export type ResetPinSelfServiceMutationError = ErrorType<void>;
+
+/**
+ * @summary Reset PIN after OTP verification
+ */
+export const useResetPinSelfService = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof resetPinSelfService>>,
+    TError,
+    { data: BodyType<ResetPinSelfServiceBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof resetPinSelfService>>,
+  TError,
+  { data: BodyType<ResetPinSelfServiceBody> },
+  TContext
+> => {
+  return useMutation(getResetPinSelfServiceMutationOptions(options));
 };
 
 /**

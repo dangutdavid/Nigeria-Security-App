@@ -64,7 +64,21 @@ export async function validateApiSession(): Promise<boolean> {
     requireAuth: true,
     timeoutMs: 4000,
   });
-  if (api.ok) return true;
+  if (api.ok) {
+    // Rotate the token while it is still valid so an active user is never
+    // forced to re-login when the 12h TTL lapses. Best-effort — a failed
+    // refresh keeps the current (still valid) token.
+    const refreshed = await mobileApiFetch<{ token?: string }>({
+      method: "POST",
+      path: "/auth/refresh",
+      requireAuth: true,
+      timeoutMs: 4000,
+    });
+    if (refreshed.ok && refreshed.data.token) {
+      await setMobileApiToken(refreshed.data.token);
+    }
+    return true;
+  }
   if (api.status === 401 || api.status === 403) {
     await setMobileApiToken(null);
   }

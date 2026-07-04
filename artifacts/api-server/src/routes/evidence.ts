@@ -15,9 +15,16 @@ import {
 import { recordAuditEvent } from "../lib/auditStore";
 import { getAuth, requireAgencyAccess } from "../middlewares/authMiddleware";
 import { isAdminRole } from "../lib/auth";
+import { rateLimit } from "../lib/rateLimit";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
+
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 60,
+  message: "Too many evidence uploads from this device. Try again later.",
+});
 
 function fail(res: Response, error: unknown) {
   logger.error({ err: error }, "Evidence request failed");
@@ -69,16 +76,16 @@ function toEvidencePayload(record: EvidenceRecord) {
 // PART 1 — Create evidence metadata for a report. Public like report
 // submission itself (citizens attach evidence when filing); authenticated
 // users are recorded as the uploader.
-router.post("/reports/:reportId/evidence", async (req, res) => {
+router.post("/reports/:reportId/evidence", uploadLimiter, async (req, res) => {
   const parsed = EvidenceCreateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Validation failed", issues: parsed.error.flatten() });
     return;
   }
   try {
-    const report = await citizenReportStore.findByIdOrReference(req.params.reportId);
+    const report = await citizenReportStore.findByIdOrReference(String(req.params.reportId));
     if (!report) {
-      res.status(404).json({ error: `No report found for ${req.params.reportId}` });
+      res.status(404).json({ error: `No report found for ${String(req.params.reportId)}` });
       return;
     }
     const auth = getAuth(req);
@@ -112,6 +119,7 @@ router.post("/reports/:reportId/evidence", async (req, res) => {
 // PART 2 — Binary upload for previously created evidence metadata.
 router.put(
   "/reports/:reportId/evidence/:evidenceId/content",
+  uploadLimiter,
   express.raw({ type: () => true, limit: MAX_UPLOAD_BYTES }),
   async (req, res) => {
     try {
@@ -125,8 +133,8 @@ router.put(
         res.status(400).json({ error: "Empty upload body." });
         return;
       }
-      const record = await evidenceStore.findById(req.params.evidenceId);
-      const report = await citizenReportStore.findByIdOrReference(req.params.reportId);
+      const record = await evidenceStore.findById(String(req.params.evidenceId));
+      const report = await citizenReportStore.findByIdOrReference(String(req.params.reportId));
       if (!record || !report || record.reportId !== report.id) {
         res.status(404).json({ error: "Evidence metadata not found for this report." });
         return;

@@ -536,6 +536,57 @@ export type SourceQueryParameter = ReportSource;
 
 export type SearchQueryParameter = string;
 
+export type RefreshToken200 = {
+  token: string;
+};
+
+export type RequestPinResetOtpBody = {
+  badgeNumber: string;
+  email?: string;
+};
+
+export type RequestPinResetOtp200Result =
+  (typeof RequestPinResetOtp200Result)[keyof typeof RequestPinResetOtp200Result];
+
+export const RequestPinResetOtp200Result = {
+  sent: "sent",
+  not_found: "not_found",
+  email_mismatch: "email_mismatch",
+} as const;
+
+export type RequestPinResetOtp200 = {
+  result: RequestPinResetOtp200Result;
+  /** Demo-mode only — never present in production */
+  code?: string;
+};
+
+export type VerifyPinResetOtpBody = {
+  badgeNumber: string;
+  code: string;
+};
+
+export type VerifyPinResetOtp200Result =
+  (typeof VerifyPinResetOtp200Result)[keyof typeof VerifyPinResetOtp200Result];
+
+export const VerifyPinResetOtp200Result = {
+  ok: "ok",
+  invalid: "invalid",
+  expired: "expired",
+} as const;
+
+export type VerifyPinResetOtp200 = {
+  result: VerifyPinResetOtp200Result;
+};
+
+export type ResetPinSelfServiceBody = {
+  badgeNumber: string;
+  newPin: string;
+};
+
+export type ResetPinSelfService200 = {
+  ok: boolean;
+};
+
 export type GetCitizenReportTimeline200 = {
   reference?: string;
   timeline: TimelineEntry[];

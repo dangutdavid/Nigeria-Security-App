@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { isAdminRole, verifyToken, type AuthClaims } from "../lib/auth";
+import { isAdminRole, isTokenRevoked, verifyToken, type AuthClaims } from "../lib/auth";
 
 export type AuthedRequest = Request & { auth?: AuthClaims };
 
@@ -7,13 +7,16 @@ export type AuthedRequest = Request & { auth?: AuthClaims };
  * Parse `Authorization: Bearer <token>` and attach verified claims to the
  * request. Non-blocking — unauthenticated requests still pass through so public
  * endpoints keep working. Security decisions use these server-verified claims,
- * never client-supplied agency/role headers.
+ * never client-supplied agency/role headers. Revoked tokens (logout / refresh
+ * rotation) are rejected here.
  */
-export function attachAuth(req: Request, _res: Response, next: NextFunction): void {
+export async function attachAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
   const header = req.header("authorization");
   if (header && header.startsWith("Bearer ")) {
     const claims = verifyToken(header.slice("Bearer ".length).trim());
-    if (claims) (req as AuthedRequest).auth = claims;
+    if (claims && !(await isTokenRevoked(claims))) {
+      (req as AuthedRequest).auth = claims;
+    }
   }
   next();
 }

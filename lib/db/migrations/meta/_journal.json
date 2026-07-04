@@ -15,6 +15,13 @@
       "when": 1783115598005,
       "tag": "0001_chemical_wrecker",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783125473679,
+      "tag": "0002_smart_psynapse",
+      "breakpoints": true
     }
   ]
 }

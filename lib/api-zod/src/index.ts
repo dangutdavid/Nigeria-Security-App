@@ -12,7 +12,10 @@ export {
   CreateReferralBody,
   EndDutySessionBody,
   ListAgencyReportsParams,
+  RequestPinResetOtpBody,
+  ResetPinSelfServiceBody,
   StartDutySessionBody,
   UpdateReferralStatusBody,
+  VerifyPinResetOtpBody,
 } from "./generated/api";
 export type { AdminUser, AgencyType, ReportStatus } from "./mvp";

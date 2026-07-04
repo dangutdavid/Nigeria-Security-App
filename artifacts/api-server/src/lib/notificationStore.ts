@@ -61,6 +61,7 @@ export interface NotificationStore {
   markAllRead(filter: NotificationFilterInput): Promise<number>;
   unreadCount(filter: NotificationFilterInput): Promise<number>;
   savePushToken(input: Omit<PushTokenRecord, "createdAt">): Promise<PushTokenRecord>;
+  listPushTokens(filter: { userId?: string; agency?: string }): Promise<PushTokenRecord[]>;
 }
 
 function nowIso(): string {
@@ -155,6 +156,14 @@ class InMemoryNotificationStore implements NotificationStore {
     const record: PushTokenRecord = { ...input, createdAt: nowIso() };
     this.tokens.push(record);
     return record;
+  }
+
+  async listPushTokens(filter: { userId?: string; agency?: string }): Promise<PushTokenRecord[]> {
+    return this.tokens.filter(
+      (t) =>
+        (!filter.userId || t.userId === filter.userId) &&
+        (!filter.agency || t.agency === filter.agency),
+    );
   }
 }
 
@@ -288,6 +297,23 @@ class DrizzleNotificationStore implements NotificationStore {
       agency: row.agency ?? undefined,
       createdAt: row.createdAt.toISOString(),
     };
+  }
+
+  async listPushTokens(filter: { userId?: string; agency?: string }): Promise<PushTokenRecord[]> {
+    const conditions: SQL[] = [];
+    if (filter.userId) conditions.push(eq(pushTokens.userId, filter.userId));
+    if (filter.agency) conditions.push(eq(pushTokens.agency, filter.agency));
+    const rows = await this.db
+      .select()
+      .from(pushTokens)
+      .where(conditions.length ? and(...conditions) : undefined);
+    return rows.map((row) => ({
+      token: row.token,
+      platform: row.platform ?? undefined,
+      userId: row.userId ?? undefined,
+      agency: row.agency ?? undefined,
+      createdAt: row.createdAt.toISOString(),
+    }));
   }
 }
 

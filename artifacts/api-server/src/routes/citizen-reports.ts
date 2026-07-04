@@ -7,9 +7,16 @@ import {
   toReportPayload,
 } from "../lib/citizenReportStore";
 import { notifyReportSubmitted } from "../lib/notificationStore";
+import { rateLimit } from "../lib/rateLimit";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
+
+const submitLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  message: "Too many reports submitted from this device. Try again later.",
+});
 
 function fail(res: Response, error: unknown) {
   logger.error({ err: error }, "Citizen report request failed");
@@ -17,7 +24,7 @@ function fail(res: Response, error: unknown) {
 }
 
 // PART 1 — Submit a citizen report.
-router.post("/citizen-reports", async (req, res) => {
+router.post("/citizen-reports", submitLimiter, async (req, res) => {
   const result = CitizenReportSubmissionSchema.safeParse(req.body);
   if (!result.success) {
     res.status(400).json({ error: "Validation failed", issues: result.error.flatten() });

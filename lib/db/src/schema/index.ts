@@ -155,6 +155,8 @@ export const authUsers = pgTable(
     agency: text("agency").notNull(),
     role: userRole("role").notNull(),
     pinHash: text("pin_hash").notNull(),
+    /** Optional contact email used to sanity-check self-service PIN reset requests. */
+    email: text("email"),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -456,6 +458,22 @@ export const agencies = pgTable(
       .notNull()
       .defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+);
+
+/**
+ * Revoked auth-token ids (jti). Rows are only meaningful until `expiresAt`
+ * (the token would be rejected as expired anyway after that) and can be
+ * cleaned up opportunistically.
+ */
+export const revokedTokens = pgTable(
+  "revoked_tokens",
+  {
+    jti: text("jti").primaryKey(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
