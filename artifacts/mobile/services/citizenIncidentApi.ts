@@ -62,6 +62,8 @@ export interface CitizenIncidentSubmission {
   vehicleRegistration?: string;
   emergencyLevel: CitizenEmergencyLevel;
   suggestedAgency: CitizenAgencyRoute;
+  /** Client-generated idempotency key — retries with the same key dedupe server-side. */
+  clientId?: string;
 }
 
 export interface CitizenIncidentTimelineEntry {

@@ -364,6 +364,8 @@ export const citizenReports = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     reference: text("reference").notNull(),
+    /** Client-generated idempotency key (offline sync retries dedupe on this). */
+    clientId: text("client_id"),
     incidentType: text("incident_type").notNull(),
     description: text("description").notNull(),
     emergencyLevel: text("emergency_level").notNull(),
@@ -398,6 +400,7 @@ export const citizenReports = pgTable(
   },
   (table) => ({
     referenceIdx: uniqueIndex("citizen_reports_reference_idx").on(table.reference),
+    clientIdIdx: uniqueIndex("citizen_reports_client_id_idx").on(table.clientId),
     suggestedAgencyIdx: index("citizen_reports_suggested_agency_idx").on(table.suggestedAgency),
     assignedAgencyIdx: index("citizen_reports_assigned_agency_idx").on(table.assignedAgency),
   }),

@@ -63,6 +63,17 @@ describe("citizen report lifecycle", () => {
     expect(finalTrack.body.currentAgency).toBe("police");
   });
 
+  it("dedupes resubmissions carrying the same clientId", async () => {
+    const clientId = `test-idempotency-${Math.random().toString(36).slice(2, 10)}`;
+    const first = await submitReport({ clientId });
+    const second = await submitReport({ clientId });
+    expect(second.reference).toBe(first.reference);
+    expect(second.report.id).toBe(first.report.id);
+
+    const different = await submitReport({ clientId: `${clientId}-b` });
+    expect(different.reference).not.toBe(first.reference);
+  });
+
   it("validates submissions", async () => {
     const res = await request(app)
       .post("/api/citizen-reports")

@@ -21,6 +21,8 @@ import { logger } from "./logger";
 export interface CitizenReportRecord {
   id: string;
   reference: string;
+  /** Client-generated idempotency key (present when submitted with one). */
+  clientId?: string;
   incidentType: CitizenReportSubmission["incidentType"];
   description: string;
   location: string;
@@ -240,10 +242,16 @@ class InMemoryCitizenReportStore implements CitizenReportStore {
   private sequence = 0;
 
   async create(input: CitizenReportSubmission): Promise<CitizenReportRecord> {
+    // Idempotency: a retry carrying the same clientId returns the original.
+    if (input.clientId) {
+      const existing = this.reports.find((r) => r.clientId === input.clientId);
+      if (existing) return existing;
+    }
     this.sequence += 1;
     const submittedAt = nowIso();
     const record: CitizenReportRecord = {
       id: randomUUID(),
+      clientId: input.clientId,
       reference: makeReference(input.suggestedAgency, this.sequence),
       incidentType: input.incidentType,
       description: input.description,
@@ -329,6 +337,7 @@ function mapRow(row: typeof citizenReports.$inferSelect): CitizenReportRecord {
   return {
     id: row.id,
     reference: row.reference,
+    clientId: row.clientId ?? undefined,
     incidentType: row.incidentType as CitizenReportRecord["incidentType"],
     description: row.description,
     location: row.location,
@@ -354,6 +363,16 @@ class DrizzleCitizenReportStore implements CitizenReportStore {
   constructor(private readonly db: Database) {}
 
   async create(input: CitizenReportSubmission): Promise<CitizenReportRecord> {
+    // Idempotency: a retry carrying the same clientId returns the original
+    // report instead of creating a duplicate (unique index on client_id).
+    if (input.clientId) {
+      const [existing] = await this.db
+        .select()
+        .from(citizenReports)
+        .where(eq(citizenReports.clientId, input.clientId))
+        .limit(1);
+      if (existing) return mapRow(existing);
+    }
     const [counted] = await this.db
       .select({ value: sql<number>`count(*)::int` })
       .from(citizenReports);
@@ -363,6 +382,7 @@ class DrizzleCitizenReportStore implements CitizenReportStore {
       .insert(citizenReports)
       .values({
         reference: makeReference(input.suggestedAgency, sequence),
+        clientId: input.clientId ?? null,
         incidentType: input.incidentType,
         description: input.description,
         emergencyLevel: input.emergencyLevel,

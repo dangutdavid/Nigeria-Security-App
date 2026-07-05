@@ -167,6 +167,9 @@ export const GetCurrentUserResponse = zod.object({
 /**
  * @summary Submit a citizen incident report
  */
+export const submitCitizenReportBodyClientIdMin = 8;
+export const submitCitizenReportBodyClientIdMax = 80;
+
 export const submitCitizenReportBodyDescriptionMin = 10;
 
 export const submitCitizenReportBodyLocationLatitudeMin = -90;
@@ -177,6 +180,14 @@ export const submitCitizenReportBodyLocationLongitudeMax = 180;
 
 export const SubmitCitizenReportBody = zod.object({
   clientMutationId: zod.string().optional(),
+  clientId: zod
+    .string()
+    .min(submitCitizenReportBodyClientIdMin)
+    .max(submitCitizenReportBodyClientIdMax)
+    .optional()
+    .describe(
+      "Client-generated idempotency key — resubmitting with the same clientId returns the existing report instead of creating a duplicate.",
+    ),
   incidentType: zod.enum([
     "road_crash",
     "traffic_obstruction",

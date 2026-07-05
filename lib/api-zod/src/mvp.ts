@@ -187,6 +187,9 @@ export const CitizenReportSubmissionSchema = z.object({
   contactName: z.string().optional(),
   contactPhone: z.string().optional(),
   evidence: z.array(z.record(z.unknown())).optional(),
+  // Client-generated idempotency key: resubmitting with the same clientId
+  // returns the existing report instead of creating a duplicate.
+  clientId: z.string().min(8).max(80).optional(),
 });
 
 export const CitizenReportTimelineEntrySchema = z.object({

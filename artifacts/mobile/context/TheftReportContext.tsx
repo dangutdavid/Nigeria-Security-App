@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { submitCitizenReport } from "@/services/reportRepository";
+import { uploadReportPhoto } from "@/services/evidenceRepository";
 import React, {
   createContext,
   useCallback,
@@ -401,6 +402,7 @@ export function TheftReportProvider({
           suggestedAgency: "police",
         });
         citizenReportReference = receipt.reference;
+        if (data.photoUri) void uploadReportPhoto(receipt.reference, data.photoUri);
       } catch {
         // Submission falls back to local-only; the record is still saved.
       }

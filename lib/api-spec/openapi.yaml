@@ -1379,6 +1379,11 @@ components:
       properties:
         clientMutationId:
           type: string
+        clientId:
+          type: string
+          minLength: 8
+          maxLength: 80
+          description: Client-generated idempotency key — resubmitting with the same clientId returns the existing report instead of creating a duplicate.
         incidentType:
           $ref: "#/components/schemas/IncidentType"
         description:

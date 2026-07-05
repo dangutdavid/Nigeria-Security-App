@@ -30,6 +30,7 @@ import {
   formatCitizenAgencyLabel,
 } from "@/services/citizenIncidentApi";
 import { submitCitizenReport } from "@/services/reportRepository";
+import { uploadReportPhoto } from "@/services/evidenceRepository";
 
 // Broad, citizen-friendly categories shown first; the detailed type grid is
 // filtered by the chosen category so a stressed reporter never faces all
@@ -121,6 +122,9 @@ export default function CitizenIncidentReportScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
+  // Stable per-form idempotency key: tapping Submit twice (or retrying after
+  // a lost response) can never create a duplicate report server-side.
+  const clientIdRef = useRef(`citizen-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
 
   const [incidentType, setIncidentType] = useState<CitizenIncidentType | "">("");
   const [typeCategory, setTypeCategory] = useState<TypeCategory | "">("");
@@ -229,6 +233,7 @@ export default function CitizenIncidentReportScreen() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const result = await submitCitizenReport({
+        clientId: clientIdRef.current,
         incidentType: incidentType as CitizenIncidentType,
         description: description.trim(),
         location: location.trim(),
@@ -244,6 +249,9 @@ export default function CitizenIncidentReportScreen() {
         emergencyLevel: emergencyLevel as CitizenEmergencyLevel,
         suggestedAgency: suggestedAgency as CitizenAgencyRoute,
       });
+      // Best-effort: push the photo through the evidence pipeline; the local
+      // photoUri on the report remains the offline fallback.
+      if (photoUri) void uploadReportPhoto(result.reference, photoUri);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setReceipt(result);
     } catch {

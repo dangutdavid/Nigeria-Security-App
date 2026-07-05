@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { endDutyOnApi, startDutyOnApi } from "@/services/dutyRepository";
 
 export type PatrolStatus = "off_duty" | "on_duty" | "on_break";
 
@@ -24,6 +25,8 @@ export interface PatrolSession {
   encounters: PatrolEncounter[];
   totalKm?: number;
   notes: string;
+  /** Backend duty-session id when the start was mirrored to the API. */
+  serverSessionId?: string;
 }
 
 interface PatrolContextType {
@@ -101,6 +104,10 @@ export function PatrolProvider({ children }: { children: React.ReactNode }) {
       encounters: [],
       notes: "",
     };
+    // Mirror to the backend duty-session API (best-effort; local stays
+    // authoritative for the UI).
+    const serverSessionId = await startDutyOnApi(route);
+    if (serverSessionId) session.serverSessionId = serverSessionId;
     await persistActive(session);
   }
 
@@ -113,6 +120,12 @@ export function PatrolProvider({ children }: { children: React.ReactNode }) {
       notes,
       totalKm,
     };
+    if (ended.serverSessionId) {
+      void endDutyOnApi(ended.serverSessionId, [
+        ...ended.encounters.map((e) => ({ ...e })),
+        { note: notes, totalKm: totalKm ?? null, endedAt: ended.endTime },
+      ]);
+    }
     await persistSessions([ended, ...sessions]);
     await persistActive(null);
   }

@@ -2,6 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { AgencyType } from "@/context/AuthContext";
 import { normalizePlate } from "@/lib/plate";
+import {
+  createReferralOnApi,
+  isBackendReportReference,
+  updateReferralStatusOnApi,
+} from "@/services/referralRepository";
 
 /**
  * Cross-agency referral layer (explicit sharing model).
@@ -57,6 +62,8 @@ export interface Referral {
   createdByName: string;
   createdAt: string;
   notes: ReferralNote[];
+  /** Backend referral id when mirrored to the API (CIR-referenced records). */
+  serverReferralId?: string;
 }
 
 const hrsAgo = (h: number) => new Date(Date.now() - h * 3600000).toISOString();
@@ -365,6 +372,17 @@ export function ReferralProvider({ children }: { children: React.ReactNode }) {
             ]
           : [],
       };
+      // Mirror to the backend referral API when the record is a backend
+      // citizen report (best-effort; local remains authoritative for the UI).
+      if (isBackendReportReference(input.recordId)) {
+        const serverReferralId = await createReferralOnApi({
+          reportReference: input.recordId,
+          toAgency: input.toAgency,
+          reason: input.initialNote?.trim() || input.snapshot.title,
+        });
+        if (serverReferralId) referral.serverReferralId = serverReferralId;
+      }
+
       setReferrals((prev) => {
         const next = [referral, ...prev];
         void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
@@ -378,6 +396,10 @@ export function ReferralProvider({ children }: { children: React.ReactNode }) {
   const updateReferralStatus = useCallback(
     async (id: string, status: ReferralStatus) => {
       setReferrals((prev) => {
+        const target = prev.find((r) => r.id === id);
+        if (target?.serverReferralId) {
+          void updateReferralStatusOnApi(target.serverReferralId, status);
+        }
         const next = prev.map((r) => (r.id === id ? { ...r, status } : r));
         void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         return next;

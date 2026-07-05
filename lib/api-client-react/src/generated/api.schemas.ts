@@ -244,6 +244,12 @@ export interface EvidenceCreateRequest {
 
 export interface CitizenReportSubmitRequest {
   clientMutationId?: string;
+  /**
+   * Client-generated idempotency key — resubmitting with the same clientId returns the existing report instead of creating a duplicate.
+   * @minLength 8
+   * @maxLength 80
+   */
+  clientId?: string;
   incidentType: IncidentType;
   /** @minLength 10 */
   description: string;

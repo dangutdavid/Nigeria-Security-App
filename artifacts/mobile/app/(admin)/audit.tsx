@@ -10,8 +10,8 @@ import {
   AuditEvent,
   AuditSeverity,
   getAuditMetrics,
-  listAuditEvents,
 } from "@/services/auditLogService";
+import { listAuditEvents } from "@/services/auditRepository";
 
 type SeverityFilter = "all" | AuditSeverity;
 type AgencyFilter = "all" | "frsc" | "police" | "vio" | "civil_defence" | "admin";
@@ -34,12 +34,24 @@ export default function AdminAuditScreen() {
   const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
-    const [nextEvents, nextMetrics] = await Promise.all([
+    const [nextEvents, localMetrics] = await Promise.all([
       listAuditEvents({ severity, agency, query }),
       getAuditMetrics(),
     ]);
     setEvents(nextEvents);
-    setMetrics(nextMetrics);
+    // Compute metrics from whichever trail we're actually displaying
+    // (backend when API mode is on); local metrics remain the fallback.
+    if (nextEvents.length > 0) {
+      const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+      setMetrics({
+        total: nextEvents.length,
+        last24h: nextEvents.filter((e) => new Date(e.createdAt).getTime() >= dayAgo).length,
+        warnings: nextEvents.filter((e) => e.severity === "warning").length,
+        critical: nextEvents.filter((e) => e.severity === "critical").length,
+      });
+    } else {
+      setMetrics(localMetrics);
+    }
   }, [agency, query, severity]);
 
   useFocusEffect(useCallback(() => { void load(); }, [load]));

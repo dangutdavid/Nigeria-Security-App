@@ -477,6 +477,13 @@ const SEED_INCIDENTS: Incident[] = [
   },
 ];
 
+/** Ids of the bundled sample incidents, used to badge them as demo data. */
+const SEED_INCIDENT_IDS: ReadonlySet<string> = new Set(SEED_INCIDENTS.map((i) => i.id));
+
+export function isDemoIncident(incident: Pick<Incident, "id">): boolean {
+  return SEED_INCIDENT_IDS.has(incident.id);
+}
+
 const DEFAULT_DRAFT: DraftReport = { probableCauses: [], vehicles: [], victims: [] };
 
 export function getProbableCauseLibrary(type: IncidentType) {
@@ -585,6 +592,9 @@ export function IncidentProvider({ children }: { children: React.ReactNode }) {
       for (let attempt = 0; attempt < 2 && !syncedIds.has(incident.id); attempt += 1) {
         try {
           await submitCitizenReport({
+            // The incident's own id doubles as the idempotency key, so a
+            // retry after a lost response can never create a duplicate.
+            clientId: `frsc-incident-${incident.id}`,
             incidentType: INCIDENT_TYPE_TO_REPORT_TYPE[incident.type] ?? "road_crash",
             description: `${incident.title}. ${incident.description}`.trim(),
             location: incident.location,
