@@ -4,6 +4,14 @@ Integrated mobile-first safety and field-operations platform for Nigerian public
 
 The project currently focuses on an Expo React Native app with local/mock data that can progressively move to the API server. It supports citizen incident reporting, agency dashboards, admin oversight, map/location support, notifications, dynamic agency onboarding, and backend-ready contracts.
 
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system architecture with diagrams: context, containers, data model, key sequence flows, security boundaries, and the target production topology.
+- [docs/ROADMAP.md](docs/ROADMAP.md) — the working-backwards plan from the production end state to today, with an ordered execution checklist.
+- [docs/TOOLING.md](docs/TOOLING.md) — tools in use, CI (`.github/workflows/ci.yml`), and what to adopt before production.
+- [docs/Nigeria-Security-App-Architecture.pdf](docs/Nigeria-Security-App-Architecture.pdf) — all three documents rendered as one shareable PDF with the diagrams drawn.
+- [artifacts/mobile/docs/api-integration.md](artifacts/mobile/docs/api-integration.md) — mobile API integration notes.
+
 ## What Is Built
 
 ### Mobile App (`artifacts/mobile`)
@@ -79,7 +87,9 @@ lib/
   api-zod/          shared Zod schemas
   api-client-react/ generated API client package
   db/               Drizzle/PostgreSQL schema
+docs/               architecture, roadmap, tooling
 scripts/            workspace scripts
+.github/workflows/  CI (typecheck, tests, migration check)
 ```
 
 ## Requirements
