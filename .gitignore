@@ -47,3 +47,17 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Environment (real secrets never committed; see .env.example)
+.env
+.env.local
+.env.*.local
+
+# Local evidence binary storage (api-server local-disk backend)
+artifacts/api-server/data/
+
+# Claude Code local session settings
+.claude/
+
+# Vitest evidence-upload artifacts
+.vitest-evidence/
