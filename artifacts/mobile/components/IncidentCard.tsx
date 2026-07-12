@@ -14,7 +14,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
-import { Incident, IncidentStatus, useIncidents } from "@/context/IncidentContext";
+import { Incident, IncidentStatus, isDemoIncident, useIncidents } from "@/context/IncidentContext";
+import { shouldUseApi } from "@/services/apiConfig";
 import { useColors } from "@/hooks/useColors";
 import { StatusBadge } from "./StatusBadge";
 
@@ -231,6 +232,11 @@ export function IncidentCard({ incident }: IncidentCardProps) {
             )}
           </View>
           <View style={styles.timeRow}>
+            {shouldUseApi() && isDemoIncident(incident) && (
+              <View style={styles.demoPill}>
+                <Text style={styles.demoPillText}>DEMO</Text>
+              </View>
+            )}
             {user?.id === incident.assignedTo && incident.status !== "closed" && (
               <View style={[styles.assignedMePill, { backgroundColor: colors.primary + "15" }]}>
                 <View style={[styles.assignedMeDot, { backgroundColor: colors.primary }]} />
@@ -569,6 +575,21 @@ const styles = StyleSheet.create({
   assignedMeText: {
     fontSize: 10,
     fontFamily: "Inter_700Bold",
+  },
+  demoPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: "#F2C94C33",
+    borderWidth: 1,
+    borderColor: "#B7791F",
+    marginRight: 6,
+  },
+  demoPillText: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    color: "#B7791F",
+    letterSpacing: 0.8,
   },
   backdrop: {
     flex: 1,

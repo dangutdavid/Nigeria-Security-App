@@ -8,11 +8,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useInspections } from "@/context/InspectionContext";
 import { useReferrals } from "@/context/ReferralContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { useColors } from "@/hooks/useColors";
 import { usePermissions } from "@/lib/permissions";
 import { confirmAction } from "@/utils/confirm";
 
-const PRIMARY = "#7B3F00";
+const FALLBACK_PRIMARY = "#7B3F00";
 
 type MenuItem = {
   icon: keyof typeof Feather.glyphMap;
@@ -28,11 +29,12 @@ type MenuItem = {
 
 export default function VIOProfile() {
   const colors = useColors();
+  const { primary: PRIMARY } = useAgencyBrand("vio", { primary: FALLBACK_PRIMARY });
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
   const { inspections } = useInspections();
-  const { can, roleLabel } = usePermissions();
+  const { can, roleLabel, canCustomizeOwnAgency } = usePermissions();
   const { pendingCountFor } = useReferrals();
   const { isDark, toggleTheme } = useTheme();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -63,10 +65,14 @@ export default function VIOProfile() {
     { icon: "award", label: "Certificates", sub: "View all issued certs", onPress: () => router.push("/(vio)/certificates" as any) },
     { icon: "search", label: "Vehicle Lookup", sub: "Check registration and records", onPress: () => router.push("/vehicle-lookup") },
     { icon: "git-pull-request", label: "Referrals", sub: "Cross-agency shared records", badge: pendingReferrals, onPress: () => router.push("/referrals") },
+    { icon: "bell", label: "Notifications", sub: "Alerts, read state, and local preferences", onPress: () => router.push("/notifications" as any) },
     { icon: "anchor", label: "Duty Log", sub: "Start or review patrol sessions", onPress: () => router.push("/patrol-log") },
     { icon: "bar-chart-2", label: "Analytics", sub: "Inspection trends and pass rates", onPress: () => router.push("/analytics-vio") },
     ...(canManageUsers
       ? [{ icon: "users" as const, label: "Manage Officers", sub: "Create and manage your zone", onPress: () => router.push("/users") }]
+      : []),
+    ...(canCustomizeOwnAgency
+      ? [{ icon: "edit-2" as const, label: "Customise Agency", sub: "Theme colours and logo", onPress: () => router.push("/agency-customize" as any) }]
       : []),
     { icon: isDark ? "moon" : "sun", label: "Dark Mode", sub: isDark ? "On" : "Off", toggle: true, toggled: isDark, onToggle: toggleTheme },
     { icon: "lock", label: "Change PIN", sub: "Update your security PIN", onPress: () => router.push("/change-pin" as any) },

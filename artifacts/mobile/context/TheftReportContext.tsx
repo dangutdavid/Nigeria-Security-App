@@ -1,5 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
+import { submitCitizenReport } from "@/services/reportRepository";
+import { uploadReportPhoto } from "@/services/evidenceRepository";
 import React, {
   createContext,
   useCallback,
@@ -11,26 +13,8 @@ import React, {
 
 const STORAGE_KEY = "@frsc_theft_reports_v1";
 
-export type TheftStage = "new" | "acknowledged" | "investigating";
-
-export type TheftStatusAction =
-  | "reported"
-  | "acknowledged"
-  | "investigating"
-  | "recovered"
-  | "false_alarm";
-
-export interface TheftStatusEvent {
-  at: string;
-  action: TheftStatusAction;
-  by?: string;
-  agency?: string;
-  note?: string;
-}
-
 export interface TheftReport {
   id: string;
-  reference: string;
   plate: string;
   make: string;
   model: string;
@@ -45,8 +29,8 @@ export interface TheftReport {
   reporterName?: string;
   contactPhone?: string;
   status: "active" | "recovered" | "false_alarm";
-  stage: TheftStage;
-  history: TheftStatusEvent[];
+  /** Backend citizen-report reference when the theft was submitted via API. */
+  citizenReportReference?: string;
 }
 
 export interface NearbyTheftAlert extends TheftReport {
@@ -90,60 +74,7 @@ export function formatMinutesAgo(reportedAt: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function refPrefix(year: number): string {
-  return `STV-${year}-`;
-}
-
-function nextRefForYear(existing: TheftReport[], year: number): string {
-  const prefix = refPrefix(year);
-  const maxSeq = existing
-    .map((r) => r.reference)
-    .filter((ref): ref is string => !!ref && ref.startsWith(prefix))
-    .map((ref) => parseInt(ref.slice(prefix.length), 10))
-    .filter((n) => !Number.isNaN(n))
-    .reduce((m, n) => Math.max(m, n), 0);
-  return `${prefix}${String(maxSeq + 1).padStart(4, "0")}`;
-}
-
-/**
- * Backfills reference / stage / history on reports loaded from older storage
- * formats, ensuring references never collide with existing ones.
- */
-function normalizeReports(list: TheftReport[]): TheftReport[] {
-  const usedSeq: Record<string, number> = {};
-  for (const r of list) {
-    if (r.reference) {
-      const m = /^STV-(\d{4})-(\d+)$/.exec(r.reference);
-      if (m) {
-        const prefix = refPrefix(parseInt(m[1], 10));
-        usedSeq[prefix] = Math.max(usedSeq[prefix] ?? 0, parseInt(m[2], 10));
-      }
-    }
-  }
-  return list.map((r) => {
-    let rec = r;
-    if (!rec.reference) {
-      const year =
-        new Date(rec.reportedAt).getFullYear() || new Date().getFullYear();
-      const prefix = refPrefix(year);
-      const seq = (usedSeq[prefix] ?? 0) + 1;
-      usedSeq[prefix] = seq;
-      rec = { ...rec, reference: `${prefix}${String(seq).padStart(4, "0")}` };
-    }
-    if (!rec.stage) rec = { ...rec, stage: "new" };
-    if (!rec.history || rec.history.length === 0) {
-      rec = {
-        ...rec,
-        history: [
-          { at: rec.reportedAt, action: "reported", by: rec.reporterName },
-        ],
-      };
-    }
-    return rec;
-  });
-}
-
-const SEED_BASE: Omit<TheftReport, "reference" | "stage" | "history">[] = [
+const SEED_REPORTS: TheftReport[] = [
   {
     id: "theft-seed-1",
     plate: "AGL 234 KJ",
@@ -230,34 +161,58 @@ const SEED_BASE: Omit<TheftReport, "reference" | "stage" | "history">[] = [
     contactPhone: "08098765432",
     status: "active",
   },
+  {
+    id: "theft-seed-6",
+    plate: "ABC 732 LM",
+    make: "Toyota",
+    model: "Sienna",
+    color: "Gold",
+    year: "2017",
+    description: "Vehicle taken from church premises during evening service.",
+    photoUri: undefined,
+    location: "Nyanya, Abuja",
+    latitude: 9.0267,
+    longitude: 7.5753,
+    reportedAt: new Date(Date.now() - 9 * 60000).toISOString(),
+    reporterName: "Maryam Hassan",
+    contactPhone: "08123456780",
+    status: "active",
+  },
+  {
+    id: "theft-seed-7",
+    plate: "OGN 402 YK",
+    make: "Mack",
+    model: "Granite",
+    color: "White",
+    year: "2016",
+    description: "Truck removed from depot without authorization. Cargo container still attached.",
+    photoUri: undefined,
+    location: "Sango Ota, Ogun",
+    latitude: 6.6905,
+    longitude: 3.2342,
+    reportedAt: new Date(Date.now() - 155 * 60000).toISOString(),
+    reporterName: "Depot Security",
+    contactPhone: "08070001122",
+    status: "active",
+  },
+  {
+    id: "theft-seed-8",
+    plate: "ENU 219 KC",
+    make: "Mercedes-Benz",
+    model: "C300",
+    color: "Grey",
+    year: "2021",
+    description: "Recovered after roadside stop. Owner notified.",
+    photoUri: undefined,
+    location: "Independence Layout, Enugu",
+    latitude: 6.4413,
+    longitude: 7.4988,
+    reportedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+    reporterName: "Ikenna Nwafor",
+    contactPhone: "08045556789",
+    status: "recovered",
+  },
 ];
-
-const SEED_STAGES: TheftStage[] = [
-  "investigating",
-  "acknowledged",
-  "new",
-  "new",
-  "new",
-];
-
-const SEED_REPORTS: TheftReport[] = SEED_BASE.map((r, i) => {
-  const stage = SEED_STAGES[i] ?? "new";
-  const history: TheftStatusEvent[] = [
-    { at: r.reportedAt, action: "reported", by: r.reporterName },
-  ];
-  if (stage === "acknowledged" || stage === "investigating") {
-    history.push({ at: r.reportedAt, action: "acknowledged", agency: "police" });
-  }
-  if (stage === "investigating") {
-    history.push({ at: r.reportedAt, action: "investigating", agency: "police" });
-  }
-  return {
-    ...r,
-    reference: `STV-2026-${String(i + 1).padStart(4, "0")}`,
-    stage,
-    history,
-  };
-});
 
 interface TheftReportContextType {
   reports: TheftReport[];
@@ -265,24 +220,12 @@ interface TheftReportContextType {
   userLocation: { latitude: number; longitude: number } | null;
   locationPermission: "granted" | "denied" | "undetermined";
   addReport: (
-    report: Omit<
-      TheftReport,
-      "id" | "reportedAt" | "status" | "reference" | "stage" | "history"
-    >,
+    report: Omit<TheftReport, "id" | "reportedAt" | "status">,
   ) => Promise<TheftReport>;
   updateReportStatus: (
     id: string,
     status: TheftReport["status"],
-    by?: string,
-    agency?: string,
   ) => Promise<void>;
-  advanceStage: (
-    id: string,
-    stage: Exclude<TheftStage, "new">,
-    by?: string,
-    agency?: string,
-  ) => Promise<void>;
-  getReportByReference: (reference: string) => TheftReport | null;
   requestLocationPermission: () => Promise<boolean>;
 }
 
@@ -293,8 +236,6 @@ const TheftReportContext = createContext<TheftReportContextType>({
   locationPermission: "undetermined",
   addReport: async () => ({} as TheftReport),
   updateReportStatus: async () => {},
-  advanceStage: async () => {},
-  getReportByReference: () => null,
   requestLocationPermission: async () => false,
 });
 
@@ -323,9 +264,8 @@ export function TheftReportProvider({
       if (val) {
         try {
           const stored = JSON.parse(val) as TheftReport[];
-          const merged = normalizeReports(mergeWithSeed(stored));
+          const merged = mergeWithSeed(stored);
           setReports(merged);
-          void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
         } catch {
           setReports(SEED_REPORTS);
         }
@@ -438,27 +378,41 @@ export function TheftReportProvider({
 
   const addReport = useCallback(
     async (
-      data: Omit<
-        TheftReport,
-        "id" | "reportedAt" | "status" | "reference" | "stage" | "history"
-      >,
+      data: Omit<TheftReport, "id" | "reportedAt" | "status">,
     ): Promise<TheftReport> => {
-      const nowIso = new Date().toISOString();
-      const reference = nextRefForYear(reports, new Date().getFullYear());
+      // API-first: file the theft with the police via the citizen-report
+      // pipeline so it lands in the backend. The local record below stays as
+      // the cache that powers offline viewing and nearby-alert radius maths.
+      let citizenReportReference: string | undefined;
+      try {
+        const vehicle = [data.year, data.color, data.make, data.model]
+          .filter(Boolean)
+          .join(" ");
+        const receipt = await submitCitizenReport({
+          incidentType: "vehicle_theft",
+          description: `Stolen vehicle: ${vehicle} (${data.plate}). ${data.description}`.trim(),
+          location: data.location,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          address: data.location,
+          locationSource: data.latitude != null ? "gps" : "manual",
+          photoUri: data.photoUri,
+          vehicleRegistration: data.plate,
+          emergencyLevel: "high",
+          suggestedAgency: "police",
+        });
+        citizenReportReference = receipt.reference;
+        if (data.photoUri) void uploadReportPhoto(receipt.reference, data.photoUri);
+      } catch {
+        // Submission falls back to local-only; the record is still saved.
+      }
+
       const report: TheftReport = {
         ...data,
         id: `theft-${Date.now()}`,
-        reference,
-        reportedAt: nowIso,
+        reportedAt: new Date().toISOString(),
         status: "active",
-        stage: "new",
-        history: [
-          {
-            at: nowIso,
-            action: "reported",
-            by: data.reporterName || "Citizen",
-          },
-        ],
+        citizenReportReference,
       };
       setReports((prev) => {
         const next = [report, ...prev];
@@ -467,80 +421,18 @@ export function TheftReportProvider({
       });
       return report;
     },
-    [reports],
+    [],
   );
 
   const updateReportStatus = useCallback(
-    async (
-      id: string,
-      status: TheftReport["status"],
-      by?: string,
-      agency?: string,
-    ) => {
+    async (id: string, status: TheftReport["status"]) => {
       setReports((prev) => {
-        const next = prev.map((r) =>
-          r.id === id
-            ? {
-                ...r,
-                status,
-                history: [
-                  ...(r.history ?? []),
-                  {
-                    at: new Date().toISOString(),
-                    action: status,
-                    by,
-                    agency,
-                  } as TheftStatusEvent,
-                ],
-              }
-            : r,
-        );
+        const next = prev.map((r) => (r.id === id ? { ...r, status } : r));
         void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         return next;
       });
     },
     [],
-  );
-
-  const advanceStage = useCallback(
-    async (
-      id: string,
-      stage: Exclude<TheftStage, "new">,
-      by?: string,
-      agency?: string,
-    ) => {
-      setReports((prev) => {
-        const next = prev.map((r) =>
-          r.id === id
-            ? {
-                ...r,
-                stage,
-                history: [
-                  ...(r.history ?? []),
-                  {
-                    at: new Date().toISOString(),
-                    action: stage,
-                    by,
-                    agency,
-                  } as TheftStatusEvent,
-                ],
-              }
-            : r,
-        );
-        void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        return next;
-      });
-    },
-    [],
-  );
-
-  const getReportByReference = useCallback(
-    (reference: string): TheftReport | null => {
-      const norm = reference.trim().toUpperCase();
-      if (!norm) return null;
-      return reports.find((r) => r.reference.toUpperCase() === norm) ?? null;
-    },
-    [reports],
   );
 
   return (
@@ -552,8 +444,6 @@ export function TheftReportProvider({
         locationPermission,
         addReport,
         updateReportStatus,
-        advanceStage,
-        getReportByReference,
         requestLocationPermission,
       }}
     >

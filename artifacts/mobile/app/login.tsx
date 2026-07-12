@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,7 +14,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { AgencyType, useAuth } from "@/context/AuthContext";
+import { AgencyType, routeForUser, useAuth } from "@/context/AuthContext";
 import { useAgency } from "@/context/AgencyContext";
 import { AgencyEmblem, AgencyEmblemId } from "@/components/AgencyEmblem";
 import { useColors } from "@/hooks/useColors";
@@ -35,19 +35,22 @@ const DEMO_HINTS: Record<string, { badge: string; pin: string; role: string }[]>
     { badge: "VIO-SV2", pin: "1234", role: "Senior Inspector" },
     { badge: "VIO-CMD", pin: "1234", role: "Director" },
   ],
-};
-
-const AGENCY_ROUTES: Record<string, string> = {
-  frsc: "/(tabs)",
-  police: "/(police)",
-  vio: "/(vio)",
+  civil_defence: [
+    { badge: "NSCDC-001", pin: "1234", role: "Civil Defence Officer" },
+    { badge: "NSCDC-SV", pin: "1234", role: "Supervisor" },
+    { badge: "NSCDC-CMD", pin: "1234", role: "Commandant" },
+  ],
+  admin: [
+    { badge: "ADMIN-001", pin: "1234", role: "Admin" },
+    { badge: "SUPER-001", pin: "1234", role: "Super Admin" },
+  ],
 };
 
 export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { login } = useAuth();
+  const { allUsers, login } = useAuth();
   const { selectedAgency, clearAgency } = useAgency();
 
   const [badge, setBadge] = useState("");
@@ -58,7 +61,17 @@ export default function LoginScreen() {
 
   const agencyId = selectedAgency?.id ?? "frsc";
   const primaryColor = selectedAgency?.primaryColor ?? "#1B5E3B";
-  const hints = DEMO_HINTS[agencyId] ?? DEMO_HINTS.frsc;
+  const hints = useMemo(() => {
+    const dynamicHints = allUsers
+      .filter((candidate) => candidate.agency === agencyId && candidate.status === "active")
+      .slice(0, 3)
+      .map((candidate) => ({
+        badge: candidate.badgeNumber,
+        pin: "1234",
+        role: labelForRole(candidate.role),
+      }));
+    return dynamicHints.length > 0 ? dynamicHints : DEMO_HINTS[agencyId] ?? DEMO_HINTS.frsc;
+  }, [agencyId, allUsers]);
 
   async function handleLogin() {
     if (!badge.trim() || !pin.trim()) {
@@ -71,7 +84,12 @@ export default function LoginScreen() {
     setLoading(false);
     if (result === "ok") {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      const route = AGENCY_ROUTES[agencyId] ?? "/(tabs)";
+      const signedInUser = allUsers.find(
+        (candidate) =>
+          candidate.badgeNumber.toUpperCase() === badge.trim().toUpperCase() &&
+          candidate.agency === agencyId,
+      );
+      const route = routeForUser(signedInUser);
       router.replace(route as any);
     } else {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -196,6 +214,23 @@ export default function LoginScreen() {
       </ScrollView>
     </KeyboardAvoidingView>
   );
+}
+
+function labelForRole(role: string) {
+  switch (role) {
+    case "super_admin":
+      return "Super Admin";
+    case "admin":
+      return "Admin";
+    case "commander":
+      return "Commander";
+    case "supervisor":
+      return "Supervisor";
+    case "officer":
+      return "Officer";
+    default:
+      return "User";
+  }
 }
 
 const styles = StyleSheet.create({

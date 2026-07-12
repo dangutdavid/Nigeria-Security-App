@@ -2,6 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { AgencyType } from "@/context/AuthContext";
 import { normalizePlate } from "@/lib/plate";
+import {
+  createReferralOnApi,
+  isBackendReportReference,
+  updateReferralStatusOnApi,
+} from "@/services/referralRepository";
 
 /**
  * Cross-agency referral layer (explicit sharing model).
@@ -57,6 +62,8 @@ export interface Referral {
   createdByName: string;
   createdAt: string;
   notes: ReferralNote[];
+  /** Backend referral id when mirrored to the API (CIR-referenced records). */
+  serverReferralId?: string;
 }
 
 const hrsAgo = (h: number) => new Date(Date.now() - h * 3600000).toISOString();
@@ -129,6 +136,147 @@ const SEED_REFERRALS: Referral[] = [
     createdByName: "Insp. Chukwuemeka Okonkwo",
     createdAt: hrsAgo(8),
     notes: [],
+  },
+  {
+    id: "ref-seed-4",
+    fromAgency: "police",
+    toAgency: "civil_defence",
+    recordType: "crime_report",
+    recordId: "CIR-NSC002",
+    snapshot: {
+      title: "Crowd control support requested",
+      severity: "high",
+      location: "Ahmadu Bello Way near Secretariat Junction, Kaduna",
+      summary:
+        "Police patrol dispersed initial protest activity. Requesting NSCDC support around public infrastructure and crowd monitoring.",
+    },
+    status: "pending",
+    createdBy: "p2",
+    createdByName: "DSP Aisha Ibrahim",
+    createdAt: hrsAgo(5),
+    notes: [
+      {
+        id: "rn-seed-4",
+        text: "No active assault reported, but the crowd is reforming around government property.",
+        authorName: "DSP Aisha Ibrahim",
+        agency: "police",
+        createdAt: hrsAgo(5),
+      },
+    ],
+  },
+  {
+    id: "ref-seed-5",
+    fromAgency: "frsc",
+    toAgency: "civil_defence",
+    recordType: "incident",
+    recordId: "CIR-NSC001",
+    snapshot: {
+      title: "Fire risk near market access road",
+      plate: "LND 442 XA",
+      severity: "critical",
+      location: "Mile 12 Market access road, Kosofe, Lagos",
+      summary:
+        "FRSC unit reports traffic obstruction around a smoke/fire scene. NSCDC rescue coordination requested for crowd control and scene safety.",
+    },
+    status: "acknowledged",
+    createdBy: "f1",
+    createdByName: "Marshal Adewale Johnson",
+    createdAt: hrsAgo(2),
+    notes: [],
+  },
+  {
+    id: "ref-seed-6",
+    fromAgency: "civil_defence",
+    toAgency: "frsc",
+    recordType: "incident",
+    recordId: "CIR-NSC004",
+    snapshot: {
+      title: "Flooding affecting traffic corridor",
+      severity: "medium",
+      location: "Zoo Road, Kano Municipal, Kano",
+      summary:
+        "NSCDC flood response team requests FRSC traffic diversion support while evacuation assessment continues.",
+    },
+    status: "actioned",
+    createdBy: "n2",
+    createdByName: "Superintendent Ibrahim Musa",
+    createdAt: hrsAgo(16),
+    notes: [
+      {
+        id: "rn-seed-6",
+        text: "Traffic build-up is affecting access for rescue vehicles.",
+        authorName: "Superintendent Ibrahim Musa",
+        agency: "civil_defence",
+        createdAt: hrsAgo(16),
+      },
+    ],
+  },
+  {
+    id: "ref-seed-7",
+    fromAgency: "vio",
+    toAgency: "frsc",
+    recordType: "inspection",
+    recordId: "ins-005",
+    snapshot: {
+      title: "Failed commercial bus inspection",
+      plate: "KRD 118 XP",
+      severity: "fail",
+      location: "Lagos VIO Office",
+      summary:
+        "Commercial bus failed safety inspection with brake-light and tyre defects. FRSC patrol support requested on Jibowu corridor.",
+    },
+    status: "pending",
+    createdBy: "v1",
+    createdByName: "Officer Grace Okafor",
+    createdAt: hrsAgo(1),
+    notes: [],
+  },
+  {
+    id: "ref-seed-8",
+    fromAgency: "frsc",
+    toAgency: "police",
+    recordType: "incident",
+    recordId: "INC-TODAY-003",
+    snapshot: {
+      title: "Suspicious abandoned truck at port access",
+      plate: "APP-441-TR",
+      severity: "property_only",
+      location: "Apapa-Oshodi Expressway",
+      summary:
+        "Truck breakdown is causing obstruction, but driver left scene before FRSC arrival. Police identity check requested.",
+    },
+    status: "pending",
+    createdBy: "u1",
+    createdByName: "Okafor Emmanuel",
+    createdAt: hrsAgo(2),
+    notes: [],
+  },
+  {
+    id: "ref-seed-9",
+    fromAgency: "civil_defence",
+    toAgency: "police",
+    recordType: "incident",
+    recordId: "CIR-NSC007",
+    snapshot: {
+      title: "Civil emergency with crowd control risk",
+      severity: "critical",
+      location: "Barnawa, Kaduna South, Kaduna",
+      summary:
+        "NSCDC responders are managing a partial building collapse. Police support requested for access control and crowd dispersal.",
+    },
+    status: "acknowledged",
+    createdBy: "c2",
+    createdByName: "ASC Halima Yusuf",
+    createdAt: hrsAgo(9),
+    notes: [
+      {
+        id: "rn-seed-9",
+        text: "Crowd is blocking emergency vehicle access on the narrow approach road.",
+        authorName: "ASC Halima Yusuf",
+        agency: "civil_defence",
+        createdAt: hrsAgo(9),
+      },
+    ],
   },
 ];
 
@@ -224,6 +372,17 @@ export function ReferralProvider({ children }: { children: React.ReactNode }) {
             ]
           : [],
       };
+      // Mirror to the backend referral API when the record is a backend
+      // citizen report (best-effort; local remains authoritative for the UI).
+      if (isBackendReportReference(input.recordId)) {
+        const serverReferralId = await createReferralOnApi({
+          reportReference: input.recordId,
+          toAgency: input.toAgency,
+          reason: input.initialNote?.trim() || input.snapshot.title,
+        });
+        if (serverReferralId) referral.serverReferralId = serverReferralId;
+      }
+
       setReferrals((prev) => {
         const next = [referral, ...prev];
         void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
@@ -237,6 +396,10 @@ export function ReferralProvider({ children }: { children: React.ReactNode }) {
   const updateReferralStatus = useCallback(
     async (id: string, status: ReferralStatus) => {
       setReferrals((prev) => {
+        const target = prev.find((r) => r.id === id);
+        if (target?.serverReferralId) {
+          void updateReferralStatusOnApi(target.serverReferralId, status);
+        }
         const next = prev.map((r) => (r.id === id ? { ...r, status } : r));
         void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         return next;

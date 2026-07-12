@@ -51,6 +51,19 @@ Checklist. Update this file at the end of each working session.
 
 ## Build log
 
+### 2026-07-12
+- **Pulled the GitHub backend update into the workspace.** Merged ~37 commits from
+  `dangutdavid/Nigeria-Security-App` `main`: real backend (auth with refresh rotation,
+  Postgres persistence via Drizzle migrations, notifications/push, evidence, audit and ops
+  routes), backend-wired mobile flows, admin and civil-defence sections, an emergency screen,
+  EAS build config, and Vitest test suites.
+- Conflicting files (theft context, track-report, stolen-alerts, report-theft, root layout,
+  README) resolved in favor of the GitHub backend-wired versions; local-only files
+  (PROGRESS.md, replit.md, agent memory) preserved.
+- Aligned the workspace `@types/react` catalog to the mobile app's Expo-pinned ~19.1.x so a
+  single version exists workspace-wide (two versions broke mockup-sandbox typechecking).
+- `pnpm install` + full workspace typecheck pass; Expo app and API server verified running.
+
 ### 2026-06-11
 - **Citizen stolen-vehicle loop completed (P0).** Added a human-readable case reference
   (`STV-YYYY-NNNN`) generated per year, an additive workflow `stage`

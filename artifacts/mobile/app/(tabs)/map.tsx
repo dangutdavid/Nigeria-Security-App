@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -10,8 +10,16 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { useIncidents, Incident } from "@/context/IncidentContext";
 import { StatusBadge } from "@/components/StatusBadge";
+import {
+  CitizenIncidentReceipt,
+  formatCitizenIncidentStatus,
+  getCitizenReportCoordinatesText,
+  getCitizenReportLocationText,
+} from "@/services/citizenIncidentApi";
+import { listReportsByAgency } from "@/services/reportRepository";
 
 const SEVERITY_COLORS: Record<string, string> = {
   fatal: "#8B0000",
@@ -58,6 +66,7 @@ export default function MapScreen() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [selected, setSelected] = useState<Incident | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(true);
+  const [citizenReports, setCitizenReports] = useState<CitizenIncidentReceipt[]>([]);
 
   const topPad = insets.top + 67;
   const bottomPad = insets.bottom + 34 + 90;
@@ -97,6 +106,12 @@ export default function MapScreen() {
   }, [incidents]);
 
   const maxTotal = stateStats.length > 0 ? stateStats[0].total : 1;
+
+  useFocusEffect(
+    useCallback(() => {
+      void listReportsByAgency("frsc").then(setCitizenReports);
+    }, []),
+  );
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -334,6 +349,20 @@ export default function MapScreen() {
             </TouchableOpacity>
           </TouchableOpacity>
         ))}
+
+        <View style={styles.listHeaderRow}>
+          <Text style={[styles.listHeaderText, { color: colors.mutedForeground }]}>
+            Citizen report locations · {citizenReports.length}
+          </Text>
+        </View>
+        {citizenReports.map((report) => (
+          <CitizenReportLocationCard
+            key={report.reference}
+            report={report}
+            colors={colors}
+            onPress={() => router.push("/(tabs)/cases" as any)}
+          />
+        ))}
       </ScrollView>
 
       {/* Report FAB */}
@@ -345,6 +374,40 @@ export default function MapScreen() {
         <Feather name="plus" size={22} color="#fff" />
       </TouchableOpacity>
     </View>
+  );
+}
+
+function CitizenReportLocationCard({
+  report,
+  colors,
+  onPress,
+}: {
+  report: CitizenIncidentReceipt;
+  colors: ReturnType<typeof useColors>;
+  onPress: () => void;
+}) {
+  const coordinates = getCitizenReportCoordinatesText(report);
+  const { primary: brandPrimary } = useAgencyBrand("frsc", { primary: "#1B5E3B" });
+  return (
+    <TouchableOpacity activeOpacity={0.75} onPress={onPress} style={[styles.citizenCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={styles.citizenIcon}>
+        <Feather name={coordinates ? "map-pin" : "navigation"} size={17} color={brandPrimary} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <View style={styles.citizenTop}>
+          <Text style={[styles.citizenRef, { color: colors.text }]}>{report.reference}</Text>
+          <Text style={styles.citizenSource}>Citizen Report</Text>
+        </View>
+        <Text style={[styles.citizenMeta, { color: colors.mutedForeground }]} numberOfLines={2}>
+          {getCitizenReportLocationText(report)}
+        </Text>
+        <Text style={[styles.citizenMeta, { color: colors.mutedForeground }]}>
+          {report.emergencyLevel.toUpperCase()} · {formatCitizenIncidentStatus(report.status)}
+          {coordinates ? ` · ${coordinates}` : " · Manual location"}
+        </Text>
+      </View>
+      <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+    </TouchableOpacity>
   );
 }
 
@@ -534,6 +597,26 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     gap: 12,
   },
+  citizenCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 11,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 13,
+  },
+  citizenIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    backgroundColor: "#1B5E3B16",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  citizenTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
+  citizenRef: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  citizenSource: { color: "#1B5E3B", fontSize: 11, fontFamily: "Inter_700Bold" },
+  citizenMeta: { fontSize: 12, fontFamily: "Inter_500Medium", lineHeight: 17, marginTop: 3 },
   severityDot: {
     width: 12,
     height: 12,

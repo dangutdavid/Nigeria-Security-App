@@ -6,7 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -23,12 +23,27 @@ import { PatrolProvider } from "@/context/PatrolContext";
 import { ReferralProvider } from "@/context/ReferralContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { TheftReportProvider } from "@/context/TheftReportContext";
+import { addNotificationRouting } from "@/services/pushNotificationService";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
+  const router = useRouter();
+
+  // Route notification taps (foreground, background, and cold start) to the
+  // screen carried in the push payload.
+  useEffect(() => {
+    return addNotificationRouting((route) => {
+      try {
+        router.push(route as Parameters<typeof router.push>[0]);
+      } catch {
+        router.push("/notifications");
+      }
+    });
+  }, [router]);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -36,7 +51,14 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="(police)" options={{ headerShown: false }} />
       <Stack.Screen name="(vio)" options={{ headerShown: false }} />
-      <Stack.Screen name="report" options={{ headerShown: false, presentation: "modal" }} />
+      <Stack.Screen name="(civil-defence)" options={{ headerShown: false }} />
+      <Stack.Screen name="(admin)" options={{ headerShown: false }} />
+      <Stack.Screen name="agency-workspace" options={{ headerShown: false }} />
+      <Stack.Screen name="agency-customize" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="report"
+        options={{ headerShown: false, presentation: "modal" }}
+      />
       <Stack.Screen name="case/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="analytics" options={{ headerShown: false }} />
       <Stack.Screen name="users" options={{ headerShown: false }} />
@@ -48,12 +70,22 @@ function RootLayoutNav() {
       <Stack.Screen name="otp-verify" options={{ headerShown: false }} />
       <Stack.Screen name="reset-pin" options={{ headerShown: false }} />
       <Stack.Screen name="logout" options={{ headerShown: false }} />
-      <Stack.Screen name="report-theft" options={{ headerShown: false, presentation: "modal" }} />
-      <Stack.Screen name="theft-alerts" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="report-theft"
+        options={{ headerShown: false, presentation: "modal" }}
+      />
+      <Stack.Screen
+        name="report-incident"
+        options={{ headerShown: false, presentation: "modal" }}
+      />
       <Stack.Screen name="track-report" options={{ headerShown: false }} />
+      <Stack.Screen name="notifications" options={{ headerShown: false }} />
+      <Stack.Screen name="theft-alerts" options={{ headerShown: false }} />
       <Stack.Screen name="crime/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="inspection/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="referrals" options={{ headerShown: false }} />
+      <Stack.Screen name="emergency" options={{ headerShown: false }} />
+      <Stack.Screen name="unauthorized" options={{ headerShown: false }} />
       <Stack.Screen name="analytics-police" options={{ headerShown: false }} />
       <Stack.Screen name="analytics-vio" options={{ headerShown: false }} />
     </Stack>

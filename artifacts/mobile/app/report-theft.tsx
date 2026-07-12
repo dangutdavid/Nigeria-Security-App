@@ -55,7 +55,7 @@ export default function ReportTheftScreen() {
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [submittedReport, setSubmittedReport] = useState<{ plate: string; id: string; reference: string } | null>(null);
+  const [submittedReport, setSubmittedReport] = useState<{ plate: string; id: string } | null>(null);
 
   const scrollRef = useRef<ScrollView>(null);
   const topPad = insets.top + (Platform.OS === "web" ? 67 : 0);
@@ -154,7 +154,7 @@ export default function ReportTheftScreen() {
         contactPhone: contactPhone.trim(),
       });
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setSubmittedReport({ plate: report.plate, id: report.id, reference: report.reference });
+      setSubmittedReport({ plate: report.plate, id: report.id });
       setSubmitted(true);
     } catch {
       Alert.alert("Error", "Could not submit your report. Please try again.");
@@ -172,11 +172,6 @@ export default function ReportTheftScreen() {
           </View>
           <Text style={[styles.successTitle, { color: colors.text }]}>Report Submitted!</Text>
           <Text style={[styles.successPlate, { color: "#C0392B" }]}>{submittedReport.plate}</Text>
-          <View style={{ alignSelf: "stretch", borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 14, alignItems: "center", backgroundColor: colors.card, borderColor: colors.border }}>
-            <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1.2, color: colors.mutedForeground }}>YOUR CASE REFERENCE</Text>
-            <Text style={{ fontSize: 24, fontFamily: "Inter_700Bold", letterSpacing: 1, marginTop: 6, color: colors.text }}>{submittedReport.reference}</Text>
-            <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 6, color: colors.mutedForeground }}>Save this number — use it to track your report status anytime.</Text>
-          </View>
           <Text style={[styles.successSub, { color: colors.mutedForeground }]}>
             Nearby users are being alerted now. The alert radius will expand over the next few hours to reach more people.
           </Text>
@@ -198,16 +193,6 @@ export default function ReportTheftScreen() {
               <Text style={[styles.successRowText, { color: colors.text }]}>Within 20 miles — after 6 hours</Text>
             </View>
           </View>
-          <TouchableOpacity
-            style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, alignSelf: "stretch", borderWidth: 1.5, borderColor: "#C0392B", borderRadius: 14, paddingVertical: 13, marginBottom: 10 }}
-            onPress={() =>
-              router.push({ pathname: "/track-report", params: { ref: submittedReport.reference } } as any)
-            }
-            activeOpacity={0.85}
-          >
-            <Feather name="search" size={16} color="#C0392B" />
-            <Text style={{ fontSize: 15, fontFamily: "Inter_700Bold", color: "#C0392B" }}>Track This Report</Text>
-          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.doneBtn, { backgroundColor: "#C0392B" }]}
             onPress={() => router.back()}

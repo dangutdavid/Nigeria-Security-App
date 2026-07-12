@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useFocusEffect, useRouter, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -27,6 +27,12 @@ import {
   ALL_STATE_NAMES,
   getLGAsForStates,
 } from "@/data/nigeriaLGAs";
+import {
+  CitizenIncidentReceipt,
+  CitizenIncidentStatus,
+  formatCitizenIncidentStatus,
+} from "@/services/citizenIncidentApi";
+import { listReportsByAgency, updateReportStatus } from "@/services/reportRepository";
 
 // ---------------------------------------------------------------------------
 // Filter config
@@ -48,6 +54,33 @@ const SEVERITY_FILTERS: Array<{ label: string; value: SeverityLevel | "all" }> =
   { label: "Serious", value: "serious" },
   { label: "Minor", value: "minor" },
 ];
+
+const CITIZEN_TYPE_LABELS: Record<string, string> = {
+  road_crash: "Road Crash",
+  traffic_obstruction: "Traffic Obstruction",
+  dangerous_driving: "Dangerous Driving",
+  vehicle_breakdown: "Vehicle Breakdown",
+  road_hazard: "Road Hazard",
+  vehicle_theft: "Vehicle Theft Referral",
+};
+
+const CITIZEN_STATUS_FLOW: Record<CitizenIncidentStatus, CitizenIncidentStatus | null> = {
+  submitted: "triaged",
+  triaged: "assigned",
+  assigned: "in_progress",
+  in_progress: "resolved",
+  resolved: "closed",
+  closed: null,
+};
+
+const CITIZEN_STATUS_TO_FILTER: Record<CitizenIncidentStatus, StatusFilterValue> = {
+  submitted: "submitted",
+  triaged: "under_review",
+  assigned: "assigned",
+  in_progress: "under_review",
+  resolved: "closed",
+  closed: "closed",
+};
 
 // ---------------------------------------------------------------------------
 // Location filter modal
@@ -276,6 +309,7 @@ export default function CasesScreen() {
   const params = useLocalSearchParams();
   const { incidents, updateIncident } = useIncidents();
   const { user } = useAuth();
+  const [citizenReports, setCitizenReports] = useState<CitizenIncidentReceipt[]>([]);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilterValue>("all");
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | "all">("all");
@@ -288,6 +322,16 @@ export default function CasesScreen() {
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "severity">("newest");
+
+  const loadCitizenReports = useCallback(async () => {
+    setCitizenReports(await listReportsByAgency("frsc"));
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadCitizenReports();
+    }, [loadCitizenReports]),
+  );
 
   React.useEffect(() => {
     const nextStatus = typeof params.status === "string" ? params.status : null;
@@ -332,6 +376,33 @@ export default function CasesScreen() {
     return true;
   });
 
+  const filteredCitizenReports = citizenReports.filter((report) => {
+    if (draftOnly || mineOnly) return false;
+    if (todayOnly) {
+      const d = new Date(report.submittedAt);
+      const now = new Date();
+      if (d.toDateString() !== now.toDateString()) return false;
+    }
+    if (query) {
+      const q = query.toLowerCase();
+      const haystack = `${report.reference} ${CITIZEN_TYPE_LABELS[report.incidentType] ?? report.incidentType} ${report.location} ${report.description} ${report.vehicleRegistration ?? ""}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    if (statusFilter !== "all") {
+      if (statusFilter === "open") {
+        if (report.status === "resolved" || report.status === "closed") return false;
+      } else if (CITIZEN_STATUS_TO_FILTER[report.status] !== statusFilter) {
+        return false;
+      }
+    }
+    if (severityFilter !== "all") {
+      const high = report.emergencyLevel === "critical" || report.emergencyLevel === "high";
+      if (!high) return false;
+    }
+    if (selectedStates.length > 0 || selectedLGAs.length > 0) return false;
+    return true;
+  });
+
   const sorted = [...filtered].sort((a, b) => {
     if (sortBy === "newest") return new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime();
     if (sortBy === "oldest") return new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime();
@@ -343,14 +414,15 @@ export default function CasesScreen() {
 
   const quickStats = useMemo(() => {
     const todayStr = new Date().toDateString();
+    const openCitizenReports = citizenReports.filter((i) => i.status !== "resolved" && i.status !== "closed");
     return {
-      total: incidents.length,
-      open: incidents.filter((i) => i.status !== "closed").length,
-      fatal: incidents.filter((i) => i.severity === "fatal").length,
-      today: incidents.filter((i) => new Date(i.dateTime).toDateString() === todayStr).length,
-      closed: incidents.filter((i) => i.status === "closed").length,
+      total: incidents.length + citizenReports.length,
+      open: incidents.filter((i) => i.status !== "closed").length + openCitizenReports.length,
+      fatal: incidents.filter((i) => i.severity === "fatal").length + citizenReports.filter((i) => i.emergencyLevel === "critical" || i.emergencyLevel === "high").length,
+      today: incidents.filter((i) => new Date(i.dateTime).toDateString() === todayStr).length + citizenReports.filter((i) => new Date(i.submittedAt).toDateString() === todayStr).length,
+      closed: incidents.filter((i) => i.status === "closed").length + citizenReports.filter((i) => i.status === "resolved" || i.status === "closed").length,
     };
-  }, [incidents]);
+  }, [incidents, citizenReports]);
 
   const activeFiltersCount =
     (statusFilter === "all" ? 0 : 1) +
@@ -368,9 +440,23 @@ export default function CasesScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    await loadCitizenReports();
     await new Promise((resolve) => setTimeout(resolve, 500));
     setRefreshing(false);
   };
+
+  async function advanceCitizenReport(report: CitizenIncidentReceipt) {
+    const nextStatus = CITIZEN_STATUS_FLOW[report.status];
+    if (!nextStatus) return;
+    await updateReportStatus({
+      reference: report.reference,
+      status: nextStatus,
+      actorName: user?.name ?? "FRSC",
+      actorAgencyLabel: "FRSC",
+    });
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await loadCitizenReports();
+  }
 
   const myDraftIds = useMemo(
     () => filtered.filter((i) => i.status === "draft" && i.reportedBy === user?.id).map((i) => i.id),
@@ -479,7 +565,7 @@ export default function CasesScreen() {
           <Text style={[styles.statChipNum, { color: todayOnly ? "#fff" : colors.text }]}>{quickStats.today}</Text>
           <Text style={[styles.statChipLabel, { color: todayOnly ? "rgba(255,255,255,0.85)" : colors.mutedForeground }]}>Today</Text>
         </TouchableOpacity>
-        {user?.role !== "field_officer" && (
+        {user?.role !== "officer" && (
           <TouchableOpacity
             style={[styles.statChip, { backgroundColor: mineOnly ? colors.secondary : colors.card, borderColor: mineOnly ? colors.secondary : colors.border }]}
             onPress={() => setMineOnly(!mineOnly)}
@@ -544,7 +630,7 @@ export default function CasesScreen() {
         <View style={styles.filterMetaRow}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Text style={[styles.filterMeta, { color: colors.mutedForeground }]}>
-              {filtered.length} of {incidents.length}
+              {filtered.length + filteredCitizenReports.length} of {incidents.length + citizenReports.length}
               {filtered.reduce((s, i) => s + i.victims.length, 0) > 0 ? ` · ${filtered.reduce((s, i) => s + i.victims.length, 0)} victims` : ""}
               {filtered.filter((i) => i.severity === "fatal" && i.status !== "closed").length > 0 ? ` · ` : ""}
             </Text>
@@ -613,9 +699,27 @@ export default function CasesScreen() {
       <FlatList
         data={sorted}
         keyExtractor={(i) => i.id}
-        contentContainerStyle={[styles.list, { paddingBottom: draftOnly && myDraftIds.length > 0 ? bottomPad + 64 : bottomPad }, sorted.length === 0 && styles.emptyList]}
+        contentContainerStyle={[styles.list, { paddingBottom: draftOnly && myDraftIds.length > 0 ? bottomPad + 64 : bottomPad }, sorted.length === 0 && filteredCitizenReports.length === 0 && styles.emptyList]}
+        ListHeaderComponent={
+          filteredCitizenReports.length > 0 ? (
+            <View style={styles.citizenListSection}>
+              <View style={styles.citizenListHeader}>
+                <Text style={[styles.citizenListTitle, { color: colors.mutedForeground }]}>CITIZEN REPORTS</Text>
+                <Text style={[styles.citizenListCount, { color: colors.primary }]}>{filteredCitizenReports.length}</Text>
+              </View>
+              {filteredCitizenReports.map((report) => (
+                <CitizenReportCard
+                  key={report.reference}
+                  report={report}
+                  colors={colors}
+                  onAdvance={() => advanceCitizenReport(report)}
+                />
+              ))}
+            </View>
+          ) : null
+        }
         renderItem={({ item }) => <IncidentCard incident={item} />}
-        scrollEnabled={!!sorted.length}
+        scrollEnabled={!!sorted.length || !!filteredCitizenReports.length}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.primary} />}
         ListEmptyComponent={<View style={styles.emptyState}><Feather name="map-pin" size={40} color={colors.mutedForeground} /><Text style={[styles.emptyTitle, { color: colors.text }]}>No cases found</Text></View>}
@@ -645,6 +749,100 @@ export default function CasesScreen() {
       />
     </View>
   );
+}
+
+function CitizenReportCard({
+  report,
+  colors,
+  onAdvance,
+}: {
+  report: CitizenIncidentReceipt;
+  colors: ReturnType<typeof useColors>;
+  onAdvance: () => void;
+}) {
+  const nextStatus = CITIZEN_STATUS_FLOW[report.status];
+  const isHigh = report.emergencyLevel === "critical" || report.emergencyLevel === "high";
+  const submittedAt = new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(report.submittedAt));
+  const latestTimeline = report.timeline?.[report.timeline.length - 1];
+
+  return (
+    <View style={[styles.citizenCard, { backgroundColor: colors.card, borderColor: isHigh ? colors.fatal + "55" : colors.border }]}>
+      <View style={styles.citizenCardTop}>
+        <View style={[styles.sourcePill, { backgroundColor: colors.primary + "14", borderColor: colors.primary + "35" }]}>
+          <Feather name="user" size={11} color={colors.primary} />
+          <Text style={[styles.sourcePillText, { color: colors.primary }]}>Citizen Report</Text>
+        </View>
+        <View style={[styles.statusPill, { backgroundColor: statusColor(report.status, colors) + "16" }]}>
+          <Text style={[styles.statusPillText, { color: statusColor(report.status, colors) }]}>
+            {formatCitizenIncidentStatus(report.status)}
+          </Text>
+        </View>
+      </View>
+
+      <Text style={[styles.citizenTitle, { color: colors.text }]}>
+        {CITIZEN_TYPE_LABELS[report.incidentType] ?? report.incidentType}
+      </Text>
+      <Text style={[styles.citizenReference, { color: colors.mutedForeground }]}>
+        {report.reference} · {submittedAt}
+      </Text>
+      <Text style={[styles.citizenDescription, { color: colors.text }]} numberOfLines={3}>
+        {report.description}
+      </Text>
+
+      <View style={styles.citizenMetaRow}>
+        <View style={[styles.metaChip, { backgroundColor: colors.muted }]}>
+          <Feather name="map-pin" size={12} color={colors.mutedForeground} />
+          <Text style={[styles.metaChipText, { color: colors.mutedForeground }]} numberOfLines={1}>
+            {report.location}
+          </Text>
+        </View>
+        <View style={[styles.metaChip, { backgroundColor: isHigh ? colors.fatal + "12" : colors.muted }]}>
+          <Feather name="alert-circle" size={12} color={isHigh ? colors.fatal : colors.mutedForeground} />
+          <Text style={[styles.metaChipText, { color: isHigh ? colors.fatal : colors.mutedForeground }]}>
+            {report.emergencyLevel.toUpperCase()}
+          </Text>
+        </View>
+      </View>
+
+      {report.vehicleRegistration ? (
+        <View style={[styles.vehicleRow, { borderColor: colors.border }]}>
+          <Feather name="truck" size={13} color={colors.primary} />
+          <Text style={[styles.vehicleText, { color: colors.text }]}>{report.vehicleRegistration}</Text>
+        </View>
+      ) : null}
+
+      {latestTimeline ? (
+        <Text style={[styles.timelineHint, { color: colors.mutedForeground }]}>
+          Latest: {latestTimeline.action} by {latestTimeline.by}
+        </Text>
+      ) : null}
+
+      {nextStatus ? (
+        <TouchableOpacity style={[styles.advanceBtn, { backgroundColor: colors.primary }]} onPress={onAdvance} activeOpacity={0.85}>
+          <Feather name="arrow-right-circle" size={15} color="#fff" />
+          <Text style={styles.advanceBtnText}>Mark {formatCitizenIncidentStatus(nextStatus)}</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={[styles.resolvedBanner, { backgroundColor: colors.successLight }]}>
+          <Feather name="check-circle" size={14} color={colors.success} />
+          <Text style={[styles.resolvedText, { color: colors.success }]}>Resolved citizen report</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function statusColor(status: CitizenIncidentStatus, colors: ReturnType<typeof useColors>) {
+  if (status === "submitted") return colors.warning;
+  if (status === "triaged") return colors.primary;
+  if (status === "assigned") return colors.secondary;
+  if (status === "in_progress") return "#7C3AED";
+  return colors.success;
 }
 
 const styles = StyleSheet.create({
@@ -747,6 +945,29 @@ const styles = StyleSheet.create({
   emptyList: { flexGrow: 1 },
   emptyState: { alignItems: "center", justifyContent: "center", paddingTop: 80 },
   emptyTitle: { marginTop: 10, fontSize: 16, fontFamily: "Inter_700Bold" },
+  citizenListSection: { gap: 10, marginBottom: 12 },
+  citizenListHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  citizenListTitle: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  citizenListCount: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  citizenCard: { borderWidth: 1, borderRadius: 18, padding: 14, gap: 10 },
+  citizenCardTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
+  sourcePill: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 5 },
+  sourcePillText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  statusPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  statusPillText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  citizenTitle: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  citizenReference: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  citizenDescription: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
+  citizenMetaRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  metaChip: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 6, maxWidth: "100%" },
+  metaChipText: { fontSize: 11, fontFamily: "Inter_600SemiBold", maxWidth: 210 },
+  vehicleRow: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, flexDirection: "row", alignItems: "center", gap: 7, alignSelf: "flex-start" },
+  vehicleText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  timelineHint: { fontSize: 11, fontFamily: "Inter_500Medium", lineHeight: 16 },
+  advanceBtn: { minHeight: 42, borderRadius: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  advanceBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_700Bold" },
+  resolvedBanner: { minHeight: 38, borderRadius: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7 },
+  resolvedText: { fontSize: 12, fontFamily: "Inter_700Bold" },
   // LocationFilterSheet styles
   clearBtn: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   gpsRow: {

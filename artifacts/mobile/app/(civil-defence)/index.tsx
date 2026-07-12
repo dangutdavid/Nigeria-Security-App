@@ -1,0 +1,128 @@
+import { Feather } from "@expo/vector-icons";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
+import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { MetricCard } from "@/components/MetricCard";
+import { NotificationAccessCard } from "@/components/NotificationAccessCard";
+import { useAuth } from "@/context/AuthContext";
+import { useReferrals } from "@/context/ReferralContext";
+import { useColors } from "@/hooks/useColors";
+import { useAgencyBrand } from "@/context/AgencyContext";
+import { CitizenIncidentReceipt } from "@/services/citizenIncidentApi";
+import { AgencyMetrics, getAgencyMetrics, listReportsByAgency } from "@/services/reportRepository";
+
+export default function CivilDefenceHome() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { user } = useAuth();
+  const { inboxFor } = useReferrals();
+  const { primary: PRIMARY } = useAgencyBrand("civil_defence", { primary: "#234E2A" });
+  const [reports, setReports] = useState<CitizenIncidentReceipt[]>([]);
+  const [serverMetrics, setServerMetrics] = useState<AgencyMetrics | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async () => {
+    // Prefer server-computed metrics in API mode; getAgencyMetrics returns null
+    // when API is disabled/unavailable, so the list-derived counts below apply.
+    const [list, metricsResult] = await Promise.all([
+      listReportsByAgency("civil_defence"),
+      getAgencyMetrics("civil_defence"),
+    ]);
+    setReports(list);
+    setServerMetrics(metricsResult);
+  }, []);
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
+
+  const referrals = user ? inboxFor("civil_defence") : [];
+  const metrics = useMemo(() => ({
+    newReports: serverMetrics ? serverMetrics.submitted : reports.filter((r) => r.status === "submitted").length,
+    high: serverMetrics ? serverMetrics.highPriority : reports.filter((r) => r.emergencyLevel === "high" || r.emergencyLevel === "critical").length,
+    active: serverMetrics ? serverMetrics.assigned + serverMetrics.in_progress : reports.filter((r) => r.status === "assigned" || r.status === "in_progress").length,
+    resolved: serverMetrics ? serverMetrics.resolved + serverMetrics.closed : reports.filter((r) => r.status === "resolved" || r.status === "closed").length,
+    referrals: referrals.filter((r) => r.status !== "closed").length,
+  }), [reports, referrals, serverMetrics]);
+
+  async function refresh() {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }
+
+  return (
+    <ScrollView
+      style={[styles.root, { backgroundColor: colors.background }]}
+      contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 110 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={PRIMARY} />}
+    >
+      <View style={[styles.hero, { backgroundColor: PRIMARY }]}>
+        <Text style={styles.kicker}>Civil Defence / NSCDC</Text>
+        <Text style={styles.heroTitle}>Welcome, {user?.name.split(" ")[0] ?? "Officer"}</Text>
+        <Text style={styles.heroSub}>Civil protection, emergency response, and community safety operations.</Text>
+      </View>
+
+      <NotificationAccessCard accentColor={PRIMARY} />
+
+      <View style={styles.metricRow}>
+        <MetricCard label="New citizen reports" value={metrics.newReports} icon="inbox" color={PRIMARY} bgColor={PRIMARY + "18"} />
+        <MetricCard label="High priority" value={metrics.high} icon="alert-octagon" color="#C0392B" bgColor="#FEE8E8" />
+      </View>
+      <View style={styles.metricRow}>
+        <MetricCard label="Assigned / active" value={metrics.active} icon="activity" color="#7C3AED" bgColor="#7C3AED18" />
+        <MetricCard label="Resolved" value={metrics.resolved} icon="check-circle" color="#27AE60" bgColor="#E8F8EE" />
+      </View>
+      <View style={styles.metricRow}>
+        <MetricCard label="Open referrals" value={metrics.referrals} icon="git-pull-request" color="#C8960C" bgColor="#FFF8DC" />
+        <MetricCard label="Emergency alerts" value={metrics.high + metrics.newReports} icon="bell" color="#D35400" bgColor="#D3540018" />
+      </View>
+
+      <View style={styles.quickRow}>
+        <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: PRIMARY }]} onPress={() => router.push("/(civil-defence)/incidents" as any)}>
+          <Feather name="shield" size={18} color="#fff" />
+          <Text style={styles.primaryText}>Open incidents</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => router.push("/(civil-defence)/alerts" as any)}>
+          <Feather name="bell" size={18} color={PRIMARY} />
+          <Text style={[styles.secondaryText, { color: PRIMARY }]}>Alerts</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>RECENT NSCDC REPORTS</Text>
+        <TouchableOpacity onPress={() => router.push("/(civil-defence)/incidents" as any)}>
+          <Text style={[styles.linkText, { color: PRIMARY }]}>See all</Text>
+        </TouchableOpacity>
+      </View>
+      {reports.slice(0, 3).map((report) => (
+        <View key={report.reference} style={[styles.reportCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.reportTitle, { color: colors.text }]}>{report.reference}</Text>
+          <Text style={[styles.reportMeta, { color: colors.mutedForeground }]}>{report.incidentType.replaceAll("_", " ")} · {report.status.replaceAll("_", " ")}</Text>
+          <Text style={[styles.reportDesc, { color: colors.text }]} numberOfLines={2}>{report.description}</Text>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  hero: { backgroundColor: "#234E2A", borderRadius: 22, padding: 18, marginBottom: 14 },
+  kicker: { color: "rgba(255,255,255,0.78)", fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
+  heroTitle: { color: "#fff", fontSize: 25, fontFamily: "Inter_700Bold", marginTop: 8 },
+  heroSub: { color: "rgba(255,255,255,0.86)", fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19, marginTop: 6 },
+  metricRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
+  quickRow: { flexDirection: "row", gap: 10, marginTop: 4, marginBottom: 18 },
+  primaryBtn: { flex: 1, height: 50, borderRadius: 14, backgroundColor: "#234E2A", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  primaryText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
+  secondaryBtn: { flex: 1, height: 50, borderRadius: 14, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  secondaryText: { color: "#234E2A", fontSize: 14, fontFamily: "Inter_700Bold" },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  sectionTitle: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  linkText: { color: "#234E2A", fontSize: 12, fontFamily: "Inter_700Bold" },
+  reportCard: { borderWidth: 1, borderRadius: 14, padding: 13, marginBottom: 10 },
+  reportTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  reportMeta: { fontSize: 12, fontFamily: "Inter_600SemiBold", textTransform: "capitalize", marginTop: 3 },
+  reportDesc: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 8, lineHeight: 18 },
+});

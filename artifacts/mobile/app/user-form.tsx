@@ -18,11 +18,14 @@ import { useAgency } from "@/context/AgencyContext";
 import { useAuth, UserRole, UserStatus } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { assignableRoles } from "@/lib/permissions";
+import * as userRepo from "@/services/userRepository";
 
 const ROLE_OPTIONS: { label: string; value: UserRole; color: string }[] = [
-  { label: "Field Officer", value: "field_officer", color: "#2C7BE5" },
+  { label: "Officer", value: "officer", color: "#2C7BE5" },
   { label: "Supervisor", value: "supervisor", color: "#C8960C" },
   { label: "Commander", value: "commander", color: "#1B5E3B" },
+  { label: "Admin", value: "admin", color: "#5C6BC0" },
+  { label: "Super Admin", value: "super_admin", color: "#7B2CBF" },
 ];
 
 const STATUS_OPTIONS: { label: string; value: UserStatus; color: string }[] = [
@@ -48,7 +51,7 @@ const EMPTY_FORM: FormState = {
   name: "",
   badgeNumber: "",
   email: "",
-  role: "field_officer",
+  role: "officer",
   sector: "",
   station: "",
   phone: "",
@@ -61,19 +64,34 @@ export default function UserFormScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
-  const { user: currentUser, getUserById, addUser, updateUser, deleteUser, resetPin, allUsers } = useAuth();
+  const { id, agency } = useLocalSearchParams<{ id?: string; agency?: string }>();
+  const { user: currentUser, getUserById, addUser, updateUser, deleteUser, resetPin, mergeApiUsers, allUsers } = useAuth();
+
+  // Repository falls back to these local primitives when API mode is off/unavailable.
+  const adapter: userRepo.UserRepositoryLocalAdapter = {
+    list: () => allUsers,
+    merge: mergeApiUsers,
+    create: addUser,
+    update: updateUser,
+    remove: deleteUser,
+    resetPin,
+  };
 
   const isEditing = !!id;
   const editTarget = id ? getUserById(id) : undefined;
 
   const isCommander = currentUser?.role === "commander";
   const { getAgencyById } = useAgency();
-  const agencyColor =
-    (currentUser ? getAgencyById(currentUser.agency)?.primaryColor : undefined) ?? colors.primary;
+  const targetAgency = isEditing
+    ? editTarget?.agency
+    : currentUser?.role === "admin" || currentUser?.role === "super_admin"
+      ? agency ?? currentUser?.agency
+      : currentUser?.agency;
+  const targetAgencyConfig = targetAgency ? getAgencyById(targetAgency) : undefined;
+  const agencyColor = targetAgencyConfig?.primaryColor ?? (currentUser ? getAgencyById(currentUser.agency)?.primaryColor : undefined) ?? colors.primary;
 
   // Roles this user is allowed to assign (centralized RBAC rule:
-  // commanders → any role, supervisors → field officers only).
+  // commanders → agency roles, supervisors → officers only, admins → platform roles.
   const allowedRoles: UserRole[] = assignableRoles(currentUser);
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -111,10 +129,12 @@ export default function UserFormScreen() {
   function validate(): string | null {
     if (!form.name.trim()) return "Name is required.";
     if (!form.badgeNumber.trim()) return "Badge number is required.";
-    if (!form.sector.trim()) return "Sector is required.";
-    if (!form.station.trim()) return "Station is required.";
-    if (!form.phone.trim()) return "Phone number is required.";
     if (!isEditing) {
+      // Contact fields are local-only; required when creating, optional when
+      // editing (a backend-sourced user may not have them populated).
+      if (!form.sector.trim()) return "Sector is required.";
+      if (!form.station.trim()) return "Station is required.";
+      if (!form.phone.trim()) return "Phone number is required.";
       if (!form.pin) return "PIN is required.";
       if (form.pin.length < 4) return "PIN must be at least 4 digits.";
       if (form.pin !== form.confirmPin) return "PINs do not match.";
@@ -135,20 +155,8 @@ export default function UserFormScreen() {
     setSaving(true);
     try {
       if (isEditing && editTarget) {
-        await updateUser(editTarget.id, {
-          name: form.name.trim(),
-          badgeNumber: form.badgeNumber.trim().toUpperCase(),
-          email: form.email.trim().toLowerCase(),
-          role: form.role,
-          sector: form.sector.trim(),
-          station: form.station.trim(),
-          phone: form.phone.trim(),
-          status: form.status,
-        });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.back();
-      } else {
-        await addUser(
+        await userRepo.updateUser(
+          editTarget.id,
           {
             name: form.name.trim(),
             badgeNumber: form.badgeNumber.trim().toUpperCase(),
@@ -158,9 +166,26 @@ export default function UserFormScreen() {
             station: form.station.trim(),
             phone: form.phone.trim(),
             status: form.status,
-            agency: currentUser?.agency ?? "frsc",
           },
-          form.pin
+          adapter,
+        );
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.back();
+      } else {
+        await userRepo.createUser(
+          {
+            name: form.name.trim(),
+            badgeNumber: form.badgeNumber.trim().toUpperCase(),
+            email: form.email.trim().toLowerCase(),
+            role: form.role,
+            sector: form.sector.trim(),
+            station: form.station.trim(),
+            phone: form.phone.trim(),
+            status: form.status,
+            agency: targetAgency ?? currentUser?.agency ?? "frsc",
+          },
+          form.pin,
+          adapter,
         );
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.back();
@@ -187,7 +212,7 @@ export default function UserFormScreen() {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
-            await deleteUser(editTarget.id);
+            await userRepo.removeUser(editTarget.id, adapter);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
             router.back();
           },
@@ -202,7 +227,7 @@ export default function UserFormScreen() {
       Alert.alert("Error", "New PIN must be at least 4 digits.");
       return;
     }
-    await resetPin(editTarget.id, newPin);
+    await userRepo.resetPin(editTarget.id, newPin, adapter);
     setNewPin("");
     setShowResetPin(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -292,6 +317,12 @@ export default function UserFormScreen() {
           {/* Section: Assignment */}
           <SectionLabel label="ASSIGNMENT" colors={colors} />
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            {!isEditing && targetAgencyConfig && (
+              <View style={[styles.agencyBanner, { backgroundColor: agencyColor + "14", borderColor: agencyColor + "33" }]}>
+                <Feather name="shield" size={16} color={agencyColor} />
+                <Text style={[styles.agencyBannerText, { color: agencyColor }]}>Creating user for {targetAgencyConfig.shortName}</Text>
+              </View>
+            )}
             <FormField
               label="Sector"
               icon="map"
@@ -688,6 +719,20 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     overflow: "hidden",
+  },
+  agencyBanner: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    margin: 12,
+    marginBottom: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  agencyBannerText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
   },
   optionRow: {
     flexDirection: "row",

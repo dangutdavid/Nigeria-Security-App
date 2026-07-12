@@ -18,6 +18,7 @@ import { usePatrol } from "@/context/PatrolContext";
 import { useReferrals } from "@/context/ReferralContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useColors } from "@/hooks/useColors";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { usePermissions } from "@/lib/permissions";
 import { confirmAction } from "@/utils/confirm";
 
@@ -96,7 +97,8 @@ export default function ProfileScreen() {
   const myClosed = incidents.filter((i) => i.reportedBy === user?.id && i.status === "closed").length;
   const myDrafts = incidents.filter((i) => i.reportedBy === user?.id && i.status === "draft").length;
   const myPatrolSessions = sessions.filter((s) => s.officerId === user?.id).length;
-  const { can, roleLabel } = usePermissions();
+  const { can, roleLabel, canCustomizeOwnAgency } = usePermissions();
+  const { primary: brandPrimary } = useAgencyBrand("frsc", { primary: colors.primary });
   const canManageUsers = can("manage_users", "user");
   const canAssignCases = can("assign", "incident");
   const canUseCommandTools = canManageUsers;
@@ -127,7 +129,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView style={[styles.root, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: bottomPad }} showsVerticalScrollIndicator={false}>
-      <View style={[styles.header, { backgroundColor: colors.primary, paddingTop: topPad + 16 }]}>
+      <View style={[styles.header, { backgroundColor: brandPrimary, paddingTop: topPad + 16 }]}>
         <View style={styles.avatarWrap}>
           <View style={[styles.avatar, { backgroundColor: "rgba(255,255,255,0.2)" }]}> 
             <Text style={styles.avatarText}>{user.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}</Text>
@@ -308,6 +310,12 @@ export default function ProfileScreen() {
             badge={pendingReferrals}
             onPress={() => router.push("/referrals")}
           />
+          <SettingRow
+            icon="bell"
+            label="Notifications"
+            subtitle="Alerts, read state, and local preferences"
+            onPress={() => router.push("/notifications" as any)}
+          />
           {canAssignCases ? (
             <SettingRow
               icon="clipboard"
@@ -318,6 +326,9 @@ export default function ProfileScreen() {
           ) : null}
           {canManageUsers ? (
             <SettingRow icon="users" label="Manage Users" subtitle="Create and assign officers" onPress={() => router.push("/users")} />
+          ) : null}
+          {canCustomizeOwnAgency ? (
+            <SettingRow icon="edit-2" label="Customise Agency" subtitle="Theme colours and logo" onPress={() => router.push("/agency-customize" as any)} />
           ) : null}
           <SettingRow icon="key" label="Change PIN" subtitle="Update your login PIN" onPress={() => router.push("/change-pin")} />
           <SettingRow icon="help-circle" label="Forgot PIN" subtitle="Recover access with OTP" onPress={() => router.push("/forgot-pin")} />

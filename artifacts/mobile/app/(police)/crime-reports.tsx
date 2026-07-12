@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   FlatList,
   Modal,
@@ -22,8 +22,15 @@ import {
   useCrimeReports,
 } from "@/context/CrimeReportContext";
 import { useColors } from "@/hooks/useColors";
+import {
+  CitizenIncidentReceipt,
+  CitizenIncidentStatus,
+  formatCitizenIncidentStatus,
+} from "@/services/citizenIncidentApi";
+import { listReportsByAgency, updateReportStatus } from "@/services/reportRepository";
+import { useAgencyBrand } from "@/context/AgencyContext";
 
-const PRIMARY = "#1A3A6C";
+const FALLBACK_PRIMARY = "#1A3A6C";
 
 const STATUS_TABS: { id: CrimeStatus | "all"; label: string }[] = [
   { id: "all", label: "All" },
@@ -50,6 +57,37 @@ const SEV_COLORS: Record<string, string> = {
 const CRIME_TYPES: CrimeType[] = ["vehicle_theft", "robbery", "assault", "drug_trafficking", "fraud", "kidnapping", "arson", "cybercrime", "other"];
 const SEVERITIES = ["minor", "moderate", "serious", "critical"] as const;
 
+const CITIZEN_STATUS_FLOW: Record<CitizenIncidentStatus, CitizenIncidentStatus | null> = {
+  submitted: "triaged",
+  triaged: "assigned",
+  assigned: "in_progress",
+  in_progress: "resolved",
+  resolved: "closed",
+  closed: null,
+};
+
+const CITIZEN_STATUS_COLORS: Record<CitizenIncidentStatus, string> = {
+  submitted: "#E53935",
+  triaged: "#F57C00",
+  assigned: FALLBACK_PRIMARY,
+  in_progress: "#1565C0",
+  resolved: "#388E3C",
+  closed: "#9E9E9E",
+};
+
+const CITIZEN_STATUS_TO_TAB: Record<CitizenIncidentStatus, CrimeStatus> = {
+  submitted: "open",
+  triaged: "investigating",
+  assigned: "investigating",
+  in_progress: "investigating",
+  resolved: "closed",
+  closed: "closed",
+};
+
+function formatIncidentType(type: string) {
+  return type.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
@@ -61,6 +99,7 @@ function timeAgo(iso: string) {
 
 function NewReportModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const colors = useColors();
+  const { primary: PRIMARY } = useAgencyBrand("police", { primary: FALLBACK_PRIMARY });
   const { user } = useAuth();
   const { addReport } = useCrimeReports();
   const [crimeType, setCrimeType] = useState<CrimeType>("robbery");
@@ -167,12 +206,21 @@ function NewReportModal({ visible, onClose }: { visible: boolean; onClose: () =>
 
 export default function CrimeReportsScreen() {
   const colors = useColors();
+  const { primary: PRIMARY } = useAgencyBrand("police", { primary: FALLBACK_PRIMARY });
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { user } = useAuth();
   const { reports } = useCrimeReports();
+  const [citizenReports, setCitizenReports] = useState<CitizenIncidentReceipt[]>([]);
   const [statusFilter, setStatusFilter] = useState<CrimeStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
+
+  const loadCitizenReports = useCallback(async () => {
+    setCitizenReports(await listReportsByAgency("police"));
+  }, []);
+
+  useFocusEffect(useCallback(() => { void loadCitizenReports(); }, [loadCitizenReports]));
 
   const filtered = useMemo(() => {
     let r = reports;
@@ -183,6 +231,73 @@ export default function CrimeReportsScreen() {
     }
     return [...r].sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime());
   }, [reports, statusFilter, search]);
+
+  const filteredCitizenReports = useMemo(() => {
+    let r = citizenReports;
+    if (statusFilter !== "all") r = r.filter((x) => CITIZEN_STATUS_TO_TAB[x.status] === statusFilter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      r = r.filter((x) =>
+        x.reference.toLowerCase().includes(q) ||
+        x.location.toLowerCase().includes(q) ||
+        x.description.toLowerCase().includes(q) ||
+        (x.vehicleRegistration ?? "").toLowerCase().includes(q)
+      );
+    }
+    return [...r].sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+  }, [citizenReports, statusFilter, search]);
+
+  async function advanceCitizenReport(report: CitizenIncidentReceipt) {
+    const next = CITIZEN_STATUS_FLOW[report.status];
+    if (!next) return;
+    await updateReportStatus({
+      reference: report.reference,
+      status: next,
+      actorName: user?.name ?? "Police",
+      actorAgencyLabel: "Police",
+    });
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await loadCitizenReports();
+  }
+
+  function renderCitizenReport(report: CitizenIncidentReceipt) {
+    const next = CITIZEN_STATUS_FLOW[report.status];
+    return (
+      <View key={report.reference} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.sevBar, { backgroundColor: CITIZEN_STATUS_COLORS[report.status] }]} />
+        <View style={{ flex: 1, gap: 5 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
+            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>{report.reference}</Text>
+            <Text style={[styles.cardTime, { color: colors.mutedForeground }]}>{timeAgo(report.submittedAt)}</Text>
+          </View>
+          <Text style={[styles.cardMeta, { color: colors.mutedForeground }]}>{formatIncidentType(report.incidentType)} · {report.location}</Text>
+          <Text style={[styles.cardMeta, { color: colors.text }]} numberOfLines={2}>{report.description}</Text>
+          <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
+            <View style={[styles.sourceBadge, { backgroundColor: PRIMARY + "18" }]}>
+              <Text style={[styles.badgeText, { color: PRIMARY }]}>Citizen Report</Text>
+            </View>
+            <View style={[styles.badge, { backgroundColor: CITIZEN_STATUS_COLORS[report.status] + "22" }]}>
+              <Text style={[styles.badgeText, { color: CITIZEN_STATUS_COLORS[report.status] }]}>{formatCitizenIncidentStatus(report.status)}</Text>
+            </View>
+            <View style={[styles.badge, { backgroundColor: colors.muted }]}>
+              <Text style={[styles.badgeText, { color: colors.mutedForeground }]}>{report.emergencyLevel.toUpperCase()}</Text>
+            </View>
+            {report.vehicleRegistration && (
+              <View style={[styles.badge, { backgroundColor: "#FFF8DC" }]}>
+                <Text style={[styles.badgeText, { color: "#5C3D00" }]}>{report.vehicleRegistration}</Text>
+              </View>
+            )}
+          </View>
+          {next && (
+            <TouchableOpacity style={[styles.advanceBtn, { borderColor: PRIMARY, backgroundColor: PRIMARY + "12" }]} onPress={() => advanceCitizenReport(report)}>
+              <Feather name="arrow-right-circle" size={14} color={PRIMARY} />
+              <Text style={[styles.advanceText, { color: PRIMARY }]}>Mark {formatCitizenIncidentStatus(next)}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   function renderItem({ item: r }: { item: CrimeReport }) {
     return (
@@ -256,11 +371,22 @@ export default function CrimeReportsScreen() {
         keyExtractor={(r) => r.id}
         contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          filteredCitizenReports.length > 0 ? (
+            <View style={{ gap: 10, marginBottom: 8 }}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Citizen Reports</Text>
+              {filteredCitizenReports.map(renderCitizenReport)}
+              {filtered.length > 0 && <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 6 }]}>Police Case Files</Text>}
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <Feather name="file-text" size={40} color={colors.mutedForeground} />
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No crime reports found</Text>
-          </View>
+          filteredCitizenReports.length === 0 ? (
+            <View style={styles.empty}>
+              <Feather name="file-text" size={40} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No crime reports found</Text>
+            </View>
+          ) : null
         }
       />
 
@@ -287,7 +413,11 @@ const styles = StyleSheet.create({
   cardMeta: { fontSize: 12, fontFamily: "Inter_400Regular" },
   caseNum: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   badge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  sourceBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  advanceBtn: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, marginTop: 4 },
+  advanceText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  sectionTitle: { fontSize: 13, fontFamily: "Inter_700Bold" },
   empty: { alignItems: "center", paddingTop: 60, gap: 12 },
   emptyText: { fontSize: 15, fontFamily: "Inter_400Regular" },
 });

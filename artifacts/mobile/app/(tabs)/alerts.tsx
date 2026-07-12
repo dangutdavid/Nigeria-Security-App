@@ -53,7 +53,7 @@ function buildAlerts(
     }
   }
 
-  if (role === "field_officer" && userId) {
+  if (role === "officer" && userId) {
     const assignedToMe = incidents.filter(
       (i) => i.assignedTo === userId && i.status !== "closed",
     );
@@ -204,7 +204,7 @@ export default function AlertsScreen() {
   }, []);
 
   const allAlerts = useMemo(
-    () => buildAlerts(incidents, user?.role || "field_officer", user?.id),
+    () => buildAlerts(incidents, user?.role || "officer", user?.id),
     [incidents, user?.role, user?.id],
   );
 
@@ -240,11 +240,6 @@ export default function AlertsScreen() {
         <View style={styles.headerRow}>
           <View>
             <Text style={[styles.title, { color: colors.text }]}>Alerts</Text>
-            {alerts.length > 0 && (
-              <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
-                {unreadCount > 0 ? `${unreadCount} unread` : "All read"} · {alerts.length} total
-              </Text>
-            )}
           </View>
           {unreadCount > 0 && (
             <View style={[styles.badge, { backgroundColor: colors.fatal }]}>

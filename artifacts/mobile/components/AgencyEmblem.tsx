@@ -2,7 +2,7 @@ import React from "react";
 import { Image, StyleSheet, View } from "react-native";
 import Svg, { Circle, G, Path, Polygon, Rect, Text as SvgText } from "react-native-svg";
 
-export type AgencyEmblemId = "frsc" | "police" | "vio";
+export type AgencyEmblemId = "frsc" | "police" | "vio" | "civil_defence" | "admin" | string;
 
 const FRSC_LOGO = require("../assets/images/logo-frsc.jpg");
 const NPF_LOGO = require("../assets/images/logo-npf.jpg");
@@ -34,9 +34,29 @@ function VIOEmblem({ size }: { size: number }) {
   );
 }
 
-export function AgencyEmblem({ agency, size = 80 }: { agency: AgencyEmblemId; size?: number }) {
+function GenericEmblem({ size, label, color }: { size: number; label: string; color: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Circle cx={50} cy={50} r={45} fill={color} stroke="rgba(255,255,255,0.9)" strokeWidth={2} />
+      <Path d="M50 18 L76 29 V48 C76 65 65 79 50 84 C35 79 24 65 24 48 V29 Z" fill="rgba(255,255,255,0.16)" stroke="white" strokeWidth={3} strokeLinejoin="round" />
+      <Path d="M39 50 L47 58 L63 40" fill="none" stroke="white" strokeWidth={5} strokeLinecap="round" strokeLinejoin="round" />
+      <SvgText x={50} y={91} textAnchor="middle" fontSize={8} fontWeight="bold" fill="white" letterSpacing={2}>{label}</SvgText>
+    </Svg>
+  );
+}
+
+export function AgencyEmblem({ agency, size = 80, color = "#344054", label }: { agency: AgencyEmblemId; size?: number; color?: string; label?: string }) {
   if (agency === "vio") {
     return <VIOEmblem size={size} />;
+  }
+  if (agency === "civil_defence") {
+    return <GenericEmblem size={size} label="NSCDC" color="#234E2A" />;
+  }
+  if (agency === "admin") {
+    return <GenericEmblem size={size} label="ADMIN" color="#344054" />;
+  }
+  if (agency !== "frsc" && agency !== "police") {
+    return <GenericEmblem size={size} label={label ?? "AGENCY"} color={color} />;
   }
 
   const source = agency === "police" ? NPF_LOGO : FRSC_LOGO;

@@ -14,9 +14,12 @@
       "backgroundColor": "#0F1B2D"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "ng.gov.securityapp"
     },
-    "android": {},
+    "android": {
+      "package": "ng.gov.securityapp"
+    },
     "web": {
       "favicon": "./assets/images/app-icon.png"
     },
@@ -28,11 +31,19 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-secure-store",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5ca14ec0-f8b8-493a-b347-be07e5fcd2b1"
+      }
+    },
+    "owner": "dangutdavid"
   }
 }

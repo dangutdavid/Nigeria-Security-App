@@ -4,13 +4,15 @@ import { Redirect, Tabs } from "expo-router";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import { useAgencyBrand } from "@/context/AgencyContext";
 import { useAuth } from "@/context/AuthContext";
 
-const PRIMARY = "#1A3A6C";
+const FALLBACK_PRIMARY = "#1A3A6C";
 
 export default function PoliceTabLayout() {
   const { user, isLoading } = useAuth();
   const colors = useColors();
+  const { primary: PRIMARY } = useAgencyBrand("police", { primary: FALLBACK_PRIMARY });
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
@@ -18,7 +20,7 @@ export default function PoliceTabLayout() {
 
   if (isLoading) return null;
   if (!user) return <Redirect href="/" />;
-  if (user.agency !== "police") return <Redirect href="/" />;
+  if (user.agency !== "police") return <Redirect href="/unauthorized" />;
 
   return (
     <Tabs
@@ -62,6 +64,13 @@ export default function PoliceTabLayout() {
         options={{
           title: "Vehicles",
           tabBarIcon: ({ color }) => <Feather name="truck" size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="map"
+        options={{
+          title: "Map",
+          tabBarIcon: ({ color }) => <Feather name="map" size={22} color={color} />,
         }}
       />
       <Tabs.Screen

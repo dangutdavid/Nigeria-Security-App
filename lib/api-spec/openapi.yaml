@@ -2,14 +2,32 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 0.2.0
+  description: Backend API contract for the Nigeria Security mobile app.
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication and session operations
+  - name: citizen-reports
+    description: Public citizen reporting and tracking
+  - name: reports
+    description: Agency report and case operations
+  - name: evidence
+    description: Evidence and photo metadata operations
+  - name: notifications
+    description: In-app and push-ready notification operations
+  - name: agencies
+    description: Agency registry operations
+  - name: admin-users
+    description: Admin user management operations
+  - name: audit
+    description: Audit log operations
+security:
+  - bearerAuth: []
 paths:
   /healthz:
     get:
@@ -17,6 +35,7 @@ paths:
       tags: [health]
       summary: Health check
       description: Returns server health status
+      security: []
       responses:
         "200":
           description: Healthy
@@ -24,13 +43,1798 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Role-aware login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout current session
+      description: Revokes the presented bearer token server-side.
+      responses:
+        "204":
+          description: Logout accepted
+
+  /auth/refresh:
+    post:
+      operationId: refreshToken
+      tags: [auth]
+      summary: Rotate a still-valid session token
+      description: Issues a fresh token and revokes the presented one. Expired or revoked tokens cannot refresh.
+      responses:
+        "200":
+          description: New token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                required: [token]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/otp/request:
+    post:
+      operationId: requestPinResetOtp
+      tags: [auth]
+      summary: Request a PIN-reset OTP
+      description: Delivers a 6-digit code to the user's own registered devices (push) — never to the caller-supplied email. Outside production the code is echoed for demo/testing.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                badgeNumber: { type: string }
+                email: { type: string }
+              required: [badgeNumber]
+      responses:
+        "200":
+          description: Request outcome
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: string
+                    enum: [sent, not_found, email_mismatch]
+                  code:
+                    type: string
+                    description: Demo-mode only — never present in production
+                required: [result]
+
+  /auth/otp/verify:
+    post:
+      operationId: verifyPinResetOtp
+      tags: [auth]
+      summary: Verify a PIN-reset OTP
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                badgeNumber: { type: string }
+                code: { type: string }
+              required: [badgeNumber, code]
+      responses:
+        "200":
+          description: Verification outcome (success grants a one-shot PIN reset)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: string
+                    enum: [ok, invalid, expired]
+                required: [result]
+
+  /auth/pin/reset:
+    post:
+      operationId: resetPinSelfService
+      tags: [auth]
+      summary: Reset PIN after OTP verification
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                badgeNumber: { type: string }
+                newPin: { type: string }
+              required: [badgeNumber, newPin]
+      responses:
+        "200":
+          description: Reset outcome
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                required: [ok]
+        "403":
+          description: OTP verification required first
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get current authenticated user
+      responses:
+        "200":
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /citizen-reports:
+    post:
+      operationId: submitCitizenReport
+      tags: [citizen-reports]
+      summary: Submit a citizen incident report
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CitizenReportSubmitRequest"
+      responses:
+        "201":
+          description: Report submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportSubmissionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /citizen-reports/track/{reference}:
+    get:
+      operationId: trackCitizenReport
+      tags: [citizen-reports]
+      summary: Track a citizen report by reference number
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ReferenceParam"
+      responses:
+        "200":
+          description: Report tracking details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CitizenReportTracking"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /citizen-reports/{reportId}/timeline:
+    get:
+      operationId: getCitizenReportTimeline
+      tags: [citizen-reports]
+      summary: Get a citizen report timeline/history by id or reference
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/ReportIdParam"
+      responses:
+        "200":
+          description: Report timeline
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reference:
+                    type: string
+                  timeline:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TimelineEntry"
+                required: [timeline]
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /reports:
+    get:
+      operationId: listReports
+      tags: [reports]
+      summary: List reports visible to the current user
+      parameters:
+        - $ref: "#/components/parameters/AgencyQuery"
+        - $ref: "#/components/parameters/StatusQuery"
+        - $ref: "#/components/parameters/EmergencyQuery"
+        - $ref: "#/components/parameters/SourceQuery"
+        - $ref: "#/components/parameters/SearchQuery"
+      responses:
+        "200":
+          description: Report list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reports:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReportSummary"
+                required: [reports]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /agencies/{agency}/reports:
+    get:
+      operationId: listAgencyReports
+      tags: [reports]
+      summary: List reports routed to one agency
+      parameters:
+        - $ref: "#/components/parameters/AgencyPath"
+        - $ref: "#/components/parameters/StatusQuery"
+        - $ref: "#/components/parameters/EmergencyQuery"
+        - $ref: "#/components/parameters/SourceQuery"
+      responses:
+        "200":
+          description: Agency report list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reports:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReportSummary"
+                required: [reports]
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /agencies/{agency}/dashboard:
+    get:
+      operationId: getAgencyDashboardMetrics
+      tags: [reports]
+      summary: Get agency dashboard metrics
+      parameters:
+        - $ref: "#/components/parameters/AgencyPath"
+      responses:
+        "200":
+          description: Agency dashboard metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgencyDashboardMetrics"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /reports/{reportId}:
+    get:
+      operationId: getReportDetail
+      tags: [reports]
+      summary: Get report detail
+      parameters:
+        - $ref: "#/components/parameters/ReportIdParam"
+      responses:
+        "200":
+          description: Report detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /reports/{reportId}/status:
+    patch:
+      operationId: updateReportStatus
+      tags: [reports]
+      summary: Update report status
+      parameters:
+        - $ref: "#/components/parameters/ReportIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportStatusUpdateRequest"
+      responses:
+        "200":
+          description: Updated report detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /reports/{reportId}/reassign:
+    post:
+      operationId: reassignReport
+      tags: [reports]
+      summary: Reassign a report to another agency
+      description: Admin-only operation for changing agency ownership/routing.
+      parameters:
+        - $ref: "#/components/parameters/ReportIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportReassignmentRequest"
+      responses:
+        "200":
+          description: Reassigned report detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /reports/{reportId}/timeline:
+    get:
+      operationId: listReportTimeline
+      tags: [reports]
+      summary: List report timeline/history
+      parameters:
+        - $ref: "#/components/parameters/ReportIdParam"
+      responses:
+        "200":
+          description: Timeline entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  timeline:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TimelineEntry"
+                required: [timeline]
+
+  /reports/{reportId}/evidence:
+    get:
+      operationId: listReportEvidence
+      tags: [evidence]
+      summary: List evidence metadata for a report
+      parameters:
+        - $ref: "#/components/parameters/ReportIdParam"
+      responses:
+        "200":
+          description: Evidence metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  evidence:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/EvidenceMetadata"
+                required: [evidence]
+    post:
+      operationId: createReportEvidenceMetadata
+      tags: [evidence]
+      summary: Create evidence/photo metadata
+      description: Stores upload metadata only; binary upload can be implemented with signed URLs later.
+      parameters:
+        - $ref: "#/components/parameters/ReportIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvidenceCreateRequest"
+      responses:
+        "201":
+          description: Evidence metadata created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceMetadata"
+
+  /reports/{reportId}/evidence/{evidenceId}/content:
+    put:
+      operationId: uploadReportEvidenceContent
+      tags: [evidence]
+      summary: Upload the evidence binary
+      description: Raw binary upload (max 15 MB) for previously created evidence metadata. Content-Type must be an allowed image/video/audio/pdf type.
+      parameters:
+        - $ref: "#/components/parameters/ReportIdParam"
+        - name: evidenceId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Binary stored; metadata updated with checksum and size
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceMetadata"
+        "415":
+          description: Unsupported content type
+
+  /reports/{reportId}/evidence/{evidenceId}/download-url:
+    get:
+      operationId: createEvidenceDownloadUrl
+      tags: [evidence]
+      summary: Mint a short-lived signed download URL
+      parameters:
+        - $ref: "#/components/parameters/ReportIdParam"
+        - name: evidenceId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Signed download link (valid ~15 minutes)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                    description: Relative API path incl. signature query params
+                  expiresAt:
+                    type: string
+                    format: date-time
+                required: [path, expiresAt]
+        "409":
+          description: No binary uploaded yet
+
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications for the current user or agency
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+        - $ref: "#/components/parameters/AgencyQuery"
+      responses:
+        "200":
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Notification"
+                required: [notifications]
+    post:
+      operationId: createNotification
+      tags: [notifications]
+      summary: Create a notification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationCreateRequest"
+      responses:
+        "201":
+          description: Notification created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  /notifications/{notificationId}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark one notification as read
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Notification updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  /notifications/read-all:
+    patch:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all visible notifications as read
+      responses:
+        "200":
+          description: Count updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: integer
+                required: [updated]
+
+  /agencies:
+    get:
+      operationId: listAgencies
+      tags: [agencies]
+      summary: List agency registry
+      parameters:
+        - name: includeInactive
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Agency registry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agencies:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Agency"
+                required: [agencies]
+    post:
+      operationId: createAgency
+      tags: [agencies]
+      summary: Create agency registry entry
+      description: Admin-only. Supports built-in and custom agency onboarding.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgencyCreateRequest"
+      responses:
+        "201":
+          description: Agency created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agency"
+
+  /agencies/{agency}:
+    patch:
+      operationId: updateAgency
+      tags: [agencies]
+      summary: Update agency registry entry
+      parameters:
+        - $ref: "#/components/parameters/AgencyPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgencyUpdateRequest"
+      responses:
+        "200":
+          description: Agency updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agency"
+
+  /admin/users:
+    get:
+      operationId: listUsers
+      tags: [admin-users]
+      summary: List users (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/AgencyQuery"
+        - name: role
+          in: query
+          schema:
+            $ref: "#/components/schemas/UserRole"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/UserStatus"
+      responses:
+        "200":
+          description: User list (PIN hashes are never returned)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminUser"
+                required: [users]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      operationId: createUser
+      tags: [admin-users]
+      summary: Create user (admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserCreateRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/AdminUser"
+                required: [user]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: Badge number already in use
+
+  /admin/users/{userId}:
+    patch:
+      operationId: updateUser
+      tags: [admin-users]
+      summary: Update user safe fields (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserUpdateRequest"
+      responses:
+        "200":
+          description: User updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/AdminUser"
+                required: [user]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User not found
+    delete:
+      operationId: deactivateUser
+      tags: [admin-users]
+      summary: Deactivate user (soft delete, admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User deactivated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  user:
+                    $ref: "#/components/schemas/AdminUser"
+                required: [ok, user]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User not found
+
+  /admin/users/{userId}/reset-pin:
+    post:
+      operationId: resetUserPin
+      tags: [admin-users]
+      summary: Reset a user's PIN (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserResetPinRequest"
+      responses:
+        "200":
+          description: PIN reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                required: [ok]
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: User not found
+
+  /audit-logs:
+    get:
+      operationId: listAuditLogs
+      tags: [audit]
+      summary: List audit logs
+      parameters:
+        - $ref: "#/components/parameters/AgencyQuery"
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: severity
+          in: query
+          schema:
+            $ref: "#/components/schemas/AuditSeverity"
+      responses:
+        "200":
+          description: Audit log list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  auditLogs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditLog"
+                required: [auditLogs]
+
+  /audit-logs/export:
+    get:
+      operationId: exportAuditLogs
+      tags: [audit]
+      summary: Export audit logs as CSV (admin only)
+      parameters:
+        - $ref: "#/components/parameters/AgencyQuery"
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: severity
+          in: query
+          schema:
+            $ref: "#/components/schemas/AuditSeverity"
+      responses:
+        "200":
+          description: CSV export (up to 1000 rows)
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /agency-units:
+    get:
+      operationId: listAgencyUnits
+      tags: [agencies]
+      summary: List units for an agency (DB mode only)
+      parameters:
+        - name: agency
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Unit list
+    post:
+      operationId: createAgencyUnit
+      tags: [agencies]
+      summary: Create a unit for an agency (DB mode only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agency: { type: string }
+                name: { type: string }
+                level: { type: string }
+                state: { type: string }
+                lga: { type: string }
+                parentUnitId: { type: string }
+              required: [agency, name, level]
+      responses:
+        "201":
+          description: Unit created
+
+  /case-types:
+    get:
+      operationId: listCaseTypes
+      tags: [agencies]
+      summary: List case types for an agency (DB mode only)
+      parameters:
+        - name: agency
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Case type list
+    post:
+      operationId: createCaseType
+      tags: [agencies]
+      summary: Create a case type (admin, DB mode only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agency: { type: string }
+                code: { type: string }
+                name: { type: string }
+                workflow:
+                  type: array
+                  items: { type: string }
+                requiredFields:
+                  type: array
+                  items: { type: string }
+                slaMinutes: { type: integer }
+              required: [agency, code, name]
+      responses:
+        "201":
+          description: Case type created
+
+  /duty-sessions:
+    get:
+      operationId: listDutySessions
+      tags: [agencies]
+      summary: List duty sessions for an agency (DB mode only)
+      parameters:
+        - name: agency
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Duty session list
+
+  /duty-sessions/start:
+    post:
+      operationId: startDutySession
+      tags: [agencies]
+      summary: Start a duty session for the authenticated officer (DB mode only)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                location:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "201":
+          description: Duty session started
+        "409":
+          description: An open duty session already exists
+
+  /duty-sessions/{dutySessionId}/end:
+    patch:
+      operationId: endDutySession
+      tags: [agencies]
+      summary: End a duty session (owner or admin, DB mode only)
+      parameters:
+        - name: dutySessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                location:
+                  type: object
+                  additionalProperties: true
+                patrolLog:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+      responses:
+        "200":
+          description: Duty session ended
+
+  /referrals:
+    get:
+      operationId: listReferrals
+      tags: [agencies]
+      summary: List referrals sent/received by an agency (DB mode)
+      parameters:
+        - name: agency
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Referrals grouped as received and sent
+    post:
+      operationId: createReferral
+      tags: [agencies]
+      summary: Refer a citizen report to another agency (DB mode)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reportReference: { type: string }
+                toAgency: { type: string }
+                reason: { type: string }
+                dueAt:
+                  type: string
+                  format: date-time
+              required: [reportReference, toAgency, reason]
+      responses:
+        "201":
+          description: Referral created
+
+  /referrals/{referralId}/status:
+    patch:
+      operationId: updateReferralStatus
+      tags: [agencies]
+      summary: Update referral status (receiving agency or admin, DB mode)
+      parameters:
+        - name: referralId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [pending, acknowledged, actioned, closed]
+                note: { type: string }
+              required: [status]
+      responses:
+        "200":
+          description: Referral updated
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    AgencyPath:
+      name: agency
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/AgencyType"
+    AgencyQuery:
+      name: agency
+      in: query
+      schema:
+        $ref: "#/components/schemas/AgencyType"
+    StatusQuery:
+      name: status
+      in: query
+      schema:
+        $ref: "#/components/schemas/ReportStatus"
+    EmergencyQuery:
+      name: emergencyLevel
+      in: query
+      schema:
+        $ref: "#/components/schemas/EmergencyLevel"
+    SourceQuery:
+      name: source
+      in: query
+      schema:
+        $ref: "#/components/schemas/ReportSource"
+    SearchQuery:
+      name: q
+      in: query
+      schema:
+        type: string
+    ReferenceParam:
+      name: reference
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 3
+    ReportIdParam:
+      name: reportId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 3
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
   schemas:
     HealthStatus:
       type: object
       properties:
         status:
           type: string
-      required:
-        - status
-
+          enum: [ok, degraded]
+        db:
+          type: string
+          enum: [postgres, in-memory, error]
+      required: [status]
+    AgencyDashboardMetrics:
+      type: object
+      properties:
+        agency:
+          type: string
+        metrics:
+          type: object
+          properties:
+            total: { type: integer }
+            submitted: { type: integer }
+            triaged: { type: integer }
+            assigned: { type: integer }
+            in_progress: { type: integer }
+            resolved: { type: integer }
+            closed: { type: integer }
+            rejected: { type: integer }
+            highPriority: { type: integer }
+            withCoordinates: { type: integer }
+            withoutCoordinates: { type: integer }
+          required:
+            [
+              total,
+              submitted,
+              triaged,
+              assigned,
+              in_progress,
+              resolved,
+              closed,
+              rejected,
+              highPriority,
+              withCoordinates,
+              withoutCoordinates,
+            ]
+      required: [agency, metrics]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        issues:
+          type: object
+          additionalProperties: true
+      required: [error]
+    AgencyType:
+      type: string
+      enum: [frsc, police, vio, civil_defence, admin, citizen, dss, fire_service, custom]
+    UserRole:
+      type: string
+      enum: [citizen, officer, supervisor, commander, admin, super_admin]
+    UserStatus:
+      type: string
+      enum: [active, inactive, suspended]
+    ReportStatus:
+      type: string
+      enum: [submitted, triaged, assigned, in_progress, resolved, closed, rejected]
+    EmergencyLevel:
+      type: string
+      enum: [low, medium, high, critical]
+    ReportSource:
+      type: string
+      enum: [citizen_report, agency_referral, officer_created, admin_created]
+    IncidentType:
+      type: string
+      enum:
+        - road_crash
+        - traffic_obstruction
+        - dangerous_driving
+        - vehicle_breakdown
+        - road_hazard
+        - theft
+        - robbery
+        - assault
+        - suspicious_activity
+        - public_threat
+        - vehicle_theft
+        - missing_vehicle_alert
+        - security_incident
+        - roadworthiness_complaint
+        - dangerous_vehicle
+        - vehicle_inspection_concern
+        - invalid_certificate_concern
+        - commercial_vehicle_safety_issue
+        - vehicle_documentation_concern
+        - fire_rescue
+        - disaster
+        - civil_emergency
+        - infrastructure_risk
+        - custom
+    LocationSource:
+      type: string
+      enum: [gps, manual]
+    Location:
+      type: object
+      properties:
+        latitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          minimum: -180
+          maximum: 180
+        address:
+          type: string
+        state:
+          type: string
+        lga:
+          type: string
+        source:
+          $ref: "#/components/schemas/LocationSource"
+        accuracy:
+          type: number
+      required: [address, source]
+    Reporter:
+      type: object
+      properties:
+        fullName:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+      required: [phone]
+    VehicleInfo:
+      type: object
+      properties:
+        registrationNumber:
+          type: string
+        make:
+          type: string
+        model:
+          type: string
+        color:
+          type: string
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        badgeNumber:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        agency:
+          $ref: "#/components/schemas/AgencyType"
+        sector:
+          type: string
+        station:
+          type: string
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, badgeNumber, email, role, agency, status, createdAt]
+    LoginRequest:
+      type: object
+      properties:
+        agency:
+          $ref: "#/components/schemas/AgencyType"
+        badgeNumber:
+          type: string
+        pin:
+          type: string
+          minLength: 4
+          maxLength: 12
+      required: [agency, badgeNumber, pin]
+    AuthSession:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+        refreshToken:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+      required: [user, token]
+    CitizenReportSubmitRequest:
+      type: object
+      properties:
+        clientMutationId:
+          type: string
+        clientId:
+          type: string
+          minLength: 8
+          maxLength: 80
+          description: Client-generated idempotency key — resubmitting with the same clientId returns the existing report instead of creating a duplicate.
+        incidentType:
+          $ref: "#/components/schemas/IncidentType"
+        description:
+          type: string
+          minLength: 10
+        location:
+          $ref: "#/components/schemas/Location"
+        reporter:
+          $ref: "#/components/schemas/Reporter"
+        vehicle:
+          $ref: "#/components/schemas/VehicleInfo"
+        vehicleRegistrationNumber:
+          type: string
+        emergencyLevel:
+          $ref: "#/components/schemas/EmergencyLevel"
+        suggestedAgency:
+          $ref: "#/components/schemas/AgencyType"
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvidenceCreateRequest"
+      required: [incidentType, description, location, emergencyLevel]
+    ReportSubmissionResponse:
+      type: object
+      properties:
+        report:
+          $ref: "#/components/schemas/ReportDetail"
+        reference:
+          type: string
+        routedAgency:
+          $ref: "#/components/schemas/AgencyType"
+      required: [report, reference, routedAgency]
+    ReportSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        reference:
+          type: string
+        incidentType:
+          $ref: "#/components/schemas/IncidentType"
+        description:
+          type: string
+        suggestedAgency:
+          $ref: "#/components/schemas/AgencyType"
+        assignedAgency:
+          $ref: "#/components/schemas/AgencyType"
+        emergencyLevel:
+          $ref: "#/components/schemas/EmergencyLevel"
+        status:
+          $ref: "#/components/schemas/ReportStatus"
+        source:
+          $ref: "#/components/schemas/ReportSource"
+        location:
+          $ref: "#/components/schemas/Location"
+        submittedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, reference, incidentType, suggestedAgency, emergencyLevel, status, source, submittedAt, updatedAt]
+    ReportDetail:
+      allOf:
+        - $ref: "#/components/schemas/ReportSummary"
+        - type: object
+          properties:
+            reporter:
+              $ref: "#/components/schemas/Reporter"
+            vehicle:
+              $ref: "#/components/schemas/VehicleInfo"
+            evidence:
+              type: array
+              items:
+                $ref: "#/components/schemas/EvidenceMetadata"
+            timeline:
+              type: array
+              items:
+                $ref: "#/components/schemas/TimelineEntry"
+            citizenMessage:
+              type: string
+          required: [timeline]
+    CitizenReportTracking:
+      type: object
+      properties:
+        reference:
+          type: string
+        report:
+          $ref: "#/components/schemas/ReportDetail"
+        citizenMessage:
+          type: string
+      required: [reference, report, citizenMessage]
+    ReportStatusUpdateRequest:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/ReportStatus"
+        note:
+          type: string
+        assignedToUserId:
+          type: string
+      required: [status]
+    ReportReassignmentRequest:
+      type: object
+      properties:
+        targetAgency:
+          $ref: "#/components/schemas/AgencyType"
+        reason:
+          type: string
+        note:
+          type: string
+      required: [targetAgency, reason]
+    TimelineEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        reportId:
+          type: string
+        status:
+          $ref: "#/components/schemas/ReportStatus"
+        action:
+          type: string
+        message:
+          type: string
+        actorUserId:
+          type: string
+        actorAgency:
+          $ref: "#/components/schemas/AgencyType"
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, action, message, createdAt]
+    EvidenceKind:
+      type: string
+      enum: [photo, video, audio, document, statement, other]
+    EvidenceCreateRequest:
+      type: object
+      properties:
+        kind:
+          $ref: "#/components/schemas/EvidenceKind"
+        uri:
+          type: string
+        fileName:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+        checksum:
+          type: string
+        capturedAt:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties: true
+      required: [kind, uri]
+    EvidenceMetadata:
+      allOf:
+        - $ref: "#/components/schemas/EvidenceCreateRequest"
+        - type: object
+          properties:
+            id:
+              type: string
+            reportId:
+              type: string
+            uploadedByUserId:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+          required: [id, reportId, createdAt]
+    NotificationType:
+      type: string
+      enum:
+        - citizen_report_submitted
+        - case_assigned
+        - status_changed
+        - report_reassigned
+        - agency_referral_received
+        - nearby_high_priority_alert
+        - officer_dispatch_request
+        - admin_action
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          $ref: "#/components/schemas/NotificationType"
+        title:
+          type: string
+        body:
+          type: string
+        recipientUserId:
+          type: string
+        recipientAgency:
+          $ref: "#/components/schemas/AgencyType"
+        reportReference:
+          type: string
+        readAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          additionalProperties: true
+      required: [id, type, title, body, createdAt]
+    NotificationCreateRequest:
+      type: object
+      properties:
+        type:
+          $ref: "#/components/schemas/NotificationType"
+        title:
+          type: string
+        body:
+          type: string
+        recipientUserId:
+          type: string
+        recipientAgency:
+          $ref: "#/components/schemas/AgencyType"
+        reportReference:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+      required: [type, title, body]
+    Agency:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/AgencyType"
+        name:
+          type: string
+        shortName:
+          type: string
+        fullName:
+          type: string
+        primaryColor:
+          type: string
+        secondaryColor:
+          type: string
+        badgePrefix:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, name, shortName, fullName, primaryColor, secondaryColor, badgePrefix, description, isActive]
+    AgencyCreateRequest:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/AgencyType"
+        name:
+          type: string
+        shortName:
+          type: string
+        fullName:
+          type: string
+        primaryColor:
+          type: string
+        secondaryColor:
+          type: string
+        badgePrefix:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        isActive:
+          type: boolean
+          default: true
+        seedDemoUsers:
+          type: boolean
+          default: true
+      required: [id, name, shortName, fullName, primaryColor, secondaryColor, badgePrefix, description]
+    AgencyUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        fullName:
+          type: string
+        primaryColor:
+          type: string
+        secondaryColor:
+          type: string
+        badgePrefix:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        isActive:
+          type: boolean
+    UserCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        badgeNumber:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        agency:
+          $ref: "#/components/schemas/AgencyType"
+        sector:
+          type: string
+        station:
+          type: string
+        pin:
+          type: string
+          minLength: 4
+          maxLength: 12
+        status:
+          $ref: "#/components/schemas/UserStatus"
+      required: [name, badgeNumber, email, role, agency, pin]
+    UserUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        sector:
+          type: string
+        station:
+          type: string
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        pin:
+          type: string
+          minLength: 4
+          maxLength: 12
+    AdminUser:
+      type: object
+      description: Lean backend auth user. Never includes the PIN hash.
+      properties:
+        id:
+          type: string
+        badgeNumber:
+          type: string
+        displayName:
+          type: string
+        agency:
+          type: string
+          description: Built-in or dynamic/custom agency id.
+        role:
+          $ref: "#/components/schemas/UserRole"
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [id, badgeNumber, displayName, agency, role, isActive]
+    AdminUserCreateRequest:
+      type: object
+      properties:
+        badgeNumber:
+          type: string
+        displayName:
+          type: string
+        agency:
+          type: string
+          description: Built-in or dynamic/custom agency id.
+        role:
+          $ref: "#/components/schemas/UserRole"
+        pin:
+          type: string
+          minLength: 4
+          maxLength: 12
+        isActive:
+          type: boolean
+      required: [badgeNumber, displayName, agency, role, pin]
+    AdminUserUpdateRequest:
+      type: object
+      description: At least one field is required.
+      properties:
+        displayName:
+          type: string
+        agency:
+          type: string
+        role:
+          $ref: "#/components/schemas/UserRole"
+        isActive:
+          type: boolean
+    AdminUserResetPinRequest:
+      type: object
+      properties:
+        pin:
+          type: string
+          minLength: 4
+          maxLength: 12
+      required: [pin]
+    AuditSeverity:
+      type: string
+      enum: [info, warning, critical]
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        detail:
+          type: string
+        actorUserId:
+          type: string
+        actorAgency:
+          $ref: "#/components/schemas/AgencyType"
+        targetId:
+          type: string
+        reportReference:
+          type: string
+        severity:
+          $ref: "#/components/schemas/AuditSeverity"
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, type, title, detail, severity, createdAt]

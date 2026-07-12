@@ -1,9 +1,26 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Network from "expo-network";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import { submitCitizenReport } from "@/services/reportRepository";
+import type { CitizenEmergencyLevel, CitizenIncidentType } from "@/services/citizenIncidentApi";
 
 export type IncidentType = "crash" | "breakdown" | "hazard" | "flooding";
 export type SeverityLevel = "fatal" | "serious" | "minor" | "property_only";
+
+/** Mapping into the backend citizen-report vocabulary for offline sync. */
+const INCIDENT_TYPE_TO_REPORT_TYPE: Record<IncidentType, CitizenIncidentType> = {
+  crash: "road_crash",
+  breakdown: "vehicle_breakdown",
+  hazard: "road_hazard",
+  flooding: "road_hazard",
+};
+
+const SEVERITY_TO_EMERGENCY: Record<SeverityLevel, CitizenEmergencyLevel> = {
+  fatal: "critical",
+  serious: "high",
+  minor: "medium",
+  property_only: "low",
+};
 export type IncidentStatus =
   | "draft"
   | "submitted"
@@ -376,7 +393,96 @@ const SEED_INCIDENTS: Incident[] = [
     ],
     pendingSync: false,
   },
+  {
+    id: "INC-TODAY-003",
+    type: "breakdown",
+    severity: "property_only",
+    status: "assigned",
+    title: "Truck breakdown — Apapa access road",
+    location: "Apapa-Oshodi Expressway",
+    lga: "Ajeromi-Ifelodun",
+    state: "Lagos",
+    latitude: 6.456,
+    longitude: 3.359,
+    dateTime: new Date(new Date().setHours(12, 5, 0, 0)).toISOString(),
+    description: "Container truck stalled near port gate, narrowing traffic to one lane.",
+    probableCauses: [{ category: "vehicle", code: "MDV", label: "Mechanically deficient vehicle" }],
+    vehicles: [{ id: "v7", plate: "APP-441-TR", make: "DAF", model: "XF", colour: "Blue", type: "truck" }],
+    victims: [],
+    evidence: [],
+    reportedBy: "u1",
+    reportedByName: "Okafor Emmanuel",
+    assignedTo: "u1",
+    assignedToName: "Okafor Emmanuel",
+    timeline: [
+      { id: "td3", action: "Incident reported", by: "Okafor Emmanuel", timestamp: new Date(new Date().setHours(12, 5, 0, 0)).toISOString() },
+      { id: "td3a", action: "Assigned to Field Officer Okafor", by: "Adaeze Nwosu", timestamp: new Date(new Date().setHours(12, 20, 0, 0)).toISOString() },
+    ],
+    pendingSync: false,
+  },
+  {
+    id: "INC-2024-006",
+    type: "crash",
+    severity: "serious",
+    status: "under_review",
+    title: "Motorcycle crash — Ring Road",
+    location: "Ring Road, Benin City",
+    lga: "Oredo",
+    state: "Edo",
+    latitude: 6.335,
+    longitude: 5.6037,
+    dateTime: new Date(Date.now() - 86400000 * 6).toISOString(),
+    description: "Motorcycle collided with taxi during lane change. One rider taken to hospital.",
+    probableCauses: [{ category: "driver", code: "WOV", label: "Wrongful overtaking" }],
+    vehicles: [
+      { id: "v8", plate: "EDO-221-MC", make: "Bajaj", model: "Boxer", colour: "Red", type: "motorcycle" },
+      { id: "v9", plate: "BDG-782-AX", make: "Toyota", model: "Corolla", colour: "Grey", type: "car" },
+    ],
+    victims: [{ id: "vt7", name: "Ifeanyi N.", age: "31", gender: "male", condition: "injured", hospital: "UBTH" }],
+    evidence: [],
+    reportedBy: "u2",
+    reportedByName: "Adaeze Nwosu",
+    assignedTo: "u2",
+    assignedToName: "Adaeze Nwosu",
+    timeline: [
+      { id: "t7", action: "Incident reported", by: "Adaeze Nwosu", timestamp: new Date(Date.now() - 86400000 * 6).toISOString() },
+      { id: "t8", action: "Moved to under review", by: "Adaeze Nwosu", timestamp: new Date(Date.now() - 86400000 * 5.8).toISOString() },
+    ],
+    pendingSync: false,
+  },
+  {
+    id: "INC-2024-007",
+    type: "hazard",
+    severity: "minor",
+    status: "closed",
+    title: "Oil spill cleared — Aba Road",
+    location: "Aba Road by Waterlines",
+    lga: "Port Harcourt",
+    state: "Rivers",
+    latitude: 4.8156,
+    longitude: 7.0498,
+    dateTime: new Date(Date.now() - 86400000 * 9).toISOString(),
+    description: "Oil spill from delivery truck cleaned and road reopened.",
+    probableCauses: [{ category: "vehicle", code: "MDV", label: "Mechanically deficient vehicle" }],
+    vehicles: [{ id: "v10", plate: "RIV-094-OY", make: "Isuzu", model: "NPR", colour: "White", type: "truck" }],
+    victims: [],
+    evidence: [],
+    reportedBy: "u4",
+    reportedByName: "Amina Musa",
+    timeline: [
+      { id: "t9", action: "Incident reported", by: "Amina Musa", timestamp: new Date(Date.now() - 86400000 * 9).toISOString() },
+      { id: "t10", action: "Case closed", by: "Adaeze Nwosu", timestamp: new Date(Date.now() - 86400000 * 8).toISOString() },
+    ],
+    pendingSync: false,
+  },
 ];
+
+/** Ids of the bundled sample incidents, used to badge them as demo data. */
+const SEED_INCIDENT_IDS: ReadonlySet<string> = new Set(SEED_INCIDENTS.map((i) => i.id));
+
+export function isDemoIncident(incident: Pick<Incident, "id">): boolean {
+  return SEED_INCIDENT_IDS.has(incident.id);
+}
 
 const DEFAULT_DRAFT: DraftReport = { probableCauses: [], vehicles: [], victims: [] };
 
@@ -467,10 +573,52 @@ export function IncidentProvider({ children }: { children: React.ReactNode }) {
     return incidents.find((incident) => incident.id === id);
   }
 
+  /**
+   * Push queued (pendingSync) incidents to the backend through the citizen
+   * report pipeline, routed to FRSC. Each incident is retried once; only
+   * successfully submitted incidents lose their pendingSync flag, so failures
+   * stay queued for the next sync. Conflict handling is last-write-wins: the
+   * device's current copy is what gets submitted.
+   */
   async function syncPending() {
-    const next = incidents.map((incident) => (incident.pendingSync ? { ...incident, pendingSync: false } : incident));
+    const pending = incidents.filter((incident) => incident.pendingSync);
+    if (pending.length === 0) {
+      setIsOffline(false);
+      return;
+    }
+
+    const syncedIds = new Set<string>();
+    for (const incident of pending) {
+      for (let attempt = 0; attempt < 2 && !syncedIds.has(incident.id); attempt += 1) {
+        try {
+          await submitCitizenReport({
+            // The incident's own id doubles as the idempotency key, so a
+            // retry after a lost response can never create a duplicate.
+            clientId: `frsc-incident-${incident.id}`,
+            incidentType: INCIDENT_TYPE_TO_REPORT_TYPE[incident.type] ?? "road_crash",
+            description: `${incident.title}. ${incident.description}`.trim(),
+            location: incident.location,
+            latitude: incident.latitude,
+            longitude: incident.longitude,
+            address: incident.location,
+            state: incident.state,
+            lga: incident.lga,
+            locationSource: "gps",
+            emergencyLevel: SEVERITY_TO_EMERGENCY[incident.severity] ?? "medium",
+            suggestedAgency: "frsc",
+          });
+          syncedIds.add(incident.id);
+        } catch {
+          // Leave pendingSync set; the incident stays queued.
+        }
+      }
+    }
+
+    const next = incidents.map((incident) =>
+      syncedIds.has(incident.id) ? { ...incident, pendingSync: false } : incident,
+    );
     await persist(next);
-    setIsOffline(false);
+    if (syncedIds.size === pending.length) setIsOffline(false);
   }
 
   function updateDraft(updates: Partial<DraftReport>) {

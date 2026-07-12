@@ -26,3 +26,8 @@ git repository. To actually deploy/push the codebase:
 **Why:** the repl's `main` branch already has Replit's auto-commits, so no
 `git commit`/`git init` is needed — those are destructive and would otherwise
 require delegation. A clean working tree + empty remote = a plain `git push`.
+
+**Isolated task environments:** `listConnections("github")` returns empty there —
+the connector is only available in the main session. End-of-task GitHub pushes
+must happen from the main environment; note it in the task summary instead of
+retrying in the task sandbox.
