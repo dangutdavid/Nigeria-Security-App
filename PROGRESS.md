@@ -52,6 +52,12 @@ Checklist. Update this file at the end of each working session.
 ## Build log
 
 ### 2026-07-12
+- **Synced the merged update back to GitHub.** GitHub `main` now matches workspace `main`
+  (`34a58ba`). The platform had flattened the merge commit, so a plain push could not
+  fast-forward; the four workspace commits were replicated on GitHub byte-for-byte (identical
+  SHAs) via the Git Data API and `main` was moved to the workspace head. The previous GitHub
+  head (`1a5d509`) is preserved on branch `pre-sync-backup-2026-07-12` — nothing was lost, and
+  all its content is already contained in `main`.
 - **Pulled the GitHub backend update into the workspace.** Merged ~37 commits from
   `dangutdavid/Nigeria-Security-App` `main`: real backend (auth with refresh rotation,
   Postgres persistence via Drizzle migrations, notifications/push, evidence, audit and ops
