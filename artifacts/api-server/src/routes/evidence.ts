@@ -53,7 +53,28 @@ const EvidenceCreateSchema = z.object({
   checksum: z.string().max(128).optional(),
   capturedAt: z.string().datetime({ offset: true }).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  /** Proof-of-submitter for unauthenticated attaches — must match the report's clientId. */
+  clientId: z.string().min(8).max(128).optional(),
 });
+
+/**
+ * Authorize an evidence attach (roadmap Phase 2.5): strangers must not be able
+ * to attach files to other people's reports. Two ways in:
+ *  - An authenticated user (officer working the case, or admin).
+ *  - The original submitter, proven by presenting the report's client-generated
+ *    idempotency key (`clientId`) — which only the submitting device knows.
+ * Reports submitted without a clientId (e.g. legacy offline queue) accept no
+ * unauthenticated attaches; the citizen's photo still rides along at submit
+ * time via the report's own photoUri.
+ */
+function canAttachEvidence(
+  req: express.Request,
+  report: { clientId?: string },
+  presentedClientId: string | undefined,
+): boolean {
+  if (getAuth(req)) return true;
+  return Boolean(report.clientId && presentedClientId && report.clientId === presentedClientId);
+}
 
 function toEvidencePayload(record: EvidenceRecord) {
   return {
@@ -86,6 +107,12 @@ router.post("/reports/:reportId/evidence", uploadLimiter, async (req, res) => {
     const report = await citizenReportStore.findByIdOrReference(String(req.params.reportId));
     if (!report) {
       res.status(404).json({ error: `No report found for ${String(req.params.reportId)}` });
+      return;
+    }
+    if (!canAttachEvidence(req, report, parsed.data.clientId)) {
+      res.status(403).json({
+        error: "Evidence can only be attached by the report's submitter (matching clientId) or an authenticated user.",
+      });
       return;
     }
     const auth = getAuth(req);
@@ -137,6 +164,15 @@ router.put(
       const report = await citizenReportStore.findByIdOrReference(String(req.params.reportId));
       if (!record || !report || record.reportId !== report.id) {
         res.status(404).json({ error: "Evidence metadata not found for this report." });
+        return;
+      }
+      // Same submitter binding as metadata create; the raw body can't carry a
+      // clientId, so unauthenticated uploads present it as a header.
+      const presentedClientId = req.header("x-report-client-id")?.trim() || undefined;
+      if (!canAttachEvidence(req, report, presentedClientId)) {
+        res.status(403).json({
+          error: "Evidence can only be uploaded by the report's submitter (matching clientId) or an authenticated user.",
+        });
         return;
       }
       const storageKey = `${record.reportId}/${record.id}`;

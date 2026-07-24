@@ -1969,7 +1969,7 @@ export const useCreateReportEvidenceMetadata = <
 };
 
 /**
- * Raw binary upload (max 15 MB) for previously created evidence metadata. Content-Type must be an allowed image/video/audio/pdf type.
+ * Raw binary upload (max 15 MB) for previously created evidence metadata. Content-Type must be an allowed image/video/audio/pdf type. Unauthenticated uploads must present the report's clientId in the x-report-client-id header.
  * @summary Upload the evidence binary
  */
 export const getUploadReportEvidenceContentUrl = (
