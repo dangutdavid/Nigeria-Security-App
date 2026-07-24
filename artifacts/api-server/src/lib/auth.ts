@@ -51,6 +51,13 @@ export function demoAuthEnabled(): boolean {
 // AUTH_SECRET is required in production — refuse to start with the dev
 // fallback there. In development a stable insecure fallback keeps local
 // setups working, with a loud warning.
+//
+// Rotation (roadmap Phase 2.6 / E6): set AUTH_SECRET to the NEW secret and
+// AUTH_SECRET_PREVIOUS to the OLD one. New tokens/signatures are minted with
+// the current secret only, but verification accepts either — so sessions and
+// signed URLs issued before the rotation stay valid until they expire
+// naturally (12h TTL) instead of logging every user out at once. Drop
+// AUTH_SECRET_PREVIOUS after a full TTL has elapsed.
 const AUTH_SECRET = (() => {
   const secret = process.env.AUTH_SECRET;
   if (secret) {
@@ -66,24 +73,49 @@ const AUTH_SECRET = (() => {
   return "dev-insecure-auth-secret-change-me";
 })();
 
-/**
- * HMAC-sign an arbitrary payload with the shared auth secret. Used for
- * short-lived signed artifacts beyond login tokens (e.g. evidence download
- * URLs) so they all rotate with AUTH_SECRET.
- */
-export function signPayload(payload: string): string {
-  return createHmac("sha256", AUTH_SECRET).update(payload).digest("base64url");
+const AUTH_SECRET_PREVIOUS = (() => {
+  const previous = process.env.AUTH_SECRET_PREVIOUS;
+  if (!previous) return null;
+  if (previous.length < 16) {
+    throw new Error("AUTH_SECRET_PREVIOUS must be at least 16 characters.");
+  }
+  if (previous === AUTH_SECRET) return null; // No-op rotation; ignore.
+  logger.info("AUTH_SECRET_PREVIOUS is set — accepting signatures from the previous secret during rotation.");
+  return previous;
+})();
+
+/** Every secret verification may accept; only VERIFY_SECRETS[0] signs. */
+const VERIFY_SECRETS: string[] = AUTH_SECRET_PREVIOUS ? [AUTH_SECRET, AUTH_SECRET_PREVIOUS] : [AUTH_SECRET];
+
+function hmac(secret: string, payload: string): string {
+  return createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
-/** Constant-time comparison of a signature against the expected value. */
-export function verifyPayloadSignature(payload: string, signature: string): boolean {
-  const expected = signPayload(payload);
+function signatureMatches(secret: string, payload: string, signature: string): boolean {
+  const expected = hmac(secret, payload);
   if (signature.length !== expected.length) return false;
   try {
     return timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
   } catch {
     return false;
   }
+}
+
+/**
+ * HMAC-sign an arbitrary payload with the shared auth secret. Used for
+ * short-lived signed artifacts beyond login tokens (e.g. evidence download
+ * URLs) so they all rotate with AUTH_SECRET.
+ */
+export function signPayload(payload: string): string {
+  return hmac(AUTH_SECRET, payload);
+}
+
+/**
+ * Constant-time comparison of a signature against the expected value.
+ * Accepts the previous secret during a rotation window.
+ */
+export function verifyPayloadSignature(payload: string, signature: string): boolean {
+  return VERIFY_SECRETS.some((secret) => signatureMatches(secret, payload, signature));
 }
 
 // ---- Stateless HMAC token (no session store; survives restart while secret is stable) ----
@@ -99,20 +131,14 @@ export function signToken(user: AuthUser): string {
     exp: Date.now() + TOKEN_TTL_MS,
   };
   const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-  const signature = createHmac("sha256", AUTH_SECRET).update(payload).digest("base64url");
-  return `${payload}.${signature}`;
+  return `${payload}.${hmac(AUTH_SECRET, payload)}`;
 }
 
 export function verifyToken(token: string): AuthClaims | null {
   const [payload, signature] = token.split(".");
   if (!payload || !signature) return null;
-  const expected = createHmac("sha256", AUTH_SECRET).update(payload).digest("base64url");
-  if (signature.length !== expected.length) return null;
-  try {
-    if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
-  } catch {
-    return null;
-  }
+  // Accept the current secret, or the previous one during a rotation window.
+  if (!VERIFY_SECRETS.some((secret) => signatureMatches(secret, payload, signature))) return null;
   try {
     const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as AuthClaims;
     if (typeof claims.exp !== "number" || claims.exp < Date.now()) return null;
