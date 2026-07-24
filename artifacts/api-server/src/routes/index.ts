@@ -37,6 +37,16 @@ router.use(auditRouter);
 // Operational-model routes (units, case types, duty sessions, DB referrals) —
 // mounted before the MVP router so DB-backed /referrals wins when configured.
 router.use(opsRouter);
-router.use(mvpRouter);
+
+// SECURITY: the legacy MVP router derives the actor from client-supplied
+// `x-agency` / `x-user-role` / `x-user-id` headers and bypasses token auth
+// entirely (see routes/mvp.ts `requireActor`). The flat, token-authenticated
+// model (auth + ops + reports routers above) has superseded every route the
+// mobile app actually calls, so the MVP router is mounted ONLY outside
+// production. In production `/api/tenants`, `/api/cases`, `/api/sync/offline`,
+// etc. return 404. Guarded by a regression test (tests/mvp-gating.test.ts).
+if (process.env["NODE_ENV"] !== "production") {
+  router.use(mvpRouter);
+}
 
 export default router;
