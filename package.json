@@ -6,11 +6,45 @@
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"!@workspace/mockup-sandbox\" --filter \"./scripts\" --if-present run typecheck",
+    "typecheck:sandbox": "pnpm --filter @workspace/mockup-sandbox run typecheck",
+    "lint": "eslint .",
+    "audit:prod": "pnpm audit --prod --audit-level high"
   },
   "private": true,
   "devDependencies": {
+    "@eslint/js": "^9",
+    "eslint": "^9",
+    "eslint-plugin-security": "^3",
+    "globals": "^15",
+    "prettier": "^3.8.1",
     "typescript": "~5.9.2",
-    "prettier": "^3.8.1"
+    "typescript-eslint": "^8"
+  },
+  "pnpm": {
+    "overrides": {
+      "path-to-regexp": "^8.4.0",
+      "ws": "^8.21.0",
+      "qs": "^6.15.2",
+      "protobufjs": "^7.6.5",
+      "body-parser": "^2.3.0"
+    },
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-c2c7-rcm5-vvqj",
+        "GHSA-q3j6-qgpj-74h6",
+        "GHSA-v39h-62p7-jpjc",
+        "GHSA-w7jw-789q-3m8p",
+        "GHSA-vxpw-j846-p89q",
+        "GHSA-3jxr-9vmj-r5cp",
+        "GHSA-52cp-r559-cp3m",
+        "GHSA-23hp-3jrh-7fpw",
+        "GHSA-8x88-c5mf-7j5w",
+        "GHSA-395f-4hp3-45gv",
+        "GHSA-v2hh-gcrm-f6hx",
+        "GHSA-4c8g-83qw-93j6",
+        "GHSA-6g55-p6wh-862q"
+      ]
+    }
   }
 }
