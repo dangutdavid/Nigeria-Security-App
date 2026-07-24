@@ -2,6 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { and, eq, lt, type SQL } from "drizzle-orm";
 import { getDb, isDbConfigured, authUsers, revokedTokens, type Database } from "@workspace/db";
 import { hashPin, verifyPin } from "./password";
+import { getRedis } from "./redis";
 import { logger } from "./logger";
 
 export type Role = "citizen" | "officer" | "supervisor" | "commander" | "admin" | "super_admin";
@@ -154,8 +155,30 @@ export function verifyToken(token: string): AuthClaims | null {
 
 const revokedInMemory = new Map<string, number>();
 
+/**
+ * Redis is the fast path for revocation checks (attachAuth runs on every
+ * authenticated request): O(1) shared across instances, entries expire with
+ * the token's own TTL. The database remains the durable record; in-memory is
+ * the last resort for single-instance demo mode.
+ */
+function redisRevocationKey(jti: string): string {
+  return `revoked:${jti}`;
+}
+
 export async function revokeToken(claims: AuthClaims): Promise<void> {
   if (!claims.jti) return; // Legacy tokens (pre-jti) expire naturally.
+
+  // Shared fast path (multi-instance): best-effort, never blocks revocation.
+  const redis = getRedis();
+  if (redis && redis.status === "ready") {
+    const ttlMs = Math.max(1000, claims.exp - Date.now());
+    try {
+      await redis.set(redisRevocationKey(claims.jti), "1", "PX", ttlMs);
+    } catch (err) {
+      logger.debug({ err }, "Redis revocation write failed — DB/in-memory record still applies");
+    }
+  }
+
   const db = getDb();
   if (db && isDbConfigured()) {
     try {
@@ -177,6 +200,18 @@ export async function isTokenRevoked(claims: AuthClaims): Promise<boolean> {
   if (!claims.jti) return false;
   const local = revokedInMemory.get(claims.jti);
   if (local !== undefined) return true;
+
+  // Shared fast path — a hit is definitive; a miss/failure falls through to
+  // the durable store (Redis may have restarted and lost its keys).
+  const redis = getRedis();
+  if (redis && redis.status === "ready") {
+    try {
+      if (await redis.exists(redisRevocationKey(claims.jti))) return true;
+    } catch (err) {
+      logger.debug({ err }, "Redis revocation check failed — falling through to database");
+    }
+  }
+
   const db = getDb();
   if (db && isDbConfigured()) {
     try {

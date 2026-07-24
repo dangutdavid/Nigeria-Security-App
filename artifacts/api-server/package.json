@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
+    "@aws-sdk/client-s3": "^3.1095.0",
     "@google/genai": "^2.8.0",
     "@opentelemetry/api": "^1.9.1",
     "@sentry/node": "^10.68.0",
@@ -21,6 +22,7 @@
     "cors": "^2",
     "drizzle-orm": "catalog:",
     "express": "^5",
+    "ioredis": "^5.11.1",
     "pino": "^9",
     "pino-http": "^10",
     "prom-client": "^15.1.3",

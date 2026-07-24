@@ -27,7 +27,8 @@
       "ws": "^8.21.0",
       "qs": "^6.15.2",
       "protobufjs": "^7.6.5",
-      "body-parser": "^2.3.0"
+      "body-parser": "^2.3.0",
+      "postcss": "^8.5.18"
     },
     "auditConfig": {
       "ignoreGhsas": [

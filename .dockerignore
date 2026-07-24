@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/.expo
+**/coverage
+**/.git
+artifacts/mobile
+artifacts/mockup-sandbox
+attached_assets
+docs
+**/*.log
+**/data/evidence
