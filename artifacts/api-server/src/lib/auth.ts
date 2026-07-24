@@ -32,6 +32,22 @@ export interface AuthClaims {
 const DEMO_PIN = "1234";
 const TOKEN_TTL_MS = 1000 * 60 * 60 * 12; // 12h
 
+/**
+ * Demo credentials — the fixed-PIN seed users (FO-001/1234 …) and the dynamic
+ * `{PREFIX}-001|SV|CMD` + demo-PIN backdoor — are a development/demo
+ * convenience and must NEVER be accepted in production builds (roadmap E1).
+ *
+ * Enabled outside production by default; disabled in production unless an
+ * operator explicitly opts in with ALLOW_DEMO_USERS=true (e.g. a staging build
+ * that wants the demo logins). ALLOW_DEMO_USERS=false forces off everywhere.
+ */
+export function demoAuthEnabled(): boolean {
+  const flag = process.env["ALLOW_DEMO_USERS"];
+  if (flag === "true") return true;
+  if (flag === "false") return false;
+  return process.env["NODE_ENV"] !== "production";
+}
+
 // AUTH_SECRET is required in production — refuse to start with the dev
 // fallback there. In development a stable insecure fallback keeps local
 // setups working, with a loud warning.
@@ -250,6 +266,7 @@ function roleFromBadgeSuffix(badge: string): Role | null {
  * repository modes. Returns null when the badge/PIN don't match the pattern.
  */
 function synthesizeDynamicUser(badge: string, pin: string, agency?: string): AuthUser | null {
+  if (!demoAuthEnabled()) return null;
   const role = roleFromBadgeSuffix(badge);
   if (role && pin === DEMO_PIN_VALUE && agency) {
     return {
@@ -285,6 +302,8 @@ class DemoUserRepository implements UserRepository {
   readonly kind = "demo" as const;
 
   async authenticate(badgeNumber: string, pin: string, agency?: string): Promise<AuthOutcome> {
+    // No demo credentials exist when demo auth is disabled (production).
+    if (!demoAuthEnabled()) return { ok: false, reason: "invalid" };
     const badge = badgeNumber.trim().toUpperCase();
     const explicit = SEED_USERS.find(
       (user) => user.badgeNumber === badge && (!agency || user.agency === agency),
@@ -483,6 +502,11 @@ class DbUserRepository implements UserRepository {
   }
 
   async seedDefaults(): Promise<void> {
+    // Never plant demo users with known PINs in a production database.
+    if (!demoAuthEnabled()) {
+      logger.info("Demo auth disabled — skipping demo user seeding (production).");
+      return;
+    }
     let created = 0;
     for (const user of SEED_USERS) {
       const inserted = await this.db

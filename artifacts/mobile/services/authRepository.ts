@@ -23,30 +23,45 @@ interface LoginResponse {
 }
 
 /**
- * Best-effort backend session: in API mode, log in against the backend and
- * persist the returned bearer token (so protected report/agency calls
- * authenticate). Returns false when API mode is off or login fails — the caller
- * keeps using local AuthContext, so demo/offline login is never blocked.
+ * Result of the backend login attempt.
+ *  - "ok"          the server authorized the credentials (token persisted).
+ *  - "rejected"    the server explicitly denied them (401 invalid / 403 inactive).
+ *  - "unreachable" API mode is off, or the backend timed out / errored with no
+ *                  auth verdict — the caller may fall back to offline local auth.
+ *
+ * The distinction matters for the login authority rule (roadmap E1): in API
+ * mode a "rejected" outcome MUST fail the login; the client may not grant
+ * access on local credentials the server has refused. Only "unreachable"
+ * (genuine offline) permits the local fallback.
  */
+export type ApiSessionOutcome =
+  | { status: "ok"; user?: User; token: string }
+  | { status: "rejected"; reason: "invalid" | "inactive" }
+  | { status: "unreachable" };
+
 export async function establishApiSession(
   badgeNumber: string,
   pin: string,
   agency?: AgencyType,
   options: { timeoutMs?: number } = {},
-): Promise<boolean> {
-  if (!shouldUseApi()) return false;
+): Promise<ApiSessionOutcome> {
+  if (!shouldUseApi()) return { status: "unreachable" };
   const api = await mobileApiFetch<LoginResponse, { badgeNumber: string; pin: string; agency?: AgencyType }>({
     method: "POST",
     path: "/auth/login",
     body: { badgeNumber, pin, agency },
-    // Short timeout so a slow/unreachable backend never blocks local login.
+    // Short timeout so a slow/unreachable backend never blocks offline login.
     timeoutMs: options.timeoutMs ?? 4000,
   });
   if (api.ok && api.data.token) {
     await setMobileApiToken(api.data.token);
-    return true;
+    return { status: "ok", user: api.data.user, token: api.data.token };
   }
-  return false;
+  // An HTTP auth verdict (401/403) is the server exercising its authority.
+  if (api.status === 401) return { status: "rejected", reason: "invalid" };
+  if (api.status === 403) return { status: "rejected", reason: "inactive" };
+  // No status => transport failure / timeout => genuinely offline.
+  return { status: "unreachable" };
 }
 
 /**
