@@ -23,6 +23,7 @@ function envInt(name: string, fallback: number): number {
 //     distributed abuser can't run the bill up (default 2000 calls / UTC day).
 // Both are tunable via env for load without a code change.
 const assistantRateLimit = rateLimit({
+  name: "assistant",
   windowMs: envInt("ASSISTANT_RATE_WINDOW_MS", 10 * 60 * 1000),
   max: envInt("ASSISTANT_RATE_MAX", 15),
   message: "Too many assistant requests. Please slow down and try again shortly.",

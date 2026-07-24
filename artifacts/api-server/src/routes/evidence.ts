@@ -21,6 +21,7 @@ import { logger } from "../lib/logger";
 const router: IRouter = Router();
 
 const uploadLimiter = rateLimit({
+  name: "evidence_upload",
   windowMs: 60 * 60 * 1000,
   max: 60,
   message: "Too many evidence uploads from this device. Try again later.",

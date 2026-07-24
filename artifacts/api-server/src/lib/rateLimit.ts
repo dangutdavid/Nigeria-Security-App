@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { rateLimitRejections } from "./metrics";
 
 /**
  * Small fixed-window in-process rate limiter. Per-instance by design — behind
@@ -20,6 +21,8 @@ export interface RateLimitOptions {
   keyFor?: (req: Request) => string;
   /** Message returned with the 429. */
   message?: string;
+  /** Label for the rate_limit_rejections_total metric. */
+  name?: string;
 }
 
 export function rateLimit(options: RateLimitOptions) {
@@ -46,6 +49,7 @@ export function rateLimit(options: RateLimitOptions) {
     }
     entry.count += 1;
     if (entry.count > options.max) {
+      rateLimitRejections.inc({ limiter: options.name ?? "unnamed" });
       res.setHeader("Retry-After", Math.ceil((entry.resetAt - now) / 1000).toString());
       res.status(429).json({
         error: options.message ?? "Too many requests. Please try again later.",

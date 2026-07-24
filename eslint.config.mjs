@@ -37,6 +37,13 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
   {
+    // k6 load scripts run in k6's runtime, which injects these globals.
+    files: ["scripts/k6/**/*.js"],
+    languageOptions: {
+      globals: { __ENV: "readonly", __VU: "readonly", __ITER: "readonly" },
+    },
+  },
+  {
     files: ["artifacts/api-server/**/*.ts", "scripts/**/*.ts", "lib/db/**/*.ts"],
     languageOptions: {
       globals: { ...globals.node },

@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import metricsRouter from "./metrics";
 import authRouter from "./auth";
 import adminUsersRouter from "./admin-users";
 import citizenReportsRouter from "./citizen-reports";
@@ -15,6 +16,8 @@ import mvpRouter from "./mvp";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+// Prometheus scrape endpoint (Bearer METRICS_TOKEN when configured).
+router.use(metricsRouter);
 // Auth (login/logout/me) — mounted before the MVP router's /auth/officer-login.
 router.use(authRouter);
 // Admin user-management endpoints (admin/super_admin only).

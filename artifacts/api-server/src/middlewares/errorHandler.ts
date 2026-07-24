@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { logger } from "../lib/logger";
+import { sentryErrorHook } from "../lib/sentry";
 
 /**
  * Consistent JSON error surface for anything routes don't handle themselves:
@@ -41,5 +42,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, next: Ne
   }
 
   logger.error({ err, url: req.originalUrl }, "Unhandled request error");
+  // Forward to Sentry (no-op without SENTRY_DSN), joined by the correlation id.
+  sentryErrorHook(err, res.getHeader("X-Request-Id")?.toString(), req.originalUrl?.split("?")[0] ?? "unknown");
   res.status(500).json({ error: "Internal server error.", code: "internal_error" });
 }
