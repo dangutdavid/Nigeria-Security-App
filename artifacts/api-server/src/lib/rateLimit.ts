@@ -39,6 +39,12 @@ export interface RateLimitOptions {
   name?: string;
 }
 
+/** Read a positive integer from the environment, else the fallback. */
+export function envInt(name: string, fallback: number): number {
+  const raw = Number(process.env[name]);
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallback;
+}
+
 // Atomic INCR + set-expiry-on-first-hit + read-ttl. One round trip per request.
 const HIT_SCRIPT = `
 local count = redis.call('INCR', KEYS[1])

@@ -7,15 +7,17 @@ import {
   toReportPayload,
 } from "../lib/citizenReportStore";
 import { notifyReportSubmitted } from "../lib/notificationStore";
-import { rateLimit } from "../lib/rateLimit";
+import { envInt, rateLimit } from "../lib/rateLimit";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
+// Env-tunable so capacity/load tests can raise the ceiling per environment
+// without a code change; production keeps the defaults.
 const submitLimiter = rateLimit({
   name: "citizen_report_submit",
-  windowMs: 60 * 60 * 1000,
-  max: 30,
+  windowMs: envInt("CITIZEN_SUBMIT_RATE_WINDOW_MS", 60 * 60 * 1000),
+  max: envInt("CITIZEN_SUBMIT_RATE_MAX", 30),
   message: "Too many reports submitted from this device. Try again later.",
 });
 

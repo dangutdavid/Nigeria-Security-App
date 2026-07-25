@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { desc, eq, sql } from "drizzle-orm";
 import {
   citizenReports,
@@ -189,10 +189,26 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function makeReference(agency: CitizenAgencyRoute, sequence: number): string {
+// Crockford-style alphabet: no I/L/O/U, so references are unambiguous when a
+// citizen reads one over the phone.
+const REFERENCE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/**
+ * Public report reference. Random rather than sequential for two reasons the
+ * load test made concrete:
+ *  - Concurrency: the old count(*)+1 scheme raced under parallel submits and
+ *    500'd on the reference unique index (16% of submits at ~22/s).
+ *  - Enumeration: sequential references let anyone walk /track/:reference and
+ *    leak total report volume. 6 random chars = ~1e9 combinations per
+ *    agency-year; the unique index plus one retry covers the residual risk.
+ */
+function makeReference(agency: CitizenAgencyRoute): string {
   const prefix = AGENCY_LABELS[agency]?.slice(0, 3).toUpperCase() ?? "CIR";
   const year = new Date().getUTCFullYear();
-  return `CIR-${prefix}-${year}-${String(sequence).padStart(4, "0")}`;
+  const bytes = randomBytes(6);
+  let suffix = "";
+  for (const b of bytes) suffix += REFERENCE_ALPHABET[b % 32];
+  return `CIR-${prefix}-${year}-${suffix}`;
 }
 
 function hasCoordinates(input: { latitude?: number; longitude?: number }): boolean {
@@ -239,7 +255,6 @@ function reassignTimelineEntry(
 
 class InMemoryCitizenReportStore implements CitizenReportStore {
   private reports: CitizenReportRecord[] = [];
-  private sequence = 0;
 
   async create(input: CitizenReportSubmission): Promise<CitizenReportRecord> {
     // Idempotency: a retry carrying the same clientId returns the original.
@@ -247,12 +262,11 @@ class InMemoryCitizenReportStore implements CitizenReportStore {
       const existing = this.reports.find((r) => r.clientId === input.clientId);
       if (existing) return existing;
     }
-    this.sequence += 1;
     const submittedAt = nowIso();
     const record: CitizenReportRecord = {
       id: randomUUID(),
       clientId: input.clientId,
-      reference: makeReference(input.suggestedAgency, this.sequence),
+      reference: makeReference(input.suggestedAgency),
       incidentType: input.incidentType,
       description: input.description,
       location: input.location,
@@ -373,35 +387,42 @@ class DrizzleCitizenReportStore implements CitizenReportStore {
         .limit(1);
       if (existing) return mapRow(existing);
     }
-    const [counted] = await this.db
-      .select({ value: sql<number>`count(*)::int` })
-      .from(citizenReports);
-    const sequence = (counted?.value ?? 0) + 1;
     const submittedAt = new Date();
-    const [row] = await this.db
-      .insert(citizenReports)
-      .values({
-        reference: makeReference(input.suggestedAgency, sequence),
-        clientId: input.clientId ?? null,
-        incidentType: input.incidentType,
-        description: input.description,
-        emergencyLevel: input.emergencyLevel,
-        suggestedAgency: input.suggestedAgency,
-        status: "submitted",
-        location: input.location,
-        latitude: input.latitude ?? null,
-        longitude: input.longitude ?? null,
-        address: input.address ?? input.location,
-        state: input.state ?? null,
-        lga: input.lga ?? null,
-        locationSource: input.locationSource ?? (hasCoordinates(input) ? "gps" : "manual"),
-        accuracy: input.accuracy ?? null,
-        vehicleRegistration: input.vehicleRegistration ?? input.vehicleRegistrationNumber ?? null,
-        photoUri: input.photoUri ?? null,
-        timeline: initialTimeline(submittedAt.toISOString()),
-      })
-      .returning();
-    return mapRow(row);
+    // Random references collide with ~1e-9 probability per attempt; the unique
+    // index is the arbiter and one retry absorbs the residual case.
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        const [row] = await this.db
+          .insert(citizenReports)
+          .values({
+            reference: makeReference(input.suggestedAgency),
+            clientId: input.clientId ?? null,
+            incidentType: input.incidentType,
+            description: input.description,
+            emergencyLevel: input.emergencyLevel,
+            suggestedAgency: input.suggestedAgency,
+            status: "submitted",
+            location: input.location,
+            latitude: input.latitude ?? null,
+            longitude: input.longitude ?? null,
+            address: input.address ?? input.location,
+            state: input.state ?? null,
+            lga: input.lga ?? null,
+            locationSource: input.locationSource ?? (hasCoordinates(input) ? "gps" : "manual"),
+            accuracy: input.accuracy ?? null,
+            vehicleRegistration: input.vehicleRegistration ?? input.vehicleRegistrationNumber ?? null,
+            photoUri: input.photoUri ?? null,
+            timeline: initialTimeline(submittedAt.toISOString()),
+          })
+          .returning();
+        return mapRow(row);
+      } catch (err) {
+        const message = err instanceof Error ? `${err.message} ${String((err as { cause?: unknown }).cause ?? "")}` : "";
+        const isReferenceCollision = message.includes("citizen_reports_reference_idx");
+        if (!isReferenceCollision || attempt >= 2) throw err;
+        logger.warn("Citizen report reference collision — regenerating");
+      }
+    }
   }
 
   async findByReference(reference: string): Promise<CitizenReportRecord | undefined> {

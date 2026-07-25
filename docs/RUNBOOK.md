@@ -69,6 +69,24 @@ baseline — migrations are forward-only, so **backups are the rollback story**.
 - Redis restart wipes revocation keys: harmless — Postgres holds the durable
   revocation record and repopulates the check path.
 
+## 4a. Single-instance load baseline
+
+Recorded 2026-07-25 with `scripts/k6/citizen-report-flow.js` (50 VUs, 2m) against
+one production-mode instance on local Postgres + Redis, limiters raised so the
+limiter was not the bottleneck:
+
+| Metric | Value |
+| --- | --- |
+| Throughput | ~22 iterations/s (submit → track → evidence each) |
+| `http_req_failed` | 0.00% |
+| `http_req_duration` p95 | 23 ms |
+| submit p95 | 34 ms |
+
+This is a laptop/local-DB figure — a floor, not a production ceiling. Re-run
+against the deployed instance to size autoscaling. (The first run of this test
+surfaced a real bug: a `count(*)+1` reference scheme raced under load and 500'd
+~6% of submits on the unique index; references are now random, verified 0% here.)
+
 ## 5. Incident triage (E4)
 
 Every response carries `X-Request-Id`.

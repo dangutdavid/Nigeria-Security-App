@@ -15,15 +15,15 @@ import {
 import { recordAuditEvent } from "../lib/auditStore";
 import { getAuth, requireAgencyAccess } from "../middlewares/authMiddleware";
 import { isAdminRole } from "../lib/auth";
-import { rateLimit } from "../lib/rateLimit";
+import { envInt, rateLimit } from "../lib/rateLimit";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
 const uploadLimiter = rateLimit({
   name: "evidence_upload",
-  windowMs: 60 * 60 * 1000,
-  max: 60,
+  windowMs: envInt("EVIDENCE_UPLOAD_RATE_WINDOW_MS", 60 * 60 * 1000),
+  max: envInt("EVIDENCE_UPLOAD_RATE_MAX", 60),
   message: "Too many evidence uploads from this device. Try again later.",
 });
 

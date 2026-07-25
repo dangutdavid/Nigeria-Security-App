@@ -5,16 +5,11 @@ import {
   assistantConfigured,
   generateAssistantReply,
 } from "../lib/assistant";
-import { rateLimit } from "../lib/rateLimit";
+import { envInt, rateLimit } from "../lib/rateLimit";
 import { dailyBudget } from "../lib/dailyBudget";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
-
-function envInt(name: string, fallback: number): number {
-  const raw = Number(process.env[name]);
-  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : fallback;
-}
 
 // The assistant is a PUBLIC (unauthenticated) endpoint that proxies paid
 // Anthropic/Gemini calls, so it needs abuse controls even without a login:

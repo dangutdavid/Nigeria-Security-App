@@ -24,6 +24,10 @@ import { ReferralProvider } from "@/context/ReferralContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { TheftReportProvider } from "@/context/TheftReportContext";
 import { addNotificationRouting } from "@/services/pushNotificationService";
+import { initSentry } from "@/services/sentry";
+
+// Error tracking — no-op without EXPO_PUBLIC_SENTRY_DSN or in Expo Go.
+initSentry();
 
 SplashScreen.preventAutoHideAsync();
 
