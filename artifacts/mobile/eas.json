@@ -11,7 +11,8 @@
       "pnpm": "9.12.0",
       "env": {
         "EXPO_PUBLIC_USE_API": "true",
-        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.146:8082/api"
+        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.146:8082/api",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://b0dd087276b31f3de061c6c1f6b9b5a5@o4511796536279040.ingest.de.sentry.io/4511796557447248"
       }
     },
     "ios-simulator": {
@@ -23,13 +24,15 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_USE_API": "true"
+        "EXPO_PUBLIC_USE_API": "true",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://b0dd087276b31f3de061c6c1f6b9b5a5@o4511796536279040.ingest.de.sentry.io/4511796557447248"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_USE_API": "true"
+        "EXPO_PUBLIC_USE_API": "true",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://b0dd087276b31f3de061c6c1f6b9b5a5@o4511796536279040.ingest.de.sentry.io/4511796557447248"
       }
     }
   },
