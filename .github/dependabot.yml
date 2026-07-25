@@ -1,0 +1,37 @@
+# Dependabot configuration.
+#
+# Tuned to the workspace's supply-chain policy (pnpm-workspace.yaml sets
+# minimumReleaseAge: 1440): the cooldown below keeps Dependabot from proposing
+# releases younger than the workspace would accept, and grouping keeps the PR
+# noise down to one reviewable batch per week.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
+    groups:
+      dev-tooling:
+        dependency-type: development
+        update-types: [minor, patch]
+      production-patches:
+        dependency-type: production
+        update-types: [patch]
+    ignore:
+      # esbuild is pinned exactly (pnpm override "0.27.3"): esbuild-plugin-pino
+      # is peer-sensitive to the esbuild version, and drizzle-kit's bundled
+      # esbuild is overridden through the same pin. Bump it deliberately, not
+      # via bot PR.
+      - dependency-name: esbuild
+      # Expo pins react/react-dom exactly (workspace catalog); Expo SDK
+      # upgrades move these, not Dependabot.
+      - dependency-name: react
+      - dependency-name: react-dom
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
