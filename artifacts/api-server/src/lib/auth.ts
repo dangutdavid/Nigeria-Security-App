@@ -346,13 +346,32 @@ interface SeedUser extends AuthUser {
   pin: string;
 }
 
+// Mirrors the full demo roster the mobile app advertises on its login screens
+// (context/AuthContext.tsx) — with the server as the login authority, any badge
+// the app shows MUST authenticate server-side or the login screen lies.
+// All of these are disabled in production by demoAuthEnabled().
 const SEED_USERS: SeedUser[] = [
-  { id: "demo-admin", name: "Admin Miriam Bello", badgeNumber: "ADMIN-001", agency: "admin", role: "admin", pin: DEMO_PIN, station: "HQ", sector: "Administration" },
+  // Admin platform
+  { id: "demo-admin", name: "Admin Miriam Bello", badgeNumber: "ADMIN-001", agency: "admin", role: "admin", pin: DEMO_PIN, station: "Operations Centre", sector: "Platform Operations" },
   { id: "demo-super", name: "Super Admin Tunde Lawal", badgeNumber: "SUPER-001", agency: "admin", role: "super_admin", pin: DEMO_PIN, station: "HQ", sector: "Administration" },
-  { id: "demo-frsc", name: "Okafor Emmanuel", badgeNumber: "FO-001", agency: "frsc", role: "officer", pin: DEMO_PIN, station: "FRSC Field Unit", sector: "FRSC Operations" },
-  { id: "demo-police", name: "Insp. Chukwuemeka Okonkwo", badgeNumber: "NPF-001", agency: "police", role: "officer", pin: DEMO_PIN, station: "Police Division", sector: "Police Operations" },
-  { id: "demo-vio", name: "Officer Grace Okafor", badgeNumber: "VIO-001", agency: "vio", role: "officer", pin: DEMO_PIN, station: "VIO Office", sector: "VIO Operations" },
-  { id: "demo-nscdc", name: "Officer Daniel Musa", badgeNumber: "NSCDC-001", agency: "civil_defence", role: "officer", pin: DEMO_PIN, station: "NSCDC Field Unit", sector: "NSCDC Operations" },
+  // FRSC
+  { id: "demo-frsc", name: "Okafor Emmanuel", badgeNumber: "FO-001", agency: "frsc", role: "officer", pin: DEMO_PIN, station: "Kubwa Outpost", sector: "Abuja FCT" },
+  { id: "demo-frsc-sv", name: "Adaeze Nwosu", badgeNumber: "SV-042", agency: "frsc", role: "supervisor", pin: DEMO_PIN, station: "FCT Sector Command", sector: "Abuja FCT" },
+  { id: "demo-frsc-cmd", name: "Brig. Usman Aliyu", badgeNumber: "CMD-007", agency: "frsc", role: "commander", pin: DEMO_PIN, station: "Zonal Command HQ", sector: "North Central Zone" },
+  { id: "demo-frsc-22", name: "Chukwudi Eze", badgeNumber: "FO-022", agency: "frsc", role: "officer", pin: "5678", station: "Ikeja Checkpoint", sector: "Lagos State" },
+  { id: "demo-frsc-37", name: "Fatima Bello", badgeNumber: "FO-037", agency: "frsc", role: "officer", pin: "5678", station: "Kano Metro Command", sector: "Kano State" },
+  // Police
+  { id: "demo-police", name: "Insp. Chukwuemeka Okonkwo", badgeNumber: "NPF-001", agency: "police", role: "officer", pin: DEMO_PIN, station: "Maitama Divisional HQ", sector: "FCT Command" },
+  { id: "demo-police-sv", name: "DSP Aisha Ibrahim", badgeNumber: "NPF-042", agency: "police", role: "supervisor", pin: DEMO_PIN, station: "Area 'E' Command Festac", sector: "Lagos State Command" },
+  { id: "demo-police-cmd", name: "ACP Rotimi Adeyemi", badgeNumber: "NPF-CMD", agency: "police", role: "commander", pin: DEMO_PIN, station: "Zonal HQ Onikan", sector: "South West Zone" },
+  // VIO
+  { id: "demo-vio", name: "Officer Grace Okafor", badgeNumber: "VIO-001", agency: "vio", role: "officer", pin: DEMO_PIN, station: "Abuja VIO Centre", sector: "FCT VIO" },
+  { id: "demo-vio-sv", name: "Sr. Inspector Musa Danjuma", badgeNumber: "VIO-SV2", agency: "vio", role: "supervisor", pin: DEMO_PIN, station: "Kano VIO Centre", sector: "Kano VIO" },
+  { id: "demo-vio-cmd", name: "Director Ngozi Eze", badgeNumber: "VIO-CMD", agency: "vio", role: "commander", pin: DEMO_PIN, station: "FRSC National HQ", sector: "National VIO HQ" },
+  // NSCDC / Civil Defence
+  { id: "demo-nscdc", name: "Officer Daniel Musa", badgeNumber: "NSCDC-001", agency: "civil_defence", role: "officer", pin: DEMO_PIN, station: "Wuse Response Unit", sector: "FCT Command" },
+  { id: "demo-nscdc-sv", name: "ASC Halima Yusuf", badgeNumber: "NSCDC-SV", agency: "civil_defence", role: "supervisor", pin: DEMO_PIN, station: "Ikeja Civil Defence Office", sector: "Lagos Command" },
+  { id: "demo-nscdc-cmd", name: "Commandant Peter Ade", badgeNumber: "NSCDC-CMD", agency: "civil_defence", role: "commander", pin: DEMO_PIN, station: "NSCDC Headquarters", sector: "National Command" },
 ];
 
 const MANAGEMENT_UNSUPPORTED = "User management requires DATABASE_URL (DB-backed auth). Not supported in demo mode.";
