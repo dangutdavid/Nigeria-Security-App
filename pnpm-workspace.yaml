@@ -47,8 +47,11 @@ catalog:
   '@tailwindcss/vite': ^4.1.14
   '@tanstack/react-query': ^5.90.21
   '@types/node': ^25.3.3
-  '@types/react': ^19.2.0
-  '@types/react-dom': ^19.2.0
+  # Keep in lockstep with artifacts/mobile's Expo-pinned @types/react (~19.1.x)
+  # so a single @types/react version exists workspace-wide; two versions break
+  # typechecking of packages whose deps resolve the hidden-hoisted copy.
+  '@types/react': ~19.1.10
+  '@types/react-dom': ~19.1.7
   '@vitejs/plugin-react': ^5.0.4
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1

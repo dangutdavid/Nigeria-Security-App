@@ -76,3 +76,7 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
   (see `.agents/memory/github-push-via-connector.md` for the exact push method).
   Note: Replit's end-of-turn auto-checkpoint commits one step after the turn ends, so
   each push may lag by one checkpoint and catches up on the next push.
+- **Keep progress in a living `.md` file**: maintain `README.md` (GitHub-facing project
+  overview) and `PROGRESS.md` (MVP-audit checklist status + a dated build log) at the repo
+  root. Update `PROGRESS.md` at the end of each working session — flip checklist items as they
+  ship and add a build-log entry for what changed.
