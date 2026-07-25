@@ -1,0 +1,33 @@
+# gitleaks configuration — CI backstop for committed secrets.
+#
+# This is the belt to GitHub-native secret scanning's braces: enable
+# "Secret scanning" + "Push protection" in the repo's Security settings
+# (Settings → Code security) as the primary control — those block a secret at
+# push time, before it ever lands. gitleaks here catches anything that slips
+# past on pull requests.
+#
+# The app signs auth tokens and evidence URLs with AUTH_SECRET; a leaked secret
+# is a full authentication bypass. Nothing real should ever be committed —
+# secrets come from the environment / a secret manager (see .env.example).
+
+title = "Nigeria Security App gitleaks config"
+
+[extend]
+# Start from gitleaks' built-in ruleset.
+useDefault = true
+
+[allowlist]
+description = "Known non-secret placeholders used in dev/demo and docs."
+regexes = [
+  # The intentional, loudly-warned development fallback secret in auth.ts.
+  '''dev-insecure-auth-secret-change-me''',
+  # Documented demo login PINs (1234 / 5678) — not credentials to any real system.
+  '''\bPIN\s+(1234|5678)\b''',
+  # Local dev Postgres URL documented in setup notes (no password, localhost).
+  '''postgres://[a-z]+@localhost:5432/\w+''',
+]
+paths = [
+  # Example env files are meant to hold placeholders, not real values.
+  '''.*\.env\.example$''',
+  '''(^|/)docs/.*\.md$''',
+]

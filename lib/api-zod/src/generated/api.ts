@@ -178,6 +178,9 @@ export const submitCitizenReportBodyLocationLatitudeMax = 90;
 export const submitCitizenReportBodyLocationLongitudeMin = -180;
 export const submitCitizenReportBodyLocationLongitudeMax = 180;
 
+export const submitCitizenReportBodyEvidenceItemClientIdMin = 8;
+export const submitCitizenReportBodyEvidenceItemClientIdMax = 128;
+
 export const SubmitCitizenReportBody = zod.object({
   clientMutationId: zod.string().optional(),
   clientId: zod
@@ -280,6 +283,14 @@ export const SubmitCitizenReportBody = zod.object({
         checksum: zod.string().optional(),
         capturedAt: zod.coerce.date().optional(),
         metadata: zod.record(zod.string(), zod.unknown()).optional(),
+        clientId: zod
+          .string()
+          .min(submitCitizenReportBodyEvidenceItemClientIdMin)
+          .max(submitCitizenReportBodyEvidenceItemClientIdMax)
+          .optional()
+          .describe(
+            "Proof-of-submitter for unauthenticated attaches — must match the clientId the report was submitted with. Authenticated users may omit it.",
+          ),
       }),
     )
     .optional(),
@@ -299,6 +310,9 @@ export const trackCitizenReportResponseReportOneLocationLatitudeMax = 90;
 
 export const trackCitizenReportResponseReportOneLocationLongitudeMin = -180;
 export const trackCitizenReportResponseReportOneLocationLongitudeMax = 180;
+
+export const trackCitizenReportResponseReportTwoEvidenceItemOneClientIdMin = 8;
+export const trackCitizenReportResponseReportTwoEvidenceItemOneClientIdMax = 128;
 
 export const TrackCitizenReportResponse = zod.object({
   reference: zod.string(),
@@ -431,6 +445,18 @@ export const TrackCitizenReportResponse = zod.object({
                 checksum: zod.string().optional(),
                 capturedAt: zod.coerce.date().optional(),
                 metadata: zod.record(zod.string(), zod.unknown()).optional(),
+                clientId: zod
+                  .string()
+                  .min(
+                    trackCitizenReportResponseReportTwoEvidenceItemOneClientIdMin,
+                  )
+                  .max(
+                    trackCitizenReportResponseReportTwoEvidenceItemOneClientIdMax,
+                  )
+                  .optional()
+                  .describe(
+                    "Proof-of-submitter for unauthenticated attaches — must match the clientId the report was submitted with. Authenticated users may omit it.",
+                  ),
               })
               .and(
                 zod.object({
@@ -864,6 +890,9 @@ export const getReportDetailResponseOneLocationLatitudeMax = 90;
 export const getReportDetailResponseOneLocationLongitudeMin = -180;
 export const getReportDetailResponseOneLocationLongitudeMax = 180;
 
+export const getReportDetailResponseTwoEvidenceItemOneClientIdMin = 8;
+export const getReportDetailResponseTwoEvidenceItemOneClientIdMax = 128;
+
 export const GetReportDetailResponse = zod
   .object({
     id: zod.string(),
@@ -993,6 +1022,14 @@ export const GetReportDetailResponse = zod
               checksum: zod.string().optional(),
               capturedAt: zod.coerce.date().optional(),
               metadata: zod.record(zod.string(), zod.unknown()).optional(),
+              clientId: zod
+                .string()
+                .min(getReportDetailResponseTwoEvidenceItemOneClientIdMin)
+                .max(getReportDetailResponseTwoEvidenceItemOneClientIdMax)
+                .optional()
+                .describe(
+                  "Proof-of-submitter for unauthenticated attaches — must match the clientId the report was submitted with. Authenticated users may omit it.",
+                ),
             })
             .and(
               zod.object({
@@ -1070,6 +1107,9 @@ export const updateReportStatusResponseOneLocationLatitudeMax = 90;
 
 export const updateReportStatusResponseOneLocationLongitudeMin = -180;
 export const updateReportStatusResponseOneLocationLongitudeMax = 180;
+
+export const updateReportStatusResponseTwoEvidenceItemOneClientIdMin = 8;
+export const updateReportStatusResponseTwoEvidenceItemOneClientIdMax = 128;
 
 export const UpdateReportStatusResponse = zod
   .object({
@@ -1200,6 +1240,14 @@ export const UpdateReportStatusResponse = zod
               checksum: zod.string().optional(),
               capturedAt: zod.coerce.date().optional(),
               metadata: zod.record(zod.string(), zod.unknown()).optional(),
+              clientId: zod
+                .string()
+                .min(updateReportStatusResponseTwoEvidenceItemOneClientIdMin)
+                .max(updateReportStatusResponseTwoEvidenceItemOneClientIdMax)
+                .optional()
+                .describe(
+                  "Proof-of-submitter for unauthenticated attaches — must match the clientId the report was submitted with. Authenticated users may omit it.",
+                ),
             })
             .and(
               zod.object({
@@ -1280,6 +1328,9 @@ export const reassignReportResponseOneLocationLatitudeMax = 90;
 
 export const reassignReportResponseOneLocationLongitudeMin = -180;
 export const reassignReportResponseOneLocationLongitudeMax = 180;
+
+export const reassignReportResponseTwoEvidenceItemOneClientIdMin = 8;
+export const reassignReportResponseTwoEvidenceItemOneClientIdMax = 128;
 
 export const ReassignReportResponse = zod
   .object({
@@ -1410,6 +1461,14 @@ export const ReassignReportResponse = zod
               checksum: zod.string().optional(),
               capturedAt: zod.coerce.date().optional(),
               metadata: zod.record(zod.string(), zod.unknown()).optional(),
+              clientId: zod
+                .string()
+                .min(reassignReportResponseTwoEvidenceItemOneClientIdMin)
+                .max(reassignReportResponseTwoEvidenceItemOneClientIdMax)
+                .optional()
+                .describe(
+                  "Proof-of-submitter for unauthenticated attaches — must match the clientId the report was submitted with. Authenticated users may omit it.",
+                ),
             })
             .and(
               zod.object({
@@ -1514,6 +1573,9 @@ export const ListReportEvidenceParams = zod.object({
   reportId: zod.coerce.string().min(listReportEvidencePathReportIdMin),
 });
 
+export const listReportEvidenceResponseEvidenceItemOneClientIdMin = 8;
+export const listReportEvidenceResponseEvidenceItemOneClientIdMax = 128;
+
 export const ListReportEvidenceResponse = zod.object({
   evidence: zod.array(
     zod
@@ -1533,6 +1595,14 @@ export const ListReportEvidenceResponse = zod.object({
         checksum: zod.string().optional(),
         capturedAt: zod.coerce.date().optional(),
         metadata: zod.record(zod.string(), zod.unknown()).optional(),
+        clientId: zod
+          .string()
+          .min(listReportEvidenceResponseEvidenceItemOneClientIdMin)
+          .max(listReportEvidenceResponseEvidenceItemOneClientIdMax)
+          .optional()
+          .describe(
+            "Proof-of-submitter for unauthenticated attaches — must match the clientId the report was submitted with. Authenticated users may omit it.",
+          ),
       })
       .and(
         zod.object({
@@ -1557,6 +1627,9 @@ export const CreateReportEvidenceMetadataParams = zod.object({
     .min(createReportEvidenceMetadataPathReportIdMin),
 });
 
+export const createReportEvidenceMetadataBodyClientIdMin = 8;
+export const createReportEvidenceMetadataBodyClientIdMax = 128;
+
 export const CreateReportEvidenceMetadataBody = zod.object({
   kind: zod.enum(["photo", "video", "audio", "document", "statement", "other"]),
   uri: zod.string(),
@@ -1566,10 +1639,18 @@ export const CreateReportEvidenceMetadataBody = zod.object({
   checksum: zod.string().optional(),
   capturedAt: zod.coerce.date().optional(),
   metadata: zod.record(zod.string(), zod.unknown()).optional(),
+  clientId: zod
+    .string()
+    .min(createReportEvidenceMetadataBodyClientIdMin)
+    .max(createReportEvidenceMetadataBodyClientIdMax)
+    .optional()
+    .describe(
+      "Proof-of-submitter for unauthenticated attaches — must match the clientId the report was submitted with. Authenticated users may omit it.",
+    ),
 });
 
 /**
- * Raw binary upload (max 15 MB) for previously created evidence metadata. Content-Type must be an allowed image/video/audio/pdf type.
+ * Raw binary upload (max 15 MB) for previously created evidence metadata. Content-Type must be an allowed image/video/audio/pdf type. Unauthenticated uploads must present the report's clientId in the x-report-client-id header.
  * @summary Upload the evidence binary
  */
 export const uploadReportEvidenceContentPathReportIdMin = 3;
@@ -1578,6 +1659,18 @@ export const UploadReportEvidenceContentParams = zod.object({
   reportId: zod.coerce.string().min(uploadReportEvidenceContentPathReportIdMin),
   evidenceId: zod.coerce.string(),
 });
+
+export const UploadReportEvidenceContentHeader = zod.object({
+  "x-report-client-id": zod
+    .string()
+    .optional()
+    .describe(
+      "Proof-of-submitter for unauthenticated uploads — the clientId the report was submitted with.",
+    ),
+});
+
+export const uploadReportEvidenceContentResponseOneClientIdMin = 8;
+export const uploadReportEvidenceContentResponseOneClientIdMax = 128;
 
 export const UploadReportEvidenceContentResponse = zod
   .object({
@@ -1596,6 +1689,14 @@ export const UploadReportEvidenceContentResponse = zod
     checksum: zod.string().optional(),
     capturedAt: zod.coerce.date().optional(),
     metadata: zod.record(zod.string(), zod.unknown()).optional(),
+    clientId: zod
+      .string()
+      .min(uploadReportEvidenceContentResponseOneClientIdMin)
+      .max(uploadReportEvidenceContentResponseOneClientIdMax)
+      .optional()
+      .describe(
+        "Proof-of-submitter for unauthenticated attaches — must match the clientId the report was submitted with. Authenticated users may omit it.",
+      ),
   })
   .and(
     zod.object({

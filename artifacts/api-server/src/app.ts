@@ -1,12 +1,17 @@
 import { randomUUID } from "node:crypto";
 import express, { type Express } from "express";
-import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
+import { buildCorsMiddleware } from "./lib/cors";
 import { logger } from "./lib/logger";
+import { requestMetrics } from "./lib/metrics";
+import { initSentry } from "./lib/sentry";
 import { attachAuth } from "./middlewares/authMiddleware";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler";
 import { rejectPollutedBodies, securityHeaders } from "./middlewares/securityHeaders";
+
+// Error tracking (no-op unless SENTRY_DSN is set).
+initSentry();
 
 const app: Express = express();
 
@@ -38,7 +43,8 @@ app.use(
   }),
 );
 app.use(securityHeaders);
-app.use(cors());
+app.use(requestMetrics);
+app.use(buildCorsMiddleware());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(rejectPollutedBodies);

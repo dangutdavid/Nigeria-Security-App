@@ -250,8 +250,9 @@ export default function CitizenIncidentReportScreen() {
         suggestedAgency: suggestedAgency as CitizenAgencyRoute,
       });
       // Best-effort: push the photo through the evidence pipeline; the local
-      // photoUri on the report remains the offline fallback.
-      if (photoUri) void uploadReportPhoto(result.reference, photoUri);
+      // photoUri on the report remains the offline fallback. The clientId
+      // proves to the backend that this device submitted the report.
+      if (photoUri) void uploadReportPhoto(result.reference, photoUri, clientIdRef.current);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setReceipt(result);
     } catch {

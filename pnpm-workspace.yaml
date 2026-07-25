@@ -169,6 +169,10 @@ overrides:
 
   esbuild: "0.27.3"
 
+  # Security bumps for transitive deps in the api-server production tree live in
+  # the root package.json `pnpm.overrides` (pnpm 9 reads overrides from there,
+  # not from this file). See that block for the GHSA references.
+
 allowBuilds:
   '@google/genai': false
   esbuild: true

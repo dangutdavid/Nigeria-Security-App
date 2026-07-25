@@ -25,10 +25,15 @@ function guessMimeType(uri: string): string {
 /**
  * Attach a photo to a submitted report. Returns true when both metadata and
  * binary reached the backend. Safe to fire-and-forget.
+ *
+ * `clientId` is the report's client-generated idempotency key: the backend
+ * requires it (or an authenticated session) to prove the caller is the report's
+ * submitter, so strangers can't attach files to other people's reports.
  */
 export async function uploadReportPhoto(
   reportReference: string,
   photoUri: string,
+  clientId?: string,
 ): Promise<boolean> {
   if (!shouldUseApi() || !photoUri) return false;
 
@@ -38,7 +43,7 @@ export async function uploadReportPhoto(
   const meta = await mobileApiFetch<EvidenceMetadataResponse>({
     method: "POST",
     path: `/reports/${encodeURIComponent(reportReference)}/evidence`,
-    body: { kind: "photo", uri: photoUri, fileName, mimeType },
+    body: { kind: "photo", uri: photoUri, fileName, mimeType, ...(clientId ? { clientId } : {}) },
   });
   if (!meta.ok || !meta.data.id) {
     if (shouldUseApi()) {
@@ -57,7 +62,10 @@ export async function uploadReportPhoto(
       `${config.baseUrl}/reports/${encodeURIComponent(reportReference)}/evidence/${encodeURIComponent(meta.data.id)}/content`,
       {
         method: "PUT",
-        headers: { "Content-Type": mimeType },
+        headers: {
+          "Content-Type": mimeType,
+          ...(clientId ? { "x-report-client-id": clientId } : {}),
+        },
         body: bytes,
       },
     );

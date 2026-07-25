@@ -2,6 +2,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { and, eq, lt, type SQL } from "drizzle-orm";
 import { getDb, isDbConfigured, authUsers, revokedTokens, type Database } from "@workspace/db";
 import { hashPin, verifyPin } from "./password";
+import { getRedis } from "./redis";
 import { logger } from "./logger";
 
 export type Role = "citizen" | "officer" | "supervisor" | "commander" | "admin" | "super_admin";
@@ -32,9 +33,32 @@ export interface AuthClaims {
 const DEMO_PIN = "1234";
 const TOKEN_TTL_MS = 1000 * 60 * 60 * 12; // 12h
 
+/**
+ * Demo credentials — the fixed-PIN seed users (FO-001/1234 …) and the dynamic
+ * `{PREFIX}-001|SV|CMD` + demo-PIN backdoor — are a development/demo
+ * convenience and must NEVER be accepted in production builds (roadmap E1).
+ *
+ * Enabled outside production by default; disabled in production unless an
+ * operator explicitly opts in with ALLOW_DEMO_USERS=true (e.g. a staging build
+ * that wants the demo logins). ALLOW_DEMO_USERS=false forces off everywhere.
+ */
+export function demoAuthEnabled(): boolean {
+  const flag = process.env["ALLOW_DEMO_USERS"];
+  if (flag === "true") return true;
+  if (flag === "false") return false;
+  return process.env["NODE_ENV"] !== "production";
+}
+
 // AUTH_SECRET is required in production — refuse to start with the dev
 // fallback there. In development a stable insecure fallback keeps local
 // setups working, with a loud warning.
+//
+// Rotation (roadmap Phase 2.6 / E6): set AUTH_SECRET to the NEW secret and
+// AUTH_SECRET_PREVIOUS to the OLD one. New tokens/signatures are minted with
+// the current secret only, but verification accepts either — so sessions and
+// signed URLs issued before the rotation stay valid until they expire
+// naturally (12h TTL) instead of logging every user out at once. Drop
+// AUTH_SECRET_PREVIOUS after a full TTL has elapsed.
 const AUTH_SECRET = (() => {
   const secret = process.env.AUTH_SECRET;
   if (secret) {
@@ -50,24 +74,49 @@ const AUTH_SECRET = (() => {
   return "dev-insecure-auth-secret-change-me";
 })();
 
-/**
- * HMAC-sign an arbitrary payload with the shared auth secret. Used for
- * short-lived signed artifacts beyond login tokens (e.g. evidence download
- * URLs) so they all rotate with AUTH_SECRET.
- */
-export function signPayload(payload: string): string {
-  return createHmac("sha256", AUTH_SECRET).update(payload).digest("base64url");
+const AUTH_SECRET_PREVIOUS = (() => {
+  const previous = process.env.AUTH_SECRET_PREVIOUS;
+  if (!previous) return null;
+  if (previous.length < 16) {
+    throw new Error("AUTH_SECRET_PREVIOUS must be at least 16 characters.");
+  }
+  if (previous === AUTH_SECRET) return null; // No-op rotation; ignore.
+  logger.info("AUTH_SECRET_PREVIOUS is set — accepting signatures from the previous secret during rotation.");
+  return previous;
+})();
+
+/** Every secret verification may accept; only VERIFY_SECRETS[0] signs. */
+const VERIFY_SECRETS: string[] = AUTH_SECRET_PREVIOUS ? [AUTH_SECRET, AUTH_SECRET_PREVIOUS] : [AUTH_SECRET];
+
+function hmac(secret: string, payload: string): string {
+  return createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
-/** Constant-time comparison of a signature against the expected value. */
-export function verifyPayloadSignature(payload: string, signature: string): boolean {
-  const expected = signPayload(payload);
+function signatureMatches(secret: string, payload: string, signature: string): boolean {
+  const expected = hmac(secret, payload);
   if (signature.length !== expected.length) return false;
   try {
     return timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
   } catch {
     return false;
   }
+}
+
+/**
+ * HMAC-sign an arbitrary payload with the shared auth secret. Used for
+ * short-lived signed artifacts beyond login tokens (e.g. evidence download
+ * URLs) so they all rotate with AUTH_SECRET.
+ */
+export function signPayload(payload: string): string {
+  return hmac(AUTH_SECRET, payload);
+}
+
+/**
+ * Constant-time comparison of a signature against the expected value.
+ * Accepts the previous secret during a rotation window.
+ */
+export function verifyPayloadSignature(payload: string, signature: string): boolean {
+  return VERIFY_SECRETS.some((secret) => signatureMatches(secret, payload, signature));
 }
 
 // ---- Stateless HMAC token (no session store; survives restart while secret is stable) ----
@@ -83,20 +132,14 @@ export function signToken(user: AuthUser): string {
     exp: Date.now() + TOKEN_TTL_MS,
   };
   const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-  const signature = createHmac("sha256", AUTH_SECRET).update(payload).digest("base64url");
-  return `${payload}.${signature}`;
+  return `${payload}.${hmac(AUTH_SECRET, payload)}`;
 }
 
 export function verifyToken(token: string): AuthClaims | null {
   const [payload, signature] = token.split(".");
   if (!payload || !signature) return null;
-  const expected = createHmac("sha256", AUTH_SECRET).update(payload).digest("base64url");
-  if (signature.length !== expected.length) return null;
-  try {
-    if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
-  } catch {
-    return null;
-  }
+  // Accept the current secret, or the previous one during a rotation window.
+  if (!VERIFY_SECRETS.some((secret) => signatureMatches(secret, payload, signature))) return null;
   try {
     const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as AuthClaims;
     if (typeof claims.exp !== "number" || claims.exp < Date.now()) return null;
@@ -112,8 +155,30 @@ export function verifyToken(token: string): AuthClaims | null {
 
 const revokedInMemory = new Map<string, number>();
 
+/**
+ * Redis is the fast path for revocation checks (attachAuth runs on every
+ * authenticated request): O(1) shared across instances, entries expire with
+ * the token's own TTL. The database remains the durable record; in-memory is
+ * the last resort for single-instance demo mode.
+ */
+function redisRevocationKey(jti: string): string {
+  return `revoked:${jti}`;
+}
+
 export async function revokeToken(claims: AuthClaims): Promise<void> {
   if (!claims.jti) return; // Legacy tokens (pre-jti) expire naturally.
+
+  // Shared fast path (multi-instance): best-effort, never blocks revocation.
+  const redis = getRedis();
+  if (redis && redis.status === "ready") {
+    const ttlMs = Math.max(1000, claims.exp - Date.now());
+    try {
+      await redis.set(redisRevocationKey(claims.jti), "1", "PX", ttlMs);
+    } catch (err) {
+      logger.debug({ err }, "Redis revocation write failed — DB/in-memory record still applies");
+    }
+  }
+
   const db = getDb();
   if (db && isDbConfigured()) {
     try {
@@ -135,6 +200,18 @@ export async function isTokenRevoked(claims: AuthClaims): Promise<boolean> {
   if (!claims.jti) return false;
   const local = revokedInMemory.get(claims.jti);
   if (local !== undefined) return true;
+
+  // Shared fast path — a hit is definitive; a miss/failure falls through to
+  // the durable store (Redis may have restarted and lost its keys).
+  const redis = getRedis();
+  if (redis && redis.status === "ready") {
+    try {
+      if (await redis.exists(redisRevocationKey(claims.jti))) return true;
+    } catch (err) {
+      logger.debug({ err }, "Redis revocation check failed — falling through to database");
+    }
+  }
+
   const db = getDb();
   if (db && isDbConfigured()) {
     try {
@@ -250,6 +327,7 @@ function roleFromBadgeSuffix(badge: string): Role | null {
  * repository modes. Returns null when the badge/PIN don't match the pattern.
  */
 function synthesizeDynamicUser(badge: string, pin: string, agency?: string): AuthUser | null {
+  if (!demoAuthEnabled()) return null;
   const role = roleFromBadgeSuffix(badge);
   if (role && pin === DEMO_PIN_VALUE && agency) {
     return {
@@ -285,6 +363,8 @@ class DemoUserRepository implements UserRepository {
   readonly kind = "demo" as const;
 
   async authenticate(badgeNumber: string, pin: string, agency?: string): Promise<AuthOutcome> {
+    // No demo credentials exist when demo auth is disabled (production).
+    if (!demoAuthEnabled()) return { ok: false, reason: "invalid" };
     const badge = badgeNumber.trim().toUpperCase();
     const explicit = SEED_USERS.find(
       (user) => user.badgeNumber === badge && (!agency || user.agency === agency),
@@ -483,6 +563,11 @@ class DbUserRepository implements UserRepository {
   }
 
   async seedDefaults(): Promise<void> {
+    // Never plant demo users with known PINs in a production database.
+    if (!demoAuthEnabled()) {
+      logger.info("Demo auth disabled — skipping demo user seeding (production).");
+      return;
+    }
     let created = 0;
     for (const user of SEED_USERS) {
       const inserted = await this.db

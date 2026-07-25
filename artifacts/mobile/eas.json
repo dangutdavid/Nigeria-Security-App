@@ -11,7 +11,7 @@
       "pnpm": "9.12.0",
       "env": {
         "EXPO_PUBLIC_USE_API": "true",
-        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.146:8081/api"
+        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.146:8082/api"
       }
     },
     "ios-simulator": {

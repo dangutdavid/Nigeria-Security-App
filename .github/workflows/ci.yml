@@ -30,14 +30,44 @@ jobs:
       - name: Typecheck workspace
         run: pnpm run typecheck
 
+      - name: Lint (typescript-eslint + eslint-plugin-security)
+        run: pnpm run lint
+
       - name: API server tests
         run: pnpm --filter @workspace/api-server test
 
       - name: Mobile tests
         run: pnpm --filter @workspace/mobile test
 
+      - name: OpenAPI codegen drift
+        run: |
+          pnpm --filter @workspace/api-spec run codegen
+          if [ -n "$(git status --porcelain lib/)" ]; then
+            echo "::error::Generated client/zod is out of sync with openapi.yaml. Run 'pnpm --filter @workspace/api-spec run codegen' and commit the result."
+            git status --porcelain lib/
+            git diff -- lib/
+            exit 1
+          fi
+
+      - name: Dependency audit (production, high severity)
+        run: pnpm run audit:prod
+
       - name: Diff hygiene
         run: git diff --check
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
 
   migrations:
     name: Migrations apply cleanly

@@ -388,7 +388,10 @@ export function TheftReportProvider({
         const vehicle = [data.year, data.color, data.make, data.model]
           .filter(Boolean)
           .join(" ");
+        // Idempotency key + proof-of-submitter for the evidence upload below.
+        const clientId = `theft-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
         const receipt = await submitCitizenReport({
+          clientId,
           incidentType: "vehicle_theft",
           description: `Stolen vehicle: ${vehicle} (${data.plate}). ${data.description}`.trim(),
           location: data.location,
@@ -402,7 +405,7 @@ export function TheftReportProvider({
           suggestedAgency: "police",
         });
         citizenReportReference = receipt.reference;
-        if (data.photoUri) void uploadReportPhoto(receipt.reference, data.photoUri);
+        if (data.photoUri) void uploadReportPhoto(receipt.reference, data.photoUri, clientId);
       } catch {
         // Submission falls back to local-only; the record is still saved.
       }

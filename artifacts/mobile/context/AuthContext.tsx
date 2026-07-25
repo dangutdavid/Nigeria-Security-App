@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 
 import { createAuditEvent } from "@/services/auditLogService";
 import { clearApiSession, establishApiSession, validateApiSession } from "@/services/authRepository";
+import { shouldUseApi } from "@/services/apiConfig";
 
 export type UserRole = "citizen" | "officer" | "supervisor" | "commander" | "admin" | "super_admin";
 export type UserStatus = "active" | "inactive" | "suspended";
@@ -347,16 +348,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const agencyMatch = agency ? r.user.agency === agency : true;
       return badgeMatch && agencyMatch;
     });
-    if (!entry || entry.pin !== pin) {
-      await createAuditEvent({
+
+    const auditFailed = (reason: string) =>
+      createAuditEvent({
         type: "auth.failed_login",
         title: "Failed login attempt",
         detail: `Failed login for badge ${badgeNumber.toUpperCase()}${agency ? ` in ${agency}` : ""}.`,
         actor: { name: badgeNumber.toUpperCase(), agency },
         agency,
         severity: "warning",
-        metadata: { reason: "invalid_credentials" },
+        metadata: { reason },
       });
+
+    // The SERVER is the login authority when API mode is on. Attempt it first:
+    // an explicit rejection (401/403) fails the login and is NEVER overridden by
+    // local credentials. Only an unreachable backend (genuine offline) permits
+    // the local-records fallback below.
+    if (shouldUseApi()) {
+      const outcome = await establishApiSession(badgeNumber, pin, agency ?? entry?.user.agency);
+      if (outcome.status === "rejected") {
+        await auditFailed(outcome.reason === "inactive" ? "server_inactive" : "server_rejected");
+        return outcome.reason;
+      }
+      if (outcome.status === "ok") {
+        // Server authorized. Prefer the richer local profile if present;
+        // otherwise synthesize one from the server's user. The local PIN is NOT
+        // re-checked — the server already validated it and may hold a newer PIN.
+        const user = entry?.user ?? apiUserToUser(outcome.user, badgeNumber, agency);
+        if (!user) {
+          await auditFailed("no_local_profile");
+          return "invalid";
+        }
+        if (user.status === "inactive") {
+          await auditAuthBlocked(user, "inactive");
+          return "inactive";
+        }
+        if (user.status === "suspended") {
+          await auditAuthBlocked(user, "suspended");
+          return "suspended";
+        }
+        await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+        setUser(user);
+        setApiSessionEstablished(true);
+        await createAuditEvent({
+          type: "auth.login",
+          title: "User signed in",
+          detail: `${user.name} signed in to ${user.agency}.`,
+          actor: { id: user.id, name: user.name, agency: user.agency, role: user.role },
+          agency: user.agency,
+          severity: "info",
+        });
+        return "ok";
+      }
+      // outcome.status === "unreachable" → fall through to offline local auth.
+    }
+
+    // Offline / non-API path: local credential authority.
+    if (!entry || entry.pin !== pin) {
+      await auditFailed("invalid_credentials");
       return "invalid";
     }
     if (entry.user.status === "inactive") {
@@ -369,11 +418,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(entry.user));
     setUser(entry.user);
-    // In API mode, establish the backend session BEFORE returning so the first
-    // protected call after navigation already has the token (fixes the race).
-    // establishApiSession has a short internal timeout and returns false if the
-    // backend is unreachable, so local login is never blocked or failed.
-    setApiSessionEstablished(await establishApiSession(badgeNumber, pin, entry.user.agency));
+    // API mode but the backend was unreachable — offline login, no server session.
+    setApiSessionEstablished(false);
     await createAuditEvent({
       type: "auth.login",
       title: "User signed in",
@@ -642,6 +688,33 @@ function auditActor(user: User | null): { id?: string; name: string; agency?: Ag
   return user
     ? { id: user.id, name: user.name, agency: user.agency, role: user.role }
     : { name: "System" };
+}
+
+/**
+ * Build a mobile User from the server's authenticated user payload, for the
+ * (rare) case where the server authorizes a login for which no local demo
+ * profile exists. Fields the server doesn't carry are left blank; the server
+ * remains the source of truth for id / role / agency / status.
+ */
+function apiUserToUser(
+  apiUser: Partial<User> | undefined,
+  badgeNumber: string,
+  agency?: AgencyType,
+): User | null {
+  if (!apiUser?.id || !apiUser.role) return null;
+  return {
+    id: apiUser.id,
+    name: apiUser.name ?? badgeNumber.toUpperCase(),
+    badgeNumber: apiUser.badgeNumber ?? badgeNumber.toUpperCase(),
+    email: apiUser.email ?? "",
+    role: apiUser.role,
+    sector: apiUser.sector ?? "",
+    station: apiUser.station ?? "",
+    phone: apiUser.phone ?? "",
+    status: apiUser.status ?? "active",
+    createdAt: apiUser.createdAt ?? new Date().toISOString(),
+    agency: apiUser.agency ?? agency ?? ("frsc" as AgencyType),
+  };
 }
 
 async function auditAuthBlocked(user: User, reason: "inactive" | "suspended") {

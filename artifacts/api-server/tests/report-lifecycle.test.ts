@@ -85,11 +85,13 @@ describe("citizen report lifecycle", () => {
 
 describe("evidence", () => {
   it("creates metadata, uploads a binary, and serves signed downloads", async () => {
-    const { report, reference } = await submitReport();
+    // Submit with a clientId — the submitter's proof for the evidence attach.
+    const clientId = "test-client-lifecycle-1";
+    const { report, reference } = await submitReport({ clientId });
 
     const meta = await request(app)
       .post(`/api/reports/${reference}/evidence`)
-      .send({ kind: "photo", uri: "file:///phone/crash.jpg", fileName: "crash.jpg" });
+      .send({ kind: "photo", uri: "file:///phone/crash.jpg", fileName: "crash.jpg", clientId });
     expect(meta.status).toBe(201);
     const evidenceId = meta.body.id as string;
     expect(meta.body.reportId).toBe(report.id);
@@ -98,12 +100,14 @@ describe("evidence", () => {
     const badUpload = await request(app)
       .put(`/api/reports/${reference}/evidence/${evidenceId}/content`)
       .set("Content-Type", "application/x-msdownload")
+      .set("x-report-client-id", clientId)
       .send(Buffer.from("MZ..."));
     expect(badUpload.status).toBe(415);
 
     const upload = await request(app)
       .put(`/api/reports/${reference}/evidence/${evidenceId}/content`)
       .set("Content-Type", "image/jpeg")
+      .set("x-report-client-id", clientId)
       .send(Buffer.from("FAKEJPEG-TEST-BYTES"));
     expect(upload.status).toBe(200);
     expect(upload.body.sizeBytes).toBe(19);

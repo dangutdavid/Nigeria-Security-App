@@ -46,38 +46,44 @@ as the execution order.
 - [x] GitHub Actions CI ([.github/workflows/ci.yml](../.github/workflows/ci.yml)):
       frozen-lockfile install, workspace typecheck, API + mobile test suites, diff
       hygiene, and a migration job against fresh Postgres 16.
-- [ ] Add ESLint + `typescript-eslint` + `eslint-plugin-security` and wire into CI
-      (commands in [TOOLING.md](TOOLING.md)).
-- [ ] Add the OpenAPI drift check: CI runs `pnpm --filter @workspace/api-spec codegen`
+- [x] Add ESLint + `typescript-eslint` + `eslint-plugin-security` and wire into CI
+      (flat config at `eslint.config.mjs`, scoped to the server/scripts/db).
+- [x] Add the OpenAPI drift check: CI runs `pnpm --filter @workspace/api-spec codegen`
       and fails if `git status --porcelain lib/` is non-empty.
-- [ ] Enable GitHub secret scanning + push protection on the repository.
+- [x] Secret scanning: gitleaks CI job + `.gitleaks.toml` (backstop).
+      **Manual step remaining:** enable GitHub-native secret scanning + push
+      protection in the repo's Settings → Code security (org/repo admin only).
 
 ## Phase 2 — Close the security gaps (blocks any public exposure)
 
 > Derived from E1 and E3. Ordered by severity; items 1–3 are prerequisites for ever
 > pointing a real domain at this API. Details in ARCHITECTURE.md §8.
 
-1. **Remove the legacy `mvp.ts` router from production**
+**Status (July 2026): items 1–7 implemented on the `production-hardening`
+branch, each with regression tests.** The remaining exit criterion is the
+external pentest-style pass.
+
+1. ✅ **Remove the legacy `mvp.ts` router from production**
    (`artifacts/api-server/src/routes/mvp.ts`). It trusts client-supplied
    `x-agency`/`x-user-role` headers and bypasses token auth entirely. Either delete it
    (preferred — the flat model has superseded it) or mount it only when
    `NODE_ENV !== "production"`. Add a test asserting `/api/tenants` 404s in
    production mode.
-2. **Lock down the assistant endpoint**: add `requireAuth` or an aggressive per-IP
+2. ✅ **Lock down the assistant endpoint**: add `requireAuth` or an aggressive per-IP
    rate limit (it proxies paid Anthropic/Gemini calls), plus a max-tokens/day budget
    guard.
-3. **CORS allowlist**: replace open `cors()` with an explicit origin list
+3. ✅ **CORS allowlist**: replace open `cors()` with an explicit origin list
    (native apps send no Origin; the allowlist exists for the web/admin surface).
-4. **Make the server the login authority**: in API mode, a server rejection must fail
+4. ✅ **Make the server the login authority**: in API mode, a server rejection must fail
    the mobile login (today `AuthContext` logs in locally and attaches the API session
    best-effort). Gate demo seeding behind a build flag that is off in production
    profiles.
-5. **Bind evidence attach to the submitter**: require the report's `clientId` (or a
+5. ✅ **Bind evidence attach to the submitter**: require the report's `clientId` (or a
    one-time submission token returned at create) on
    `POST /reports/:ref/evidence` so strangers can't attach files to others' reports.
-6. **Secret rotation**: support `AUTH_SECRET` + `AUTH_SECRET_PREVIOUS` verification so
+6. ✅ **Secret rotation**: support `AUTH_SECRET` + `AUTH_SECRET_PREVIOUS` verification so
    the secret can rotate without invalidating every session at once.
-7. Run `pnpm audit --prod` clean; add it to CI.
+7. ✅ Run `pnpm audit --prod` clean; add it to CI (server tree clean of high/critical via overrides; Expo-toolchain-only advisories explicitly accepted).
 
 **Exit criteria:** external pentest-style pass of every route in ARCHITECTURE.md's
 route table finds no authorization bypass; all Phase 2 items have regression tests.
@@ -87,15 +93,20 @@ route table finds no authorization bypass; all Phase 2 items have regression tes
 > Derived from E4. Do this before real infrastructure so the first deploy is already
 > measurable.
 
-1. Sentry on both sides: `sentry-expo` in the mobile app (release-tagged),
-   `@sentry/node` in the API, joined by the existing `X-Request-Id` correlation id.
-2. Metrics endpoint (Prometheus or provider-native): request rate/latency/error by
-   route, rate-limit rejections, push delivery failures, DB pool saturation.
-3. Alerts: healthz failures, error-rate > budget, p95 latency > budget,
-   push-receipt rejection spikes.
-4. k6 load scripts for the public surface (`POST /citizen-reports` with unique
-   clientIds, `GET /track/:reference`, evidence upload). Record the single-instance
-   ceiling — this number sizes Phase 4's autoscaling.
+1. 🟡 Sentry: `@sentry/node` wired in the API (activates with SENTRY_DSN; errors
+   tagged with the `X-Request-Id` correlation id). **Mobile SDK
+   (`@sentry/react-native`) still to add** — it needs the Expo config plugin and
+   an EAS build, so it lands with Phase 5's first dev build.
+2. ✅ Metrics endpoint: `GET /api/metrics` (Prometheus, Bearer `METRICS_TOKEN`):
+   request rate/latency/error by route, rate-limit rejections by limiter, Node
+   runtime metrics.
+3. 🟡 Alerts: rules authored in
+   [observability/alert-rules.yml](observability/alert-rules.yml) (healthz,
+   error rate, p95, rate-limit spikes, assistant budget, event-loop lag).
+   **Wiring them into a live Prometheus/Grafana needs the Phase 4 infra.**
+4. 🟡 k6 script authored (`scripts/k6/citizen-report-flow.js`: submit → track →
+   evidence, with p95/error thresholds). **The single-instance ceiling still
+   needs an actual run** against a deployed instance.
 
 **Exit criteria:** a induced failure (kill DB, saturate rate limit) pages with a trace
 that names the failing route and instance.
@@ -108,21 +119,24 @@ that names the failing route and instance.
 1. **Managed Postgres** (RDS/Cloud SQL/Neon) with PITR; set `DATABASE_URL` via a
    secret manager; run `pnpm --filter @workspace/db run migrate` as a deploy step
    (CI already proves migrations apply cleanly).
-2. **Redis**: implement the shared backend for `src/lib/rateLimit.ts` counters and
-   the revocation check in `src/lib/auth.ts` (both are small interfaces today).
-   This is the one code change that unlocks N > 1 instances.
-3. **S3/GCS evidence storage**: implement `EvidenceBinaryStorage` (put /
-   createReadStream / exists) against a private bucket; keep the HMAC signed-URL
-   scheme or swap to native presigned URLs.
-4. **Compute**: containerize the API (it builds to a single `dist/index.mjs`);
-   deploy ≥2 instances behind a load balancer with `/api/healthz` as the health
-   check; TLS + WAF/CDN in front with bot rules on the public routes.
+2. ✅ **Redis**: shared backend implemented — set `REDIS_URL` and rate-limit
+   counters become global (atomic Lua fixed-window) and token revocation gets a
+   shared fast path (DB stays the durable record). Redis-down falls back to
+   in-process, never a 500.
+3. ✅ **S3/GCS evidence storage**: S3-compatible `EvidenceBinaryStorage`
+   implemented (AWS S3 / R2 / MinIO via `EVIDENCE_S3_BUCKET`, `EVIDENCE_S3_REGION`
+   or `EVIDENCE_S3_ENDPOINT`); the HMAC signed-URL scheme is kept — the bucket
+   stays private.
+4. 🟡 **Compute**: container built —
+   `docker build -f artifacts/api-server/Dockerfile .` (node:22-alpine,
+   non-root, container HEALTHCHECK on `/api/healthz`), production gates verified
+   in-container. **Deploying ≥2 instances + LB + TLS + WAF is provider work.**
 5. **Secrets**: AUTH_SECRET, DATABASE_URL, ANTHROPIC/GEMINI keys, EXPO_ACCESS_TOKEN
    in the platform secret manager; nothing in env files on disk.
 6. **SMS/email OTP provider** (e.g. Termii/Twilio for Nigerian numbers) as the OTP
    fallback for users without a registered push device — plugs into `deliverOtp` in
    `src/lib/pushDispatch.ts`.
-7. Restore-test a backup into a scratch database; document the runbook.
+7. 🟡 Runbook documented ([RUNBOOK.md](RUNBOOK.md): rotation, backup/restore, Redis, triage, deploy checklist). **The actual restore test needs the managed database.**
 
 **Exit criteria:** two API instances serve traffic simultaneously; killing one loses no
 requests; a token revoked on instance A is rejected by instance B; k6 run from Phase 3

@@ -20,12 +20,14 @@ import { logger } from "../lib/logger";
 const router: IRouter = Router();
 
 const loginLimiter = rateLimit({
+  name: "login",
   windowMs: 15 * 60 * 1000,
   max: 20,
   message: "Too many login attempts. Try again in a few minutes.",
 });
 
 const otpLimiter = rateLimit({
+  name: "otp",
   windowMs: 15 * 60 * 1000,
   max: 5,
   keyFor: (req) => `${req.ip}:${String((req.body as { badgeNumber?: string })?.badgeNumber ?? "")}`,

@@ -1,0 +1,64 @@
+# Prometheus alerting rules for the Nigeria Security App API (roadmap Phase 3.3).
+#
+# Wire into Prometheus via `rule_files`, or translate 1:1 into your provider's
+# alerting (Grafana Cloud, CloudWatch, GCP Monitoring). Budgets are starting
+# points — tighten them once k6 (scripts/k6/) establishes the real baselines.
+#
+# The API exposes /api/metrics (Bearer METRICS_TOKEN) and /api/healthz.
+
+groups:
+  - name: nigeria-security-api
+    rules:
+      # E4: "alerts fire before users notice".
+      - alert: ApiHealthzFailing
+        expr: probe_success{job="healthz"} == 0
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          summary: "API health check failing"
+          description: "/api/healthz has failed for 2 minutes — API instance or database is down."
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+            / sum(rate(http_requests_total[5m])) > 0.02
+        for: 5m
+        labels: { severity: page }
+        annotations:
+          summary: "5xx error rate above 2%"
+          description: "More than 2% of requests are failing server-side over 5 minutes."
+
+      - alert: SlowP95Latency
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(http_request_duration_seconds_bucket[5m]))) > 0.5
+        for: 10m
+        labels: { severity: warn }
+        annotations:
+          summary: "p95 latency above 500ms"
+          description: "Sustained p95 latency regression; check DB pool saturation and slow queries first."
+
+      - alert: RateLimitSpike
+        expr: sum by (limiter) (rate(rate_limit_rejections_total[5m])) > 5
+        for: 10m
+        labels: { severity: warn }
+        annotations:
+          summary: "Sustained rate-limit rejections ({{ $labels.limiter }})"
+          description: "A limiter is rejecting >5 req/s for 10 minutes — abuse wave or a legitimate traffic spike outgrowing the limits."
+
+      - alert: AssistantBudgetNearlyExhausted
+        expr: |
+          sum(rate(http_requests_total{route="/api/assistant/chat",status="503"}[15m])) > 0.1
+        for: 15m
+        labels: { severity: warn }
+        annotations:
+          summary: "Assistant returning 503s (budget or provider outage)"
+          description: "The assistant endpoint is rejecting calls — daily budget exhausted or the LLM provider is down."
+
+      - alert: EventLoopLagHigh
+        expr: nodejs_eventloop_lag_p99_seconds > 0.2
+        for: 5m
+        labels: { severity: warn }
+        annotations:
+          summary: "Node event loop lag p99 > 200ms"
+          description: "The instance is CPU-saturated or blocked; check for synchronous work on the request path."

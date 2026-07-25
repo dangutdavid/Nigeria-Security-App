@@ -13,6 +13,7 @@ import { logger } from "../lib/logger";
 const router: IRouter = Router();
 
 const submitLimiter = rateLimit({
+  name: "citizen_report_submit",
   windowMs: 60 * 60 * 1000,
   max: 30,
   message: "Too many reports submitted from this device. Try again later.",

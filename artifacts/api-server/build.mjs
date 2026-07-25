@@ -68,7 +68,10 @@ async function buildAll() {
       "googleapis",
       "firebase-admin",
       "@parcel/watcher",
-      "@sentry/profiling-node",
+      // Sentry v8 loads OpenTelemetry instrumentations dynamically
+      // (require-in-the-middle) — it must stay a runtime dependency, not be
+      // bundled, or its hooks and otel peers can't resolve.
+      "@sentry/*",
       "@tree-sitter/*",
       "aws-sdk",
       "classic-level",

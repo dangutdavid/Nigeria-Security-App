@@ -240,6 +240,12 @@ export interface EvidenceCreateRequest {
   checksum?: string;
   capturedAt?: string;
   metadata?: EvidenceCreateRequestMetadata;
+  /**
+   * Proof-of-submitter for unauthenticated attaches — must match the clientId the report was submitted with. Authenticated users may omit it.
+   * @minLength 8
+   * @maxLength 128
+   */
+  clientId?: string;
 }
 
 export interface CitizenReportSubmitRequest {

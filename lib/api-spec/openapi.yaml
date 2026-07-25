@@ -472,12 +472,18 @@ paths:
       operationId: uploadReportEvidenceContent
       tags: [evidence]
       summary: Upload the evidence binary
-      description: Raw binary upload (max 15 MB) for previously created evidence metadata. Content-Type must be an allowed image/video/audio/pdf type.
+      description: Raw binary upload (max 15 MB) for previously created evidence metadata. Content-Type must be an allowed image/video/audio/pdf type. Unauthenticated uploads must present the report's clientId in the x-report-client-id header.
       parameters:
         - $ref: "#/components/parameters/ReportIdParam"
         - name: evidenceId
           in: path
           required: true
+          schema:
+            type: string
+        - name: x-report-client-id
+          in: header
+          required: false
+          description: Proof-of-submitter for unauthenticated uploads — the clientId the report was submitted with.
           schema:
             type: string
       requestBody:
@@ -1541,6 +1547,11 @@ components:
         metadata:
           type: object
           additionalProperties: true
+        clientId:
+          type: string
+          minLength: 8
+          maxLength: 128
+          description: Proof-of-submitter for unauthenticated attaches — must match the clientId the report was submitted with. Authenticated users may omit it.
       required: [kind, uri]
     EvidenceMetadata:
       allOf:
