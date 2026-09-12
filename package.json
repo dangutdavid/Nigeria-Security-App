@@ -17,7 +17,7 @@
     "eslint": "^9",
     "eslint-plugin-security": "^3",
     "globals": "^15",
-    "prettier": "^3.8.1",
+    "prettier": "^3.9.6",
     "typescript": "~5.9.2",
     "typescript-eslint": "^8"
   },
