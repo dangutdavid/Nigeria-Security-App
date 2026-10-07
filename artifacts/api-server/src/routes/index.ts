@@ -3,6 +3,7 @@ import healthRouter from "./health";
 import metricsRouter from "./metrics";
 import authRouter from "./auth";
 import mfaRouter from "./mfa";
+import privacyRouter from "./privacy";
 import adminUsersRouter from "./admin-users";
 import citizenReportsRouter from "./citizen-reports";
 import reportsRouter from "./reports";
@@ -23,6 +24,8 @@ router.use(metricsRouter);
 router.use(authRouter);
 // Two-factor: login second step, enrolment, recovery codes, admin reset.
 router.use(mfaRouter);
+// Data-subject rights (export / erasure) and staff self-export.
+router.use(privacyRouter);
 // Admin user-management endpoints (admin/super_admin only).
 router.use(adminUsersRouter);
 // Mounted before the MVP router so the mobile-aligned citizen report endpoints

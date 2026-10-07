@@ -9,7 +9,8 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:db": "vitest run --config vitest.db.config.ts"
+    "test:db": "vitest run --config vitest.db.config.ts",
+    "retention": "node --enable-source-maps ./dist/retention.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",

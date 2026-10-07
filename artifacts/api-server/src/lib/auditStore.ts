@@ -35,6 +35,8 @@ export interface AuditFilter {
   type?: string;
   severity?: AuditSeverity;
   agency?: string;
+  /** Only events performed by this user (data-subject access export). */
+  actorUserId?: string;
   limit?: number;
 }
 
@@ -69,7 +71,8 @@ class InMemoryAuditStore implements AuditStore {
         (r) =>
           (!filter?.type || r.type === filter.type) &&
           (!filter?.severity || r.severity === filter.severity) &&
-          (!filter?.agency || r.actorAgency === filter.agency),
+          (!filter?.agency || r.actorAgency === filter.agency) &&
+          (!filter?.actorUserId || r.actorUserId === filter.actorUserId),
       )
       .slice(0, filter?.limit ?? DEFAULT_LIMIT);
   }
@@ -121,6 +124,7 @@ class DbAuditStore implements AuditStore {
     if (filter?.type) conditions.push(eq(auditEvents.type, filter.type));
     if (filter?.severity) conditions.push(eq(auditEvents.severity, filter.severity));
     if (filter?.agency) conditions.push(eq(auditEvents.actorAgency, filter.agency));
+    if (filter?.actorUserId) conditions.push(eq(auditEvents.actorUserId, filter.actorUserId));
     const rows = await this.db
       .select()
       .from(auditEvents)

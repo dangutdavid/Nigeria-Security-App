@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Readable } from "node:stream";
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -23,6 +24,8 @@ export interface EvidenceBinaryStorage {
   put(key: string, data: Buffer): Promise<void>;
   createReadStream(key: string): Promise<Readable | null>;
   exists(key: string): Promise<boolean>;
+  /** Permanently remove a binary (erasure / retention). Missing keys are not an error. */
+  delete(key: string): Promise<void>;
 }
 
 class LocalDiskEvidenceStorage implements EvidenceBinaryStorage {
@@ -56,6 +59,9 @@ class LocalDiskEvidenceStorage implements EvidenceBinaryStorage {
     } catch {
       return false;
     }
+  }
+  async delete(key: string): Promise<void> {
+    await rm(this.resolve(key), { force: true });
   }
 }
 
@@ -112,6 +118,9 @@ class S3EvidenceStorage implements EvidenceBinaryStorage {
     } catch {
       return false;
     }
+  }
+  async delete(key: string): Promise<void> {
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: this.objectKey(key) }));
   }
 }
 

@@ -87,6 +87,35 @@ export interface CitizenReportStore {
     action: string,
     actorName: string | undefined,
   ): Promise<CitizenReportRecord | undefined>;
+  /**
+   * Erasure / retention: strip personal data (free text, precise location,
+   * vehicle plate, photo, device id, actor names and notes in the timeline)
+   * while keeping the non-identifying facts (type, severity, agency, state/LGA,
+   * status, dates) for statistics. Irreversible.
+   */
+  anonymize(id: string, reason: string): Promise<CitizenReportRecord | undefined>;
+}
+
+export const ANONYMIZED_TEXT = "[Removed under data-protection request or retention policy]";
+
+/** Pure transform shared by both stores. */
+export function anonymizedFields(record: Pick<CitizenReportRecord, "timeline">, reason: string) {
+  const at = new Date().toISOString();
+  return {
+    description: ANONYMIZED_TEXT,
+    location: "[removed]",
+    address: undefined,
+    latitude: undefined,
+    longitude: undefined,
+    accuracy: undefined,
+    vehicleRegistration: undefined,
+    photoUri: undefined,
+    clientId: undefined,
+    timeline: [
+      ...record.timeline.map((e) => ({ id: e.id, action: e.action.length > 60 ? "Update" : e.action, by: "redacted", timestamp: e.timestamp })),
+      { id: randomUUID(), action: `Personal data removed (${reason})`, by: "system", timestamp: at },
+    ] as CitizenReportTimelineEntry[],
+  };
 }
 
 const AGENCY_LABELS: Record<string, string> = {
@@ -346,6 +375,13 @@ class InMemoryCitizenReportStore implements CitizenReportStore {
     report.timeline.push({ id: randomUUID(), action, by: actorName ?? "Agency", timestamp: nowIso() });
     return report;
   }
+
+  async anonymize(id: string, reason: string): Promise<CitizenReportRecord | undefined> {
+    const report = this.reports.find((r) => r.id === id);
+    if (!report) return undefined;
+    Object.assign(report, anonymizedFields(report, reason));
+    return report;
+  }
 }
 
 function mapRow(row: typeof citizenReports.$inferSelect): CitizenReportRecord {
@@ -524,6 +560,29 @@ class DrizzleCitizenReportStore implements CitizenReportStore {
       .where(eq(citizenReports.id, report.id))
       .returning();
     return row ? mapRow(row) : undefined;
+  }
+
+  async anonymize(id: string, reason: string): Promise<CitizenReportRecord | undefined> {
+    const [row] = await this.db.select().from(citizenReports).where(eq(citizenReports.id, id)).limit(1);
+    if (!row) return undefined;
+    const f = anonymizedFields(mapRow(row), reason);
+    await this.db
+      .update(citizenReports)
+      .set({
+        description: f.description,
+        location: f.location,
+        address: null,
+        latitude: null,
+        longitude: null,
+        accuracy: null,
+        vehicleRegistration: null,
+        photoUri: null,
+        clientId: null,
+        timeline: f.timeline,
+        updatedAt: new Date(),
+      })
+      .where(eq(citizenReports.id, id));
+    return { ...mapRow(row), ...f };
   }
 }
 

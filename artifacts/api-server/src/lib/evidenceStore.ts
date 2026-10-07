@@ -47,6 +47,8 @@ export interface EvidenceStore {
     id: string,
     patch: { storageKey: string; mimeType?: string; sizeBytes: number; checksum: string },
   ): Promise<EvidenceRecord | undefined>;
+  /** Erasure: remove all evidence rows of a report; returns the deleted records. */
+  deleteByReport(reportId: string): Promise<EvidenceRecord[]>;
 }
 
 function nowIso(): string {
@@ -85,6 +87,12 @@ class InMemoryEvidenceStore implements EvidenceStore {
     record.sizeBytes = patch.sizeBytes;
     record.checksum = patch.checksum;
     return record;
+  }
+
+  async deleteByReport(reportId: string): Promise<EvidenceRecord[]> {
+    const removed = this.records.filter((r) => r.reportId === reportId);
+    for (const r of removed) this.records.splice(this.records.indexOf(r), 1);
+    return removed;
   }
 }
 
@@ -163,6 +171,12 @@ class DbEvidenceStore implements EvidenceStore {
       .where(eq(citizenReportEvidence.id, id))
       .returning();
     return row ? rowToRecord(row) : undefined;
+  }
+
+  async deleteByReport(reportId: string): Promise<EvidenceRecord[]> {
+    const removed = await this.listByReport(reportId);
+    if (removed.length) await this.db.delete(citizenReportEvidence).where(eq(citizenReportEvidence.reportId, reportId));
+    return removed;
   }
 }
 
