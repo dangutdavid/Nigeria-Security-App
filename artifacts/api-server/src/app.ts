@@ -7,6 +7,7 @@ import { logger } from "./lib/logger";
 import { requestMetrics } from "./lib/metrics";
 import { initSentry } from "./lib/sentry";
 import { attachAuth } from "./middlewares/authMiddleware";
+import { dbContext } from "./middlewares/dbContext";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler";
 import { rejectPollutedBodies, securityHeaders } from "./middlewares/securityHeaders";
 
@@ -51,6 +52,9 @@ app.use(rejectPollutedBodies);
 
 // Parse the bearer token (if any) and attach verified claims before routing.
 app.use(attachAuth);
+
+// Stamp the caller's identity on its database connection (row-level security).
+app.use(dbContext);
 
 app.use("/api", router);
 

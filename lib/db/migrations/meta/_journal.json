@@ -29,6 +29,13 @@
       "when": 1783244538514,
       "tag": "0003_lethal_paibok",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791360302791,
+      "tag": "0004_row_level_security",
+      "breakpoints": true
     }
   ]
 }

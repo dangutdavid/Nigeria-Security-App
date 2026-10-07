@@ -1,6 +1,6 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { and, eq, lt, type SQL } from "drizzle-orm";
-import { getDb, isDbConfigured, authUsers, revokedTokens, type Database } from "@workspace/db";
+import { getDb, isDbConfigured, runAsSystem, authUsers, revokedTokens, type Database } from "@workspace/db";
 import { hashPin, verifyPin } from "./password";
 import { getRedis } from "./redis";
 import { logger } from "./logger";
@@ -374,6 +374,8 @@ const SEED_USERS: SeedUser[] = [
   { id: "demo-nscdc-cmd", name: "Commandant Peter Ade", badgeNumber: "NSCDC-CMD", agency: "civil_defence", role: "commander", pin: DEMO_PIN, station: "NSCDC Headquarters", sector: "National Command" },
 ];
 
+const SEED_BADGES = new Set(SEED_USERS.map((u) => u.badgeNumber));
+
 const MANAGEMENT_UNSUPPORTED = "User management requires DATABASE_URL (DB-backed auth). Not supported in demo mode.";
 
 // ---- Demo (in-memory) repository -------------------------------------------
@@ -486,11 +488,15 @@ class DbUserRepository implements UserRepository {
       .limit(1);
 
     if (row) {
+      // Demo accounts may already sit in the database (seeded in dev/staging,
+      // or a promoted staging DB). When demo auth is disabled they must not
+      // authenticate, regardless of what the table holds.
+      if (!demoAuthEnabled() && SEED_BADGES.has(row.badgeNumber)) return { ok: false, reason: "invalid" };
       if (agency && row.agency !== agency) return { ok: false, reason: "invalid" };
       if (!verifyPin(pin, row.pinHash)) return { ok: false, reason: "invalid" };
       if (!row.isActive) return { ok: false, reason: "inactive" };
       // Best-effort last-login stamp (non-fatal).
-      this.db
+      await this.db
         .update(authUsers)
         .set({ lastLoginAt: new Date() })
         .where(eq(authUsers.id, row.id))
@@ -629,7 +635,8 @@ export const userRepository: UserRepository = createUserRepository();
  */
 export async function initAuth(): Promise<void> {
   try {
-    await userRepository.seedDefaults();
+    // PRIVILEGE BOUNDARY: startup seeding has no end-user caller.
+    await runAsSystem(() => userRepository.seedDefaults());
   } catch (err) {
     logger.error({ err }, "Auth seeding failed — login may be limited until the database is reachable");
   }
@@ -640,5 +647,18 @@ export async function initAuth(): Promise<void> {
  * Returns an outcome distinguishing invalid credentials from an inactive account.
  */
 export function authenticate(badgeNumber: string, pin: string, agency?: string): Promise<AuthOutcome> {
-  return userRepository.authenticate(badgeNumber, pin, agency);
+  // PRIVILEGE BOUNDARY: credentials are verified before any session exists, so
+  // the lookup runs as 'system'. It returns only the authenticated user (or a
+  // failure reason) — never other rows.
+  return runAsSystem(() => userRepository.authenticate(badgeNumber, pin, agency));
+}
+
+/** Pre-session lookup for the OTP flow (PRIVILEGE BOUNDARY, see authenticate). */
+export function findUserByBadgeForRecovery(badgeNumber: string) {
+  return runAsSystem(() => userRepository.findByBadge(badgeNumber));
+}
+
+/** Pre-session PIN reset after a verified OTP grant (PRIVILEGE BOUNDARY). */
+export function resetPinByBadgeForRecovery(badgeNumber: string, newPin: string) {
+  return runAsSystem(() => userRepository.resetPinByBadge(badgeNumber, newPin));
 }

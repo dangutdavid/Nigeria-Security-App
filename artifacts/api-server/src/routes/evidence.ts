@@ -1,4 +1,5 @@
 import express, { Router, type IRouter, type Response } from "express";
+import { setScopedLookup } from "@workspace/db";
 import { z } from "zod";
 import { citizenReportStore, currentAgency } from "../lib/citizenReportStore";
 import {
@@ -161,15 +162,18 @@ router.put(
         res.status(400).json({ error: "Empty upload body." });
         return;
       }
+      // Same submitter binding as metadata create; the raw body can't carry a
+      // clientId, so unauthenticated uploads present it as a header. With RLS,
+      // presenting it is also what makes the report visible to an anonymous
+      // caller at all — without it the rows don't exist for them (404).
+      const presentedClientId = req.header("x-report-client-id")?.trim() || undefined;
+      if (presentedClientId) await setScopedLookup("client_id", presentedClientId);
       const record = await evidenceStore.findById(String(req.params.evidenceId));
       const report = await citizenReportStore.findByIdOrReference(String(req.params.reportId));
       if (!record || !report || record.reportId !== report.id) {
         res.status(404).json({ error: "Evidence metadata not found for this report." });
         return;
       }
-      // Same submitter binding as metadata create; the raw body can't carry a
-      // clientId, so unauthenticated uploads present it as a header.
-      const presentedClientId = req.header("x-report-client-id")?.trim() || undefined;
       if (!canAttachEvidence(req, report, presentedClientId)) {
         res.status(403).json({
           error: "Evidence can only be uploaded by the report's submitter (matching clientId) or an authenticated user.",
@@ -251,6 +255,8 @@ router.get("/evidence-files/:evidenceId", async (req, res) => {
       res.status(403).json({ error: "Invalid or expired download link." });
       return;
     }
+    // RLS: the verified signature grants exactly this one evidence row.
+    await setScopedLookup("evidence_id", req.params.evidenceId);
     const record = await evidenceStore.findById(req.params.evidenceId);
     if (!record?.storageKey) {
       res.status(404).json({ error: "Evidence binary not found." });

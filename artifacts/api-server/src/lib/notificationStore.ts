@@ -213,9 +213,11 @@ class DrizzleNotificationStore implements NotificationStore {
   constructor(private readonly db: Database) {}
 
   async create(input: NotificationCreate): Promise<NotificationRecord> {
-    const [row] = await this.db
-      .insert(citizenNotifications)
-      .values({
+    // Server-generated record: id/timestamp minted here so the insert needs no
+    // read-back (RLS lets any context append, but not read other tenants' rows).
+    const row = {
+      id: randomUUID(),
+      createdAt: new Date(),
         type: input.type,
         audience: input.audience,
         title: input.title,
@@ -229,8 +231,8 @@ class DrizzleNotificationStore implements NotificationStore {
         priority: input.priority ?? "normal",
         sourceAgency: input.sourceAgency ?? null,
         metadata: input.metadata ?? null,
-      })
-      .returning();
+    } as typeof citizenNotifications.$inferSelect;
+    await this.db.insert(citizenNotifications).values(row);
     return notificationRow(row);
   }
 

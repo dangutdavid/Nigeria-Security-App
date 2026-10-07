@@ -53,7 +53,10 @@ describe("evidence attach is bound to the submitter", () => {
       .put(`/api/reports/${reference}/evidence/${meta.body.id}/content`)
       .set("Content-Type", "image/jpeg")
       .send(Buffer.from("SNEAKY-BYTES"));
-    expect(upload.status).toBe(403);
+    // In-memory mode answers 403 (submitter check). With Postgres RLS the
+    // report is invisible to an anonymous caller who presents no clientId, so
+    // the server can't even confirm it exists: 404. Both deny the upload.
+    expect([403, 404]).toContain(upload.status);
   });
 
   it("rejects anonymous attaches to reports submitted without a clientId", async () => {

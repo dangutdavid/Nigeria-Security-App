@@ -97,9 +97,11 @@ class DbAuditStore implements AuditStore {
   constructor(private readonly db: NonNullable<ReturnType<typeof getDb>>) {}
 
   async record(input: AuditEventInput): Promise<AuditEventRecord> {
-    const [row] = await this.db
-      .insert(auditEvents)
-      .values({
+    // Server-generated record: id/timestamp minted here so the insert needs no
+    // read-back (RLS lets any context append, but not read other tenants' rows).
+    const row = {
+      id: randomUUID(),
+      createdAt: new Date(),
         type: input.type,
         title: input.title,
         detail: input.detail,
@@ -109,8 +111,8 @@ class DbAuditStore implements AuditStore {
         targetId: input.targetId,
         reportReference: input.reportReference,
         metadata: input.metadata,
-      })
-      .returning();
+    } as typeof auditEvents.$inferSelect;
+    await this.db.insert(auditEvents).values(row);
     return rowToRecord(row);
   }
 

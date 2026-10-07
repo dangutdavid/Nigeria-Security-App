@@ -4,6 +4,7 @@ import {
   citizenReports,
   getDb,
   isDbConfigured,
+  setScopedLookup,
   type Database,
 } from "@workspace/db";
 import type {
@@ -380,6 +381,9 @@ class DrizzleCitizenReportStore implements CitizenReportStore {
     // Idempotency: a retry carrying the same clientId returns the original
     // report instead of creating a duplicate (unique index on client_id).
     if (input.clientId) {
+      // RLS: an anonymous submitter may see only the report bearing its own
+      // offline clientId.
+      await setScopedLookup("client_id", input.clientId);
       const [existing] = await this.db
         .select()
         .from(citizenReports)
@@ -391,11 +395,15 @@ class DrizzleCitizenReportStore implements CitizenReportStore {
     // Random references collide with ~1e-9 probability per attempt; the unique
     // index is the arbiter and one retry absorbs the residual case.
     for (let attempt = 0; ; attempt += 1) {
+      const reference = makeReference(input.suggestedAgency);
+      // RLS: let the (possibly anonymous) submitter read back the one row it is
+      // creating — INSERT ... RETURNING is checked against the read policy.
+      await setScopedLookup("reference", reference);
       try {
         const [row] = await this.db
           .insert(citizenReports)
           .values({
-            reference: makeReference(input.suggestedAgency),
+            reference,
             clientId: input.clientId ?? null,
             incidentType: input.incidentType,
             description: input.description,
@@ -426,6 +434,8 @@ class DrizzleCitizenReportStore implements CitizenReportStore {
   }
 
   async findByReference(reference: string): Promise<CitizenReportRecord | undefined> {
+    // RLS: a citizen tracking by reference may see only that one report.
+    await setScopedLookup("reference", reference.trim());
     const rows = await this.db
       .select()
       .from(citizenReports)

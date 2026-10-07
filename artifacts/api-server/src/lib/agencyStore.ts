@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { getDb, isDbConfigured, agencies } from "@workspace/db";
+import { getDb, isDbConfigured, runAsSystem, agencies } from "@workspace/db";
 import { logger } from "./logger";
 
 export interface AgencyRecord {
@@ -238,7 +238,8 @@ export const agencyStore: AgencyStore = createAgencyStore();
 
 export async function initAgencies(): Promise<void> {
   try {
-    await agencyStore.seedDefaults();
+    // PRIVILEGE BOUNDARY: startup seeding has no end-user caller.
+    await runAsSystem(() => agencyStore.seedDefaults());
   } catch (err) {
     logger.error({ err }, "Agency seeding failed");
   }

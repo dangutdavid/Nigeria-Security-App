@@ -3,11 +3,12 @@ import { z } from "zod";
 import { AuthLoginSchema } from "@workspace/api-zod";
 import {
   authenticate,
+  findUserByBadgeForRecovery,
+  resetPinByBadgeForRecovery,
   capabilitiesForRole,
   isTokenRevoked,
   revokeToken,
   signToken,
-  userRepository,
   verifyToken,
 } from "../lib/auth";
 import { recordAuditEvent } from "../lib/auditStore";
@@ -160,7 +161,7 @@ router.post("/auth/otp/request", otpLimiter, async (req, res) => {
     res.status(400).json({ error: "Validation failed", issues: parsed.error.flatten() });
     return;
   }
-  const user = await userRepository.findByBadge(parsed.data.badgeNumber);
+  const user = await findUserByBadgeForRecovery(parsed.data.badgeNumber);
   if (!user) {
     res.json({ result: "not_found" });
     return;
@@ -219,7 +220,7 @@ router.post("/auth/pin/reset", loginLimiter, async (req, res) => {
     return;
   }
   try {
-    const ok = await userRepository.resetPinByBadge(parsed.data.badgeNumber, parsed.data.newPin);
+    const ok = await resetPinByBadgeForRecovery(parsed.data.badgeNumber, parsed.data.newPin);
     recordAuditEvent({
       type: "auth",
       title: ok ? "PIN reset" : "PIN reset failed",
