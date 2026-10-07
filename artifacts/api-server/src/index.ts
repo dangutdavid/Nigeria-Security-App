@@ -3,6 +3,7 @@ import { initAuth } from "./lib/auth";
 import { initAgencies } from "./lib/agencyStore";
 import { logger } from "./lib/logger";
 import { assertDatabaseRoleEnforcesRls } from "./lib/dbSafety";
+import { startHeartbeat } from "./lib/betterStack";
 
 const rawPort = process.env["PORT"];
 const fallbackPort = process.env["API_PORT"] ?? "8081";
@@ -29,6 +30,8 @@ async function start(): Promise<void> {
     }
 
     logger.info({ port }, "Server listening");
+    // Dead-man's switch for Better Stack Uptime (no-op unless configured).
+    startHeartbeat((err) => logger.warn({ err }, "Better Stack heartbeat failed"));
   });
 }
 
