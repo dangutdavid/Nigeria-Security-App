@@ -13,6 +13,7 @@ import {
 } from "../lib/auth";
 import { recordAuditEvent } from "../lib/auditStore";
 import { createChallenge, getMfaStatusForLogin } from "../lib/mfa";
+import { clearLoginFailures, isLockedOut, lockoutMinutes, recordLoginFailure } from "../lib/accountLockout";
 import { consumeResetGrant, issueOtp, verifyOtp } from "../lib/otpStore";
 import { rateLimit } from "../lib/rateLimit";
 import { deliverOtp } from "../lib/pushDispatch";
@@ -44,8 +45,24 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
     res.status(400).json({ error: "Validation failed", issues: result.error.flatten() });
     return;
   }
+  if (await isLockedOut(result.data.badgeNumber)) {
+    res.setHeader("Retry-After", String(lockoutMinutes() * 60));
+    res.status(429).json({
+      error: `Too many failed attempts. This account is locked for ${lockoutMinutes()} minutes.`,
+      code: "account_locked",
+    });
+    return;
+  }
   const outcome = await authenticate(result.data.badgeNumber, result.data.pin, result.data.agency);
   if (!outcome.ok) {
+    if (await recordLoginFailure(result.data.badgeNumber)) {
+      recordAuditEvent({
+        type: "auth",
+        title: "Account locked",
+        detail: `Badge ${result.data.badgeNumber.toUpperCase()} locked after repeated failed sign-ins`,
+        severity: "critical",
+      });
+    }
     recordAuditEvent({
       type: "auth",
       title: "Login failed",
@@ -60,6 +77,7 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
     return;
   }
   const { user } = outcome;
+  await clearLoginFailures(result.data.badgeNumber);
   recordAuditEvent({
     type: "auth",
     title: "Login",

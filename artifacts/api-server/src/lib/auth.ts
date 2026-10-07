@@ -44,7 +44,13 @@ export interface SignTokenOptions {
 }
 
 const DEMO_PIN = "1234";
-const TOKEN_TTL_MS = 1000 * 60 * 60 * 12; // 12h
+// Session lifetime (default 12h, one field shift). Shorten via SESSION_TTL_HOURS
+// for stricter environments; the mobile app also signs staff out after a
+// period in the background (EXPO_PUBLIC_IDLE_LOGOUT_MINUTES).
+const TOKEN_TTL_MS = (() => {
+  const hours = Number(process.env.SESSION_TTL_HOURS);
+  return (Number.isFinite(hours) && hours > 0 ? hours : 12) * 60 * 60 * 1000;
+})();
 
 /**
  * Demo credentials — the fixed-PIN seed users (FO-001/1234 …) and the dynamic

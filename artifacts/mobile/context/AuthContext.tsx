@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
 
 import { createAuditEvent } from "@/services/auditLogService";
 import { clearApiSession, establishApiSession, validateApiSession, type MfaMethod } from "@/services/authRepository";
@@ -325,6 +326,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [apiSessionEstablished, setApiSessionEstablished] = useState(false);
   const [pendingMfa, setPendingMfa] = useState<PendingMfa | null>(null);
+  const backgroundedAt = useRef<number | null>(null);
   const [mfaEnrollmentRequired, setMfaEnrollmentRequired] = useState(false);
   const [records, setRecords] = useState<UserRecord[]>(SEED_RECORDS);
 
@@ -505,6 +507,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const res = await sendMfaSms(pendingMfa.challengeToken);
     return res.ok ? { ok: true as const, ...res.data } : { ok: false as const, error: res.error };
   }
+
+  // Automatic logoff (HIPAA §164.312(a)(2)(iii)): a staff session ends when the
+  // app returns from the background after the idle limit, so an unattended or
+  // lost phone doesn't stay signed in. Citizens have no session to protect.
+  useEffect(() => {
+    const limitMs = Number(process.env.EXPO_PUBLIC_IDLE_LOGOUT_MINUTES ?? 15) * 60 * 1000;
+    if (!user || user.role === "citizen" || !(limitMs > 0)) return;
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "background" || state === "inactive") {
+        backgroundedAt.current ??= Date.now();
+        return;
+      }
+      if (state === "active") {
+        const since = backgroundedAt.current;
+        backgroundedAt.current = null;
+        if (since !== null && Date.now() - since >= limitMs) {
+          void createAuditEvent({
+            type: "auth.logout",
+            title: "Automatic sign-out",
+            detail: `${user.name} was signed out after inactivity.`,
+            actor: { id: user.id, name: user.name, agency: user.agency, role: user.role },
+            agency: user.agency,
+            severity: "info",
+          });
+          void logout();
+        }
+      }
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   async function logout() {
     const previousUser = user;
