@@ -28,7 +28,22 @@
       "qs": "^6.15.2",
       "protobufjs": "^7.6.5",
       "body-parser": "^2.3.0",
-      "postcss": "^8.5.18"
+      "postcss": "^8.5.18",
+      "proxy-addr": "^2.0.8",
+      "fast-uri@^3": "^3.1.7",
+      "brace-expansion@^5": "^5.0.11",
+      "brace-expansion@^2": "^2.1.6",
+      "brace-expansion@^1": "^1.1.20",
+      "js-yaml@^3": "^3.15.2",
+      "js-yaml@^4": "^4.3.2",
+      "nanoid@^3": "^3.3.18",
+      "tar@^7": "^7.5.21",
+      "browserslist@^4": "^4.28.7",
+      "undici@^6": "^6.28.1",
+      "source-map-js@^1": "^1.2.2",
+      "compression@^1": "^1.8.2",
+      "@xmldom/xmldom@~0.8": "~0.8.15",
+      "@xmldom/xmldom@~0.9": "~0.9.12"
     },
     "auditConfig": {
       "ignoreGhsas": [
@@ -45,7 +60,11 @@
         "GHSA-v2hh-gcrm-f6hx",
         "GHSA-4c8g-83qw-93j6",
         "GHSA-6g55-p6wh-862q",
-        "GHSA-mh99-v99m-4gvg"
+        "GHSA-mh99-v99m-4gvg",
+        "GHSA-5p2g-fcmc-qvqq",
+        "GHSA-w3rx-r6r6-pgpr",
+        "GHSA-86w9-cpqp-85rv",
+        "GHSA-vfj7-8cjw-p6xm"
       ]
     }
   }
