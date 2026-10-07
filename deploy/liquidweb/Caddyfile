@@ -1,0 +1,32 @@
+{
+	email {$ACME_EMAIL}
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$API_DOMAIN} {
+	# TLS: automatic Let's Encrypt certificates, TLS 1.2+ (Caddy defaults).
+	encode gzip
+	request_body {
+		max_size 26MB   # evidence uploads; the API enforces its own per-type limits
+	}
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "geolocation=(), camera=(), microphone=()"
+		-Server
+	}
+	# /api/metrics is for the Prometheus scraper only — never public.
+	@metrics path /api/metrics
+	respond @metrics 404
+	reverse_proxy api:8082 {
+		header_up X-Request-Id {http.request.uuid}
+	}
+	log {
+		output stdout
+		format json
+	}
+}

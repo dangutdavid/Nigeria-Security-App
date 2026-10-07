@@ -17,6 +17,17 @@ initSentry();
 
 const app: Express = express();
 
+// Client IP behind a reverse proxy. Rate limits and lockouts key on req.ip, so
+// behind Caddy/a load balancer every request would otherwise share the proxy's
+// IP (one abuser could throttle everyone). Set TRUST_PROXY to the number of
+// proxy hops (e.g. "1") or the proxy subnets ("loopback, 172.16.0.0/12").
+// Unset = trust nothing, so a directly exposed server can't be fooled by a
+// forged X-Forwarded-For header.
+const trustProxy = process.env["TRUST_PROXY"]?.trim();
+if (trustProxy) {
+  app.set("trust proxy", /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
+}
+
 app.use(
   pinoHttp({
     logger,

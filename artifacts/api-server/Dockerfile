@@ -5,8 +5,8 @@
 #   docker build -f artifacts/api-server/Dockerfile -t nigeria-security-api .
 #
 # Run:
-#   docker run -p 8081:8081 \
-#     -e NODE_ENV=production -e PORT=8081 \
+#   docker run -p 8082:8082 \
+#     -e NODE_ENV=production -e PORT=8082 \
 #     -e AUTH_SECRET=... -e DATABASE_URL=... -e REDIS_URL=... \
 #     -e EVIDENCE_S3_BUCKET=... -e CORS_ALLOWED_ORIGINS=... \
 #     nigeria-security-api
@@ -30,7 +30,14 @@ RUN pnpm install --frozen-lockfile --filter @workspace/api-server... --filter .
 # Build workspace lib declarations, then the server bundle.
 RUN pnpm run typecheck:libs && pnpm --filter @workspace/api-server run build
 
+# One-shot migration image (has drizzle-kit). Run as the table OWNER, never as
+# the runtime role:  docker build --target migrate -t nsa-migrate . &&
+#   docker run --rm -e DATABASE_URL=postgres://nsa_owner:...@db/nsa nsa-migrate
+FROM build AS migrate
+CMD ["pnpm", "--filter", "@workspace/db", "run", "migrate"]
+
 # Re-resolve to production-only dependencies for the runtime layer.
+FROM build AS prod-deps
 RUN pnpm install --frozen-lockfile --prod --ignore-scripts --filter @workspace/api-server... --filter .
 
 FROM node:22-alpine AS runtime
@@ -39,19 +46,20 @@ RUN addgroup -S api && adduser -S api -G api
 WORKDIR /workspace
 
 # Preserve the pnpm workspace layout so externalized imports resolve.
-COPY --from=build /workspace/node_modules ./node_modules
-COPY --from=build /workspace/lib ./lib
-COPY --from=build /workspace/package.json ./package.json
-COPY --from=build /workspace/artifacts/api-server/package.json ./artifacts/api-server/package.json
-COPY --from=build /workspace/artifacts/api-server/node_modules ./artifacts/api-server/node_modules
-COPY --from=build /workspace/artifacts/api-server/dist ./artifacts/api-server/dist
+COPY --from=prod-deps /workspace/node_modules ./node_modules
+COPY --from=prod-deps /workspace/lib ./lib
+COPY --from=prod-deps /workspace/package.json ./package.json
+COPY --from=prod-deps /workspace/artifacts/api-server/package.json ./artifacts/api-server/package.json
+COPY --from=prod-deps /workspace/artifacts/api-server/node_modules ./artifacts/api-server/node_modules
+COPY --from=prod-deps /workspace/artifacts/api-server/dist ./artifacts/api-server/dist
 
 USER api
 WORKDIR /workspace/artifacts/api-server
-EXPOSE 8081
+EXPOSE 8082
 
 # The LB should use /api/healthz; this container-level check backs it up.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://localhost:'+(process.env.PORT||8081)+'/api/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://localhost:'+(process.env.PORT||8082)+'/api/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
+# Retention job: same image, `node dist/retention.mjs` (see deploy/liquidweb).
 CMD ["node", "--enable-source-maps", "dist/index.mjs"]

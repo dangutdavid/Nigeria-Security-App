@@ -66,3 +66,7 @@ artifacts/api-server/data/
 .dev-stack/
 # Salesforce CLI metadata (unrelated tooling)
 .sf/
+
+# production secrets — never commit
+deploy/liquidweb/secrets/
+deploy/liquidweb/.env

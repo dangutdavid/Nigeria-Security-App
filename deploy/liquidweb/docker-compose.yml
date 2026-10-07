@@ -1,0 +1,112 @@
+# Production stack for a Liquid Web dedicated server / VPS (HIPAA-eligible
+# plan, BAA signed — see README.md). Everything runs on one host; split the
+# database onto its own server when load requires it.
+#
+#   Internet ──443──► caddy (TLS, HSTS, headers) ──► api ──► postgres / redis
+#                                                      (internal network only)
+#
+# Secrets come from ./secrets/*.env (chmod 600, never committed).
+name: nsa
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+services:
+  caddy:
+    <<: *hardening
+    image: caddy:2.8-alpine
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    networks: [edge]
+    depends_on: [api]
+
+  api:
+    <<: *hardening
+    image: ${API_IMAGE:-nsa-api:latest}
+    env_file: [./secrets/api.env]
+    environment:
+      NODE_ENV: production
+      PORT: "8082"
+      DATABASE_SSL: ""          # same-host private network; set verify-full if DB moves off-host
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    mem_limit: 1g
+    networks: [edge, internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  postgres:
+    <<: *hardening
+    image: postgres:16-alpine
+    env_file: [./secrets/postgres.env]   # POSTGRES_USER=nsa_owner, POSTGRES_PASSWORD, POSTGRES_DB
+    environment:
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --data-checksums"
+    command:
+      - postgres
+      - -c
+      - password_encryption=scram-sha-256
+      - -c
+      - log_connections=on
+      - -c
+      - log_disconnections=on
+      - -c
+      - log_statement=ddl
+    volumes:
+      # Host path MUST be on the LUKS-encrypted volume (README step 3).
+      - /srv/nsa/encrypted/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      retries: 10
+    networks: [internal]
+
+  redis:
+    <<: *hardening
+    image: redis:7-alpine
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --save '' --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru"]
+    env_file: [./secrets/redis.env]       # REDIS_PASSWORD
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
+      interval: 10s
+      retries: 10
+    networks: [internal]
+
+  # One-shot jobs (docker compose run --rm <job>):
+  migrate:
+    image: ${MIGRATE_IMAGE:-nsa-migrate:latest}
+    env_file: [./secrets/migrate.env]     # DATABASE_URL as the OWNER role
+    networks: [internal]
+    profiles: [jobs]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  retention:
+    image: ${API_IMAGE:-nsa-api:latest}
+    env_file: [./secrets/api.env]
+    environment: { NODE_ENV: production }
+    command: ["node", "--enable-source-maps", "dist/retention.mjs"]
+    read_only: true
+    cap_drop: [ALL]
+    networks: [internal]
+    profiles: [jobs]
+
+networks:
+  edge: {}
+  internal:
+    internal: true   # no route to the internet for the database or Redis
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}

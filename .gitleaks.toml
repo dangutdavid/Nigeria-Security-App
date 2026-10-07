@@ -25,6 +25,8 @@ regexes = [
   '''dGVzdC1vbmx5LWZpZWxkLWVuY3J5cHRpb24ta2V5ISE=''',
   '''nsa_app_local_dev''',
   '''test-secret-not-for-production''',
+  # Deliberately forged MFA challenge used to test rejection (tests/mfa.test.ts).
+  '''eyJ0IjoibWZhIn0\.forged-signature''',
   # Documented demo login PINs (1234 / 5678) — not credentials to any real system.
   '''\bPIN\s+(1234|5678)\b''',
   # Local dev Postgres URL documented in setup notes (no password, localhost).

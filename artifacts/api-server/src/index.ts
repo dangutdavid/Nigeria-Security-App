@@ -4,6 +4,7 @@ import { initAgencies } from "./lib/agencyStore";
 import { logger } from "./lib/logger";
 import { assertDatabaseRoleEnforcesRls } from "./lib/dbSafety";
 import { startHeartbeat } from "./lib/betterStack";
+import { getRedis } from "./lib/redis";
 
 const rawPort = process.env["PORT"];
 const fallbackPort = process.env["API_PORT"] ?? "8081";
@@ -17,6 +18,8 @@ if (Number.isNaN(port) || port <= 0) {
 async function start(): Promise<void> {
   // Refuse to run with tenant isolation silently disabled (production).
   await assertDatabaseRoleEnforcesRls();
+  // Connect Redis before traffic so the first requests use shared state.
+  getRedis();
   // Seed demo auth users (DB mode) before accepting traffic; never blocks on a
   // missing/unreachable database.
   await initAuth();
