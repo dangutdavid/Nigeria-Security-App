@@ -61,3 +61,8 @@ artifacts/api-server/data/
 
 # Vitest evidence-upload artifacts
 .vitest-evidence/
+
+# local dev stack state (scripts/dev-stack.sh)
+.dev-stack/
+# Salesforce CLI metadata (unrelated tooling)
+.sf/
