@@ -593,3 +593,24 @@ export const auditLogs = pgTable(
     ),
   }),
 );
+
+/**
+ * Second-factor enrolment per user (TOTP authenticator app and/or SMS).
+ * Secrets and phone numbers are AES-256-GCM encrypted by the API before they
+ * reach this table (artifacts/api-server/src/lib/fieldCrypto.ts); recovery
+ * codes are stored only as SHA-256 hashes. user_id is text so it covers every
+ * auth repository (DB users have uuid ids, synthesized demo users do not).
+ */
+export const authMfa = pgTable("auth_mfa", {
+  userId: text("user_id").primaryKey(),
+  totpSecretEnc: text("totp_secret_enc"),
+  totpPendingSecretEnc: text("totp_pending_secret_enc"),
+  totpEnabled: boolean("totp_enabled").notNull().default(false),
+  totpLastStep: integer("totp_last_step"),
+  smsPhoneEnc: text("sms_phone_enc"),
+  smsPendingPhoneEnc: text("sms_pending_phone_enc"),
+  smsEnabled: boolean("sms_enabled").notNull().default(false),
+  recoveryCodeHashes: jsonb("recovery_code_hashes").$type<string[]>().notNull().default([]),
+  enrolledAt: timestamp("enrolled_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

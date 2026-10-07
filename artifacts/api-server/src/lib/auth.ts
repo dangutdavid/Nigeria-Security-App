@@ -28,6 +28,19 @@ export interface AuthClaims {
   jti: string;
   /** Expiry as epoch milliseconds. */
   exp: number;
+  /** Authentication methods used (RFC 8176): e.g. ["pin"], ["pin","otp"]. */
+  amr?: string[];
+  /**
+   * "full" (default) or "mfa_enroll": a session that passed the PIN but whose
+   * role requires a second factor not yet enrolled. Such a token can reach only
+   * the MFA enrolment endpoints (see middlewares/mfaScope.ts).
+   */
+  scope?: "full" | "mfa_enroll";
+}
+
+export interface SignTokenOptions {
+  amr?: string[];
+  scope?: "full" | "mfa_enroll";
 }
 
 const DEMO_PIN = "1234";
@@ -121,8 +134,10 @@ export function verifyPayloadSignature(payload: string, signature: string): bool
 
 // ---- Stateless HMAC token (no session store; survives restart while secret is stable) ----
 
-export function signToken(user: AuthUser): string {
+export function signToken(user: AuthUser, options: SignTokenOptions = {}): string {
   const claims: AuthClaims = {
+    ...(options.amr ? { amr: options.amr } : {}),
+    ...(options.scope && options.scope !== "full" ? { scope: options.scope } : {}),
     sub: user.id,
     badgeNumber: user.badgeNumber,
     agency: user.agency,

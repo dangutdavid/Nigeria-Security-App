@@ -1,3 +1,4 @@
+import { runAsSystem } from "@workspace/db";
 import { notificationStore, type NotificationRecord } from "./notificationStore";
 import { sendPushToTokens, type PushMessage } from "./pushSender";
 import { logger } from "./logger";
@@ -9,13 +10,17 @@ import { logger } from "./logger";
 
 /** Push to every device registered for a user id. */
 export async function sendPushToUser(userId: string, message: PushMessage): Promise<number> {
-  const tokens = await notificationStore.listPushTokens({ userId });
+  // PRIVILEGE BOUNDARY: delivery targets OTHER users' devices (e.g. a citizen
+  // submission alerting agency phones), which the caller's RLS scope can't see.
+  // Tokens never leave the server.
+  const tokens = await runAsSystem(() => notificationStore.listPushTokens({ userId }));
   return sendPushToTokens(tokens.map((t) => t.token), message);
 }
 
 /** Push to every device registered under an agency. */
 export async function sendPushToAgency(agency: string, message: PushMessage): Promise<number> {
-  const tokens = await notificationStore.listPushTokens({ agency });
+  // PRIVILEGE BOUNDARY: see sendPushToUser.
+  const tokens = await runAsSystem(() => notificationStore.listPushTokens({ agency }));
   return sendPushToTokens(tokens.map((t) => t.token), message);
 }
 

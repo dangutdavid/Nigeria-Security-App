@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import metricsRouter from "./metrics";
 import authRouter from "./auth";
+import mfaRouter from "./mfa";
 import adminUsersRouter from "./admin-users";
 import citizenReportsRouter from "./citizen-reports";
 import reportsRouter from "./reports";
@@ -20,6 +21,8 @@ router.use(healthRouter);
 router.use(metricsRouter);
 // Auth (login/logout/me) — mounted before the MVP router's /auth/officer-login.
 router.use(authRouter);
+// Two-factor: login second step, enrolment, recovery codes, admin reset.
+router.use(mfaRouter);
 // Admin user-management endpoints (admin/super_admin only).
 router.use(adminUsersRouter);
 // Mounted before the MVP router so the mobile-aligned citizen report endpoints

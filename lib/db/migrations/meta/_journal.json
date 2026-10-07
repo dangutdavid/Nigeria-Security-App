@@ -36,6 +36,13 @@
       "when": 1791360302791,
       "tag": "0004_row_level_security",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791360946611,
+      "tag": "0005_auth_mfa",
+      "breakpoints": true
     }
   ]
 }

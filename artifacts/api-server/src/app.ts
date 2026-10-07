@@ -8,6 +8,7 @@ import { requestMetrics } from "./lib/metrics";
 import { initSentry } from "./lib/sentry";
 import { attachAuth } from "./middlewares/authMiddleware";
 import { dbContext } from "./middlewares/dbContext";
+import { enforceMfaScope } from "./middlewares/mfaScope";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler";
 import { rejectPollutedBodies, securityHeaders } from "./middlewares/securityHeaders";
 
@@ -52,6 +53,9 @@ app.use(rejectPollutedBodies);
 
 // Parse the bearer token (if any) and attach verified claims before routing.
 app.use(attachAuth);
+
+// Restricted sessions (MFA enrolment pending) may only reach enrolment.
+app.use(enforceMfaScope);
 
 // Stamp the caller's identity on its database connection (row-level security).
 app.use(dbContext);

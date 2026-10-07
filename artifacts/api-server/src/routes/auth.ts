@@ -12,6 +12,7 @@ import {
   verifyToken,
 } from "../lib/auth";
 import { recordAuditEvent } from "../lib/auditStore";
+import { createChallenge, getMfaStatusForLogin } from "../lib/mfa";
 import { consumeResetGrant, issueOtp, verifyOtp } from "../lib/otpStore";
 import { rateLimit } from "../lib/rateLimit";
 import { deliverOtp } from "../lib/pushDispatch";
@@ -66,12 +67,23 @@ router.post("/auth/login", loginLimiter, async (req, res) => {
     actorUserId: user.id,
     actorAgency: user.agency,
   });
+  // Second factor: an enrolled user gets a short-lived challenge, not a session.
+  const mfa = await getMfaStatusForLogin(user.id, user.role);
+  if (mfa.enrolled) {
+    const { challengeToken, methods } = createChallenge(user, mfa);
+    res.json({ mfaRequired: true, challengeToken, methods, smsMaskedPhone: mfa.smsMaskedPhone });
+    return;
+  }
+  // Role requires MFA but none enrolled yet: a restricted session that can
+  // only enrol (middlewares/mfaScope.ts), so the user is never locked out.
+  const enrollmentRequired = mfa.required;
   res.json({
-    token: signToken(user),
+    token: signToken(user, { amr: ["pin"], scope: enrollmentRequired ? "mfa_enroll" : "full" }),
     user,
     agency: user.agency,
     role: user.role,
-    capabilities: capabilitiesForRole(user.role),
+    capabilities: enrollmentRequired ? [] : capabilitiesForRole(user.role),
+    ...(enrollmentRequired ? { mfaEnrollmentRequired: true } : {}),
   });
 });
 
@@ -91,7 +103,7 @@ router.post("/auth/refresh", async (req, res) => {
     badgeNumber: claims.badgeNumber,
     agency: claims.agency,
     role: claims.role,
-  });
+  }, { amr: claims.amr, scope: claims.scope }); // rotation never upgrades or drops MFA state
   await revokeToken(claims);
   res.json({ token });
 });
