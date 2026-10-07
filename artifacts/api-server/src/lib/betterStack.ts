@@ -28,7 +28,7 @@ export function createBetterStackStream(): Writable {
   const token = process.env.BETTER_STACK_SOURCE_TOKEN!;
   const host = process.env.BETTER_STACK_INGEST_HOST!.replace(/^https?:\/\//, "").replace(/\/$/, "");
   const url = `https://${host}`;
-  let buffer: string[] = [];
+  const buffer: string[] = [];
   let inFlight = false;
 
   async function flush(): Promise<void> {
