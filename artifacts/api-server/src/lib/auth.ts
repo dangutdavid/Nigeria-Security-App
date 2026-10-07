@@ -4,6 +4,7 @@ import { getDb, isDbConfigured, runAsSystem, authUsers, revokedTokens, type Data
 import { hashPin, verifyPin } from "./password";
 import { getRedis } from "./redis";
 import { logger } from "./logger";
+import { capabilitiesFor } from "./permissions";
 
 export type Role = "citizen" | "officer" | "supervisor" | "commander" | "admin" | "super_admin";
 
@@ -252,17 +253,9 @@ export async function isTokenRevoked(claims: AuthClaims): Promise<boolean> {
 
 // ---- Capabilities (coarse, useful for the client; RBAC is still enforced server-side) ----
 
+/** Capabilities advertised to the client — derived from the enforced matrix. */
 export function capabilitiesForRole(role: Role): string[] {
-  if (role === "admin" || role === "super_admin") {
-    return ["report:view_all", "report:reassign", "report:update_status", "agency:dashboard", "agency:manage", "user:manage"];
-  }
-  if (role === "commander" || role === "supervisor") {
-    return ["report:view_agency", "report:update_status", "report:assign", "agency:dashboard"];
-  }
-  if (role === "officer") {
-    return ["report:view_agency", "report:update_status"];
-  }
-  return [];
+  return capabilitiesFor(role);
 }
 
 export function isAdminRole(role: Role): boolean {

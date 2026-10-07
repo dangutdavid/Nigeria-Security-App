@@ -14,11 +14,7 @@ import { notifyReassigned, notifyStatusChanged } from "../lib/notificationStore"
 import { recordAuditEvent } from "../lib/auditStore";
 import { logger } from "../lib/logger";
 import { isAdminRole } from "../lib/auth";
-import {
-  requireAdmin,
-  requireAgencyAccess,
-  requireAuth,
-} from "../middlewares/authMiddleware";
+import { requireAuth, requireCapability } from "../middlewares/authMiddleware";
 
 const router: IRouter = Router();
 
@@ -29,7 +25,7 @@ function fail(res: Response, error: unknown) {
 
 // PART 1 — All reports: admin / super_admin only.
 router.get("/reports", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!requireCapability(req, res, "report:view_all")) return;
   try {
     const reports = await citizenReportStore.list();
     res.json({ reports: reports.map(toReportPayload) });
@@ -40,7 +36,7 @@ router.get("/reports", async (req, res) => {
 
 // Per-agency report list: admins, or users of that agency only.
 router.get("/agencies/:agency/reports", async (req, res) => {
-  if (!requireAgencyAccess(req, res, req.params.agency)) return;
+  if (!requireCapability(req, res, "report:view_agency", { agency: req.params.agency })) return;
   try {
     const reports = await citizenReportStore.listByAgency(req.params.agency);
     res.json({ reports: reports.map(toReportPayload) });
@@ -51,7 +47,7 @@ router.get("/agencies/:agency/reports", async (req, res) => {
 
 // PART 2 — Agency dashboard metrics: admins, or users of that agency only.
 router.get("/agencies/:agency/dashboard", async (req, res) => {
-  if (!requireAgencyAccess(req, res, req.params.agency)) return;
+  if (!requireCapability(req, res, "agency:dashboard", { agency: req.params.agency })) return;
   try {
     const reports = await citizenReportStore.listByAgency(req.params.agency);
     res.json({ agency: req.params.agency, metrics: agencyDashboardMetrics(reports) });
@@ -82,7 +78,7 @@ router.get("/reports/:id", async (req, res) => {
 
 // PART 4 — Status update: admins, or agency users of the report's current agency.
 router.patch("/reports/:id/status", async (req, res) => {
-  const auth = requireAuth(req, res);
+  const auth = requireCapability(req, res, "report:update_status");
   if (!auth) return;
   const result = ReportStatusUpdateSchema.safeParse(req.body);
   if (!result.success) {
@@ -126,7 +122,7 @@ router.patch("/reports/:id/status", async (req, res) => {
 
 // PART 5 — Reassignment: admin / super_admin only.
 router.post("/reports/:id/reassign", async (req, res) => {
-  const adminAuth = requireAdmin(req, res);
+  const adminAuth = requireCapability(req, res, "report:reassign");
   if (!adminAuth) return;
   const result = ReportReassignSchema.safeParse(req.body);
   if (!result.success) {
@@ -164,7 +160,7 @@ router.post("/reports/:id/reassign", async (req, res) => {
 
 // PART 6 — Append a timeline entry: admins, or agency users of the report's agency.
 router.post("/reports/:id/timeline", async (req, res) => {
-  const auth = requireAuth(req, res);
+  const auth = requireCapability(req, res, "report:update_status");
   if (!auth) return;
   const result = ReportTimelineAppendSchema.safeParse(req.body);
   if (!result.success) {

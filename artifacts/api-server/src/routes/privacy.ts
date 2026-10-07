@@ -5,7 +5,7 @@ import { citizenReportStore } from "../lib/citizenReportStore";
 import { getMfaStatus } from "../lib/mfa";
 import { buildCitizenExport, buildStaffExport, eraseCitizenReport, findOwnedReport, requestCitizenErasure } from "../lib/privacy";
 import { envInt, rateLimit } from "../lib/rateLimit";
-import { requireAdmin, requireAuth } from "../middlewares/authMiddleware";
+import { requireAuth, requireCapability } from "../middlewares/authMiddleware";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -53,7 +53,7 @@ router.post("/privacy/citizen-reports/erasure-request", privacyLimiter, async (r
 
 // Admin / DPO: execute an erasure (after checking no legal hold applies).
 router.post("/admin/privacy/citizen-reports/:reference/erase", async (req, res) => {
-  const admin = requireAdmin(req, res);
+  const admin = requireCapability(req, res, "privacy:erase");
   if (!admin) return;
   const reason = z.string().trim().min(3).max(300).safeParse(req.body?.reason);
   if (!reason.success) return void res.status(400).json({ error: "A reason (e.g. erasure request id) is required." });

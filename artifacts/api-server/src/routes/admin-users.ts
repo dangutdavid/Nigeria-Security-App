@@ -9,7 +9,7 @@ import {
   type AdminUserFilter,
   type Role,
 } from "../lib/auth";
-import { requireAdmin } from "../middlewares/authMiddleware";
+import { requireCapability } from "../middlewares/authMiddleware";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -42,7 +42,7 @@ function isUniqueViolation(error: unknown): boolean {
 
 // GET /api/admin/users — list users (admin only). Never returns PIN hashes.
 router.get("/admin/users", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!requireCapability(req, res, "user:manage")) return;
   const q = req.query as Record<string, unknown>;
   const filter: AdminUserFilter = {};
   if (typeof q.agency === "string" && q.agency) filter.agency = q.agency;
@@ -60,7 +60,7 @@ router.get("/admin/users", async (req, res) => {
 
 // POST /api/admin/users — create a user (admin only).
 router.post("/admin/users", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!requireCapability(req, res, "user:manage")) return;
   const result = AdminUserCreateSchema.safeParse(req.body);
   if (!result.success) {
     res.status(400).json({ error: "Validation failed", issues: result.error.flatten() });
@@ -81,7 +81,7 @@ router.post("/admin/users", async (req, res) => {
 
 // PATCH /api/admin/users/:userId — update safe fields (admin only).
 router.patch("/admin/users/:userId", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!requireCapability(req, res, "user:manage")) return;
   const result = AdminUserUpdateSchema.safeParse(req.body);
   if (!result.success) {
     res.status(400).json({ error: "Validation failed", issues: result.error.flatten() });
@@ -102,7 +102,7 @@ router.patch("/admin/users/:userId", async (req, res) => {
 
 // DELETE /api/admin/users/:userId — deactivate (soft delete), never a hard delete.
 router.delete("/admin/users/:userId", async (req, res) => {
-  const auth = requireAdmin(req, res);
+  const auth = requireCapability(req, res, "user:manage");
   if (!auth) return;
   if (req.params.userId === auth.sub) {
     res.status(400).json({ error: "You cannot deactivate your own account." });
@@ -123,7 +123,7 @@ router.delete("/admin/users/:userId", async (req, res) => {
 
 // POST /api/admin/users/:userId/reset-pin — hash and store a new PIN (admin only).
 router.post("/admin/users/:userId/reset-pin", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!requireCapability(req, res, "user:manage")) return;
   const result = AdminUserResetPinSchema.safeParse(req.body);
   if (!result.success) {
     res.status(400).json({ error: "Validation failed", issues: result.error.flatten() });

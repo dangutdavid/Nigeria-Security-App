@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { isAdminRole, isTokenRevoked, verifyToken, type AuthClaims } from "../lib/auth";
+import { hasCapability, type Capability } from "../lib/permissions";
 
 export type AuthedRequest = Request & { auth?: AuthClaims };
 
@@ -56,6 +57,30 @@ export function requireAgencyAccess(req: Request, res: Response, agency: string)
   if (isAdminRole(auth.role)) return auth;
   if (auth.agency.toLowerCase() !== agency.trim().toLowerCase()) {
     res.status(403).json({ error: "You can only access your own agency's data." });
+    return null;
+  }
+  return auth;
+}
+
+/**
+ * Enforce a capability from the permission matrix (lib/permissions.ts). With
+ * `agency`, non-admins are additionally confined to their own agency. Sends
+ * 401/403 and returns null when denied.
+ */
+export function requireCapability(
+  req: Request,
+  res: Response,
+  capability: Capability,
+  scope: { agency?: string } = {},
+): AuthClaims | null {
+  const auth = requireAuth(req, res);
+  if (!auth) return null;
+  if (!hasCapability(auth.role, capability)) {
+    res.status(403).json({ error: "You don't have permission to do that.", code: "forbidden", capability });
+    return null;
+  }
+  if (scope.agency !== undefined && !isAdminRole(auth.role) && auth.agency.toLowerCase() !== scope.agency.trim().toLowerCase()) {
+    res.status(403).json({ error: "You can only access your own agency's data.", code: "forbidden" });
     return null;
   }
   return auth;

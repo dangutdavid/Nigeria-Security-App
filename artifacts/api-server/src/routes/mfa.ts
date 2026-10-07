@@ -18,7 +18,7 @@ import {
 } from "../lib/mfa";
 import { SmsDeliveryError } from "../lib/sms";
 import { envInt, rateLimit } from "../lib/rateLimit";
-import { getAuth, requireAdmin, requireAuth } from "../middlewares/authMiddleware";
+import { getAuth, requireAuth, requireCapability } from "../middlewares/authMiddleware";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -242,7 +242,7 @@ router.post("/auth/mfa/recovery-codes", verifyLimiter, async (req, res) => {
 // ---- Admin: reset a user's MFA (lost device) -------------------------------------
 
 router.post("/admin/users/:userId/mfa/reset", async (req, res) => {
-  const admin = requireAdmin(req, res);
+  const admin = requireCapability(req, res, "mfa:reset");
   if (!admin) return;
   try {
     await resetMfaForUser(String(req.params.userId));

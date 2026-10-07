@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Response } from "express";
 import { auditStore, type AuditSeverity } from "../lib/auditStore";
-import { requireAdmin } from "../middlewares/authMiddleware";
+import { requireCapability } from "../middlewares/authMiddleware";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -24,7 +24,7 @@ function parseFilter(req: { query: Record<string, unknown> }) {
 
 // PART 1 — Query audit events (admin only).
 router.get("/audit-logs", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!requireCapability(req, res, "audit:read")) return;
   try {
     const auditLogs = await auditStore.list(parseFilter(req));
     res.json({ auditLogs });
@@ -35,7 +35,7 @@ router.get("/audit-logs", async (req, res) => {
 
 // PART 2 — CSV export (admin only).
 router.get("/audit-logs/export", async (req, res) => {
-  if (!requireAdmin(req, res)) return;
+  if (!requireCapability(req, res, "audit:read")) return;
   try {
     const rows = await auditStore.list({ ...parseFilter(req), limit: 1000 });
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;

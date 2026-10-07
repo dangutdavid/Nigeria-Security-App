@@ -5,7 +5,7 @@ import {
   agencyStore,
 } from "../lib/agencyStore";
 import { recordAuditEvent } from "../lib/auditStore";
-import { requireAdmin } from "../middlewares/authMiddleware";
+import { requireCapability } from "../middlewares/authMiddleware";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -46,7 +46,7 @@ router.get("/agencies", async (req, res) => {
 
 // PART 2 — Create an agency registry entry (admin only).
 router.post("/agencies", async (req, res) => {
-  const auth = requireAdmin(req, res);
+  const auth = requireCapability(req, res, "agency:manage");
   if (!auth) return;
   const parsed = AgencyCreateSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -76,7 +76,7 @@ router.post("/agencies", async (req, res) => {
 
 // PART 3 — Update an agency registry entry (admin only).
 router.patch("/agencies/:agency", async (req, res) => {
-  const auth = requireAdmin(req, res);
+  const auth = requireCapability(req, res, "agency:manage");
   if (!auth) return;
   const parsed = AgencyUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
