@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { MyDataCard } from "@/components/MyDataCard";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -188,6 +189,7 @@ export default function TrackReportScreen() {
         ) : null}
 
         {report ? <ReportDetails report={report} colors={colors} /> : null}
+        {report ? <MyDataCard reference={report.reference} /> : null}
 
         <TouchableOpacity style={styles.homeButton} onPress={() => router.replace("/")}>
           <Feather name="home" size={17} color="#0F4C81" />

@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { rememberReportKey } from "@/services/myReportKeys";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
@@ -253,6 +254,9 @@ export default function CitizenIncidentReportScreen() {
       // photoUri on the report remains the offline fallback. The clientId
       // proves to the backend that this device submitted the report.
       if (photoUri) void uploadReportPhoto(result.reference, photoUri, clientIdRef.current);
+      // Keep this device's proof of ownership so the citizen can later export
+      // or request erasure of their own report (privacy screen / tracking).
+      void rememberReportKey(result.reference, clientIdRef.current);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setReceipt(result);
     } catch {
@@ -526,6 +530,12 @@ export default function CitizenIncidentReportScreen() {
               <Text style={styles.submitText}>Submit Incident Report</Text>
             </>
           )}
+        </TouchableOpacity>
+        {/* Transparency at the point of collection (GDPR Art. 13 / NDPA s.27). */}
+        <TouchableOpacity onPress={() => router.push("/privacy" as never)} accessibilityRole="link" style={{ marginTop: 12, alignItems: "center" }}>
+          <Text style={{ fontSize: 13, color: "#475569", textDecorationLine: "underline" }}>
+            How we use your information
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
