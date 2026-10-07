@@ -331,6 +331,7 @@ export default function ProfileScreen() {
             <SettingRow icon="edit-2" label="Customise Agency" subtitle="Theme colours and logo" onPress={() => router.push("/agency-customize" as any)} />
           ) : null}
           <SettingRow icon="key" label="Change PIN" subtitle="Update your login PIN" onPress={() => router.push("/change-pin")} />
+          <SettingRow icon="shield" label="Two-step verification" subtitle="Authenticator app or SMS codes" onPress={() => router.push("/security" as never)} />
           <SettingRow icon="help-circle" label="Forgot PIN" subtitle="Recover access with OTP" onPress={() => router.push("/forgot-pin")} />
           {canUseCommandTools ? (
             <SettingRow

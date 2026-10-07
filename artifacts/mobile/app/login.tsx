@@ -82,6 +82,17 @@ export default function LoginScreen() {
     setLoading(true);
     const result = await login(badge.trim(), pin.trim(), agencyId as AgencyType);
     setLoading(false);
+    if (result === "mfa_required") {
+      // PIN accepted; the second step happens on its own screen.
+      setPin("");
+      router.push("/mfa-verify" as never);
+      return;
+    }
+    if (result === "mfa_enrollment_required") {
+      // Role requires 2FA and none is set up: the session can only enrol.
+      router.replace("/security" as never);
+      return;
+    }
     if (result === "ok") {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const signedInUser = allUsers.find(

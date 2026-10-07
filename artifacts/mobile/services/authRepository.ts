@@ -20,7 +20,16 @@ export interface AuthRepositoryLocalAdapter {
 interface LoginResponse {
   user?: User;
   token?: string;
+  /** Second factor enrolled: no session yet — complete with /auth/mfa/verify. */
+  mfaRequired?: boolean;
+  challengeToken?: string;
+  methods?: MfaMethod[];
+  smsMaskedPhone?: string | null;
+  /** Role requires 2FA but none is set up: the session can only enrol. */
+  mfaEnrollmentRequired?: boolean;
 }
+
+export type MfaMethod = "totp" | "sms" | "recovery";
 
 /**
  * Result of the backend login attempt.
@@ -35,7 +44,8 @@ interface LoginResponse {
  * (genuine offline) permits the local fallback.
  */
 export type ApiSessionOutcome =
-  | { status: "ok"; user?: User; token: string }
+  | { status: "ok"; user?: User; token: string; enrollmentRequired?: boolean }
+  | { status: "mfa_required"; challengeToken: string; methods: MfaMethod[]; smsMaskedPhone: string | null }
   | { status: "rejected"; reason: "invalid" | "inactive" }
   | { status: "unreachable" };
 
@@ -53,9 +63,17 @@ export async function establishApiSession(
     // Short timeout so a slow/unreachable backend never blocks offline login.
     timeoutMs: options.timeoutMs ?? 4000,
   });
+  if (api.ok && api.data.mfaRequired && api.data.challengeToken) {
+    return {
+      status: "mfa_required",
+      challengeToken: api.data.challengeToken,
+      methods: api.data.methods ?? [],
+      smsMaskedPhone: api.data.smsMaskedPhone ?? null,
+    };
+  }
   if (api.ok && api.data.token) {
     await setMobileApiToken(api.data.token);
-    return { status: "ok", user: api.data.user, token: api.data.token };
+    return { status: "ok", user: api.data.user, token: api.data.token, enrollmentRequired: Boolean(api.data.mfaEnrollmentRequired) };
   }
   // An HTTP auth verdict (401/403) is the server exercising its authority.
   if (api.status === 401) return { status: "rejected", reason: "invalid" };

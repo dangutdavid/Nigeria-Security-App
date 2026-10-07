@@ -19,6 +19,7 @@ export default function AdminProfileScreen() {
     { icon: "users", title: "Manage Users", sub: "Onboard and suspend agency users", route: "/(admin)/users" },
     { icon: "git-pull-request", title: "Referrals", sub: "Cross-agency report referrals", route: "/(admin)/referrals" },
     { icon: "activity", title: "Audit Log", sub: "Security-sensitive activity trail", route: "/(admin)/audit" },
+    { icon: "shield", title: "Two-step verification", sub: "Authenticator app or SMS codes for your account", route: "/security" },
   ];
 
   return (

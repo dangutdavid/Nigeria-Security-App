@@ -38,6 +38,14 @@ export default function CivilDefenceProfileScreen() {
         </View>
         <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
       </TouchableOpacity>
+      <TouchableOpacity style={[styles.notificationBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.push("/security" as any)}>
+        <Feather name="shield" size={17} color={PRIMARY} />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.notificationTitle, { color: colors.text }]}>Two-step verification</Text>
+          <Text style={[styles.notificationSub, { color: colors.mutedForeground }]}>Authenticator app or SMS codes</Text>
+        </View>
+        <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
+      </TouchableOpacity>
       {canCustomizeOwnAgency ? (
         <TouchableOpacity style={[styles.notificationBtn, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => router.push("/agency-customize" as any)}>
           <Feather name="edit-2" size={17} color={PRIMARY} />

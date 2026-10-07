@@ -2,7 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 import { createAuditEvent } from "@/services/auditLogService";
-import { clearApiSession, establishApiSession, validateApiSession } from "@/services/authRepository";
+import { clearApiSession, establishApiSession, validateApiSession, type MfaMethod } from "@/services/authRepository";
+import { sendMfaSms, verifyMfa } from "@/services/mfaRepository";
 import { shouldUseApi } from "@/services/apiConfig";
 
 export type UserRole = "citizen" | "officer" | "supervisor" | "commander" | "admin" | "super_admin";
@@ -35,7 +36,11 @@ export interface AgencyDemoSeedInput {
   badgePrefix: string;
 }
 
-export type LoginResult = "ok" | "invalid" | "inactive" | "suspended";
+/**
+ * "mfa_required": PIN accepted, second factor pending — see completeMfaLogin.
+ * "mfa_enrollment_required": signed in, but the role needs 2FA set up first (enrol-only session).
+ */
+export type LoginResult = "ok" | "invalid" | "inactive" | "suspended" | "mfa_required" | "mfa_enrollment_required";
 export type OtpResult = "sent" | "not_found" | "email_mismatch";
 export type OtpVerifyResult = "ok" | "invalid" | "expired";
 
@@ -71,6 +76,22 @@ interface AuthContextType {
   requestOtp: (badgeNumber: string, email: string) => Promise<{ result: OtpResult; code?: string }>;
   verifyOtp: (badgeNumber: string, code: string) => Promise<OtpVerifyResult>;
   resetPinWithOtp: (badgeNumber: string, newPin: string) => Promise<boolean>;
+  /** Set after login() returns "mfa_required"; cleared on success/cancel. */
+  pendingMfa: PendingMfa | null;
+  completeMfaLogin: (method: MfaMethod, code: string) => Promise<{ ok: true; user: User } | { ok: false; error: string }>;
+  sendMfaSmsCode: () => Promise<{ ok: true; maskedPhone: string; devCode?: string } | { ok: false; error: string }>;
+  cancelMfa: () => void;
+  /** The signed-in role requires 2FA and none is set up yet (enrol-only session). */
+  mfaEnrollmentRequired: boolean;
+  markMfaEnrolled: () => void;
+}
+
+export interface PendingMfa {
+  challengeToken: string;
+  methods: MfaMethod[];
+  smsMaskedPhone: string | null;
+  badgeNumber: string;
+  agency?: AgencyType;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -90,6 +111,12 @@ const AuthContext = createContext<AuthContextType>({
   requestOtp: async () => ({ result: "not_found" }),
   verifyOtp: async () => "invalid",
   resetPinWithOtp: async () => false,
+  pendingMfa: null,
+  completeMfaLogin: async () => ({ ok: false, error: "Not available" }),
+  sendMfaSmsCode: async () => ({ ok: false, error: "Not available" }),
+  cancelMfa: () => {},
+  mfaEnrollmentRequired: false,
+  markMfaEnrolled: () => {},
 });
 
 const SEED_RECORDS: UserRecord[] = [
@@ -297,6 +324,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [apiSessionEstablished, setApiSessionEstablished] = useState(false);
+  const [pendingMfa, setPendingMfa] = useState<PendingMfa | null>(null);
+  const [mfaEnrollmentRequired, setMfaEnrollmentRequired] = useState(false);
   const [records, setRecords] = useState<UserRecord[]>(SEED_RECORDS);
 
   useEffect(() => {
@@ -370,6 +399,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await auditFailed(outcome.reason === "inactive" ? "server_inactive" : "server_rejected");
         return outcome.reason;
       }
+      if (outcome.status === "mfa_required") {
+        // PIN accepted; the server withholds the session until a second factor.
+        setPendingMfa({
+          challengeToken: outcome.challengeToken,
+          methods: outcome.methods,
+          smsMaskedPhone: outcome.smsMaskedPhone,
+          badgeNumber,
+          agency: agency ?? entry?.user.agency,
+        });
+        return "mfa_required";
+      }
       if (outcome.status === "ok") {
         // Server authorized. Prefer the richer local profile if present;
         // otherwise synthesize one from the server's user. The local PIN is NOT
@@ -390,6 +430,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
         setUser(user);
         setApiSessionEstablished(true);
+        setMfaEnrollmentRequired(Boolean(outcome.enrollmentRequired));
         await createAuditEvent({
           type: "auth.login",
           title: "User signed in",
@@ -398,7 +439,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           agency: user.agency,
           severity: "info",
         });
-        return "ok";
+        return outcome.enrollmentRequired ? "mfa_enrollment_required" : "ok";
       }
       // outcome.status === "unreachable" → fall through to offline local auth.
     }
@@ -429,6 +470,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       severity: "info",
     });
     return "ok";
+  }
+
+  async function completeMfaLogin(method: MfaMethod, code: string) {
+    const pending = pendingMfa;
+    if (!pending) return { ok: false as const, error: "Your sign-in expired. Please sign in again." };
+    const res = await verifyMfa(pending.challengeToken, method, code);
+    if (!res.ok) return { ok: false as const, error: res.error };
+    const entry = records.find(
+      (r) =>
+        r.user.badgeNumber.toUpperCase() === pending.badgeNumber.toUpperCase() &&
+        (!pending.agency || r.user.agency === pending.agency),
+    );
+    const signedIn = entry?.user ?? apiUserToUser(res.data.user, pending.badgeNumber, pending.agency);
+    if (!signedIn) return { ok: false as const, error: "Account profile not found." };
+    await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(signedIn));
+    setUser(signedIn);
+    setApiSessionEstablished(true);
+    setMfaEnrollmentRequired(false);
+    setPendingMfa(null);
+    await createAuditEvent({
+      type: "auth.login",
+      title: "User signed in (two-factor)",
+      detail: `${signedIn.name} signed in to ${signedIn.agency} with ${method}.`,
+      actor: { id: signedIn.id, name: signedIn.name, agency: signedIn.agency, role: signedIn.role },
+      agency: signedIn.agency,
+      severity: "info",
+    });
+    return { ok: true as const, user: signedIn };
+  }
+
+  async function sendMfaSmsCode() {
+    if (!pendingMfa) return { ok: false as const, error: "Your sign-in expired. Please sign in again." };
+    const res = await sendMfaSms(pendingMfa.challengeToken);
+    return res.ok ? { ok: true as const, ...res.data } : { ok: false as const, error: res.error };
   }
 
   async function logout() {
@@ -672,6 +747,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user, isLoading, apiSessionEstablished, login, logout,
+      pendingMfa, completeMfaLogin, sendMfaSmsCode, cancelMfa: () => setPendingMfa(null),
+      mfaEnrollmentRequired, markMfaEnrolled: () => setMfaEnrollmentRequired(false),
       allUsers, addUser, updateUser, deleteUser, resetPin, getUserById,
       mergeApiUsers, ensureAgencyDemoUsers, requestOtp, verifyOtp, resetPinWithOtp,
     }}>

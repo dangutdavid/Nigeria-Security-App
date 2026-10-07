@@ -76,6 +76,7 @@ export default function VIOProfile() {
       : []),
     { icon: isDark ? "moon" : "sun", label: "Dark Mode", sub: isDark ? "On" : "Off", toggle: true, toggled: isDark, onToggle: toggleTheme },
     { icon: "lock", label: "Change PIN", sub: "Update your security PIN", onPress: () => router.push("/change-pin" as any) },
+    { icon: "shield", label: "Two-step verification", sub: "Authenticator app or SMS codes", onPress: () => router.push("/security" as any) },
     { icon: "log-out", label: loggingOut ? "Signing out…" : "Sign Out", sub: "Return to agency selection", onPress: handleLogout, destructive: true },
   ];
 

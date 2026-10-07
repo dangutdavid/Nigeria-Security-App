@@ -55,6 +55,26 @@ describe("establishApiSession — server is the login authority", () => {
     expect(outcome.status).toBe("unreachable");
   });
 
+  it("returns mfa_required (and stores no token) when the server asks for a second factor", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true, status: 200, fromApi: true,
+      data: { mfaRequired: true, challengeToken: "challenge.sig", methods: ["totp", "recovery"], smsMaskedPhone: null },
+    } as never);
+    const outcome = await establishApiSession("SV-042", "1234", "frsc");
+    expect(outcome).toEqual({ status: "mfa_required", challengeToken: "challenge.sig", methods: ["totp", "recovery"], smsMaskedPhone: null });
+    expect(setMobileApiToken).not.toHaveBeenCalled();
+  });
+
+  it("flags an enrol-only session when the role requires 2FA that isn't set up", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true, status: 200, fromApi: true,
+      data: { token: "restricted", user: { id: "u2", role: "supervisor" }, mfaEnrollmentRequired: true },
+    } as never);
+    const outcome = await establishApiSession("SV-042", "1234", "frsc");
+    expect(outcome).toMatchObject({ status: "ok", enrollmentRequired: true });
+    expect(setMobileApiToken).toHaveBeenCalledWith("restricted");
+  });
+
   it("returns unreachable when API mode is disabled (never calls the network)", async () => {
     useApiMock.mockReturnValue(false);
     const outcome = await establishApiSession("FO-001", "1234", "frsc");

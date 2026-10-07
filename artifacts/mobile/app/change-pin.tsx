@@ -20,7 +20,7 @@ export default function ChangePinScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, login, resetPin } = useAuth();
+  const { user, login, resetPin, cancelMfa } = useAuth();
 
   const [currentPin, setCurrentPin] = useState("");
   const [newPin, setNewPin] = useState("");
@@ -55,7 +55,12 @@ export default function ChangePinScreen() {
     setSaving(true);
     // Verify current PIN by attempting login
     const result = await login(user?.badgeNumber ?? "", currentPin);
-    if (result !== "ok") {
+    // With two-step verification on, a correct PIN yields "mfa_required" (the
+    // server accepted the PIN and asked for the second step) — that still
+    // proves the current PIN. Drop the pending challenge; we're not signing in.
+    const pinAccepted = result === "ok" || result === "mfa_required" || result === "mfa_enrollment_required";
+    if (result === "mfa_required") cancelMfa();
+    if (!pinAccepted) {
       setSaving(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert("Incorrect PIN", "Your current PIN is incorrect.");
