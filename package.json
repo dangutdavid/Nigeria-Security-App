@@ -48,23 +48,11 @@
     "auditConfig": {
       "ignoreGhsas": [
         "GHSA-c2c7-rcm5-vvqj",
-        "GHSA-q3j6-qgpj-74h6",
-        "GHSA-v39h-62p7-jpjc",
         "GHSA-w7jw-789q-3m8p",
-        "GHSA-vxpw-j846-p89q",
-        "GHSA-3jxr-9vmj-r5cp",
-        "GHSA-52cp-r559-cp3m",
-        "GHSA-23hp-3jrh-7fpw",
-        "GHSA-8x88-c5mf-7j5w",
         "GHSA-395f-4hp3-45gv",
-        "GHSA-v2hh-gcrm-f6hx",
-        "GHSA-4c8g-83qw-93j6",
-        "GHSA-6g55-p6wh-862q",
-        "GHSA-mh99-v99m-4gvg",
         "GHSA-5p2g-fcmc-qvqq",
         "GHSA-w3rx-r6r6-pgpr",
-        "GHSA-86w9-cpqp-85rv",
-        "GHSA-vfj7-8cjw-p6xm"
+        "GHSA-86w9-cpqp-85rv"
       ]
     }
   }
